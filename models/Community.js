@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
 
 const communitySchema = new mongoose.Schema(
   {
@@ -30,6 +29,12 @@ const communitySchema = new mongoose.Schema(
       ref: "User",
       default: [],
     },
+    creator_limit: {
+      type: Number,
+      default: 10,
+      min: 1,
+      max: 10000,
+    },
     long_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: "LongVideo",
@@ -52,10 +57,6 @@ const communitySchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
-    // is_private: {
-    //   type: Boolean,
-    //   default: false,
-    // },
   },
   { timestamps: true }
 );
