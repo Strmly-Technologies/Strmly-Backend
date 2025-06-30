@@ -49,7 +49,7 @@ const longVideoSchema = new mongoose.Schema(
           episode: { type: Number, required: true },
         },
       ],
-      required: true,
+      default: [],
     },
     age_restriction: {
       type: Boolean,

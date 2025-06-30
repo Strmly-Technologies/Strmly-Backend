@@ -1,7 +1,8 @@
- const User = require("../models/User");
+const User = require("../models/User");
 const { generateToken } = require("../utils/jwt");
+const { handleError } = require("../utils/utils");
 
-const RegisterNewUser = async (req, res) => {
+const RegisterNewUser = async (req, res, next) => {
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
@@ -34,12 +35,11 @@ const RegisterNewUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error registering user:", error);
-    res.status(500).json({ message: "Internal server error" });
+    handleError(error, req, res, next);
   }
 };
 
-const LoginUserWithEmail = async (req, res) => {
+const LoginUserWithEmail = async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -69,12 +69,11 @@ const LoginUserWithEmail = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error logging in user:", error);
-    res.status(500).json({ message: "Internal server error" });
+    handleError(error, req, res, next);
   }
 };
 
-const LoginUserWithUsername = async (req, res) => {
+const LoginUserWithUsername = async (req, res, next) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -104,8 +103,7 @@ const LoginUserWithUsername = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error logging in user:", error);
-    res.status(500).json({ message: "Internal server error" });
+    handleError(error, req, res, next);
   }
 };
 
@@ -114,7 +112,7 @@ const LogoutUser = (req, res) => {
   res.status(200).json({ message: "User logged out successfully" });
 };
 
-const GetCurrentUser = async (req, res) => {
+const GetCurrentUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
     res.status(200).json({
@@ -122,12 +120,11 @@ const GetCurrentUser = async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error("Error getting user profile:", error);
-    res.status(500).json({ message: "Internal server error" });
+    handleError(error, req, res, next);
   }
 };
 
-const RefreshToken = async (req, res) => {
+const RefreshToken = async (req, res, next) => {
   try {
     const token = generateToken(req.user._id);
 
@@ -141,8 +138,7 @@ const RefreshToken = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error refreshing token:", error);
-    res.status(500).json({ message: "Internal server error" });
+    handleError(error, req, res, next);
   }
 };
 

@@ -26,12 +26,12 @@ const userSchema = new mongoose.Schema(
     },
     saved_items: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Item",
+      ref: "Community",
       default: [],
     },
     saved_videos: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Video",
+      ref: "LongVideo",
       default: [],
     },
     profile_photo: {
@@ -60,12 +60,12 @@ const userSchema = new mongoose.Schema(
     },
     playlist: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Video",
+      ref: "LongVideo",
       default: [],
     },
     history: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Video",
+      ref: "LongVideo",
       default: [],
     },
     bio: {
@@ -76,12 +76,12 @@ const userSchema = new mongoose.Schema(
     },
     liked_videos: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Video",
+      ref: "LongVideo",
       default: [],
     },
     video_frame: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Video",
+      ref: "LongVideo",
       default: [],
     },
   },

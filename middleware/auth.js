@@ -20,7 +20,7 @@ const authenticateToken = async (req, res, next) => {
       return res.status(403).json({ message: "User not found" });
     }
 
-    req.user = user;
+    req.user = { ...user.toObject(), id: user._id };
     next();
   } catch (error) {
     console.error("Authentication error:", error);
