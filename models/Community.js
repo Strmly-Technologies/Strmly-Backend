@@ -6,7 +6,7 @@ const communitySchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      // unique: true,
+      unique: true,
       trim: true,
       minlength: 2,
       maxlength: 20,
@@ -46,6 +46,16 @@ const communitySchema = new mongoose.Schema(
       trim: true,
       maxlength: 500,
     },
+    tags: {
+      type: [String],
+      default: [],
+      trim: true,
+      maxlength: 100,
+    },
+    // is_private: {
+    //   type: Boolean,
+    //   default: false,
+    // },
   },
   { timestamps: true }
 );
