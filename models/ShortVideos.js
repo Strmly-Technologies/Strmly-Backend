@@ -60,4 +60,6 @@ const shortVideoSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = shortVideoSchema;
+const ShortVideo = mongoose.model("ShortVideo", shortVideoSchema);
+
+module.exports = ShortVideo;

@@ -103,4 +103,6 @@ const longVideoSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = longVideoSchema;
+const LongVideo = mongoose.model("LongVideo", longVideoSchema);
+
+module.exports = LongVideo;
