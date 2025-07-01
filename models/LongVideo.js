@@ -22,6 +22,10 @@ const longVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    views: {
+      type: Number,
+      default: 0,
+    },
     comments: {
       type: [
         {
@@ -42,14 +46,22 @@ const longVideoSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    series_episode: {
-      type: [
-        {
-          series: { type: mongoose.Schema.Types.ObjectId, ref: "Series" },
-          episode: { type: Number, required: true },
-        },
-      ],
-      default: [],
+    series: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Series",
+      default: null,
+    },
+    episode_number: {
+      type: Number,
+      default: null,
+    },
+    season_number: {
+      type: Number,
+      default: 1,
+    },
+    is_standalone: {
+      type: Boolean,
+      default: true,
     },
     age_restriction: {
       type: Boolean,
@@ -102,6 +114,25 @@ const longVideoSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+longVideoSchema.index({ community: 1, genre: 1 });
+longVideoSchema.index({ series: 1, season_number: 1, episode_number: 1 });
+longVideoSchema.index({ created_by: 1 });
+longVideoSchema.index({ is_standalone: 1 });
+longVideoSchema.index({ name: "text", description: "text" });
+
+longVideoSchema.pre("save", function (next) {
+  if (!this.is_standalone) {
+    if (!this.series || !this.episode_number) {
+      return next(new Error("Series and episode number are required for non-standalone videos"));
+    }
+  } else {
+    this.series = null;
+    this.episode_number = null;
+    this.season_number = 1;
+  }
+  next();
+});
 
 const LongVideo = mongoose.model("LongVideo", longVideoSchema);
 

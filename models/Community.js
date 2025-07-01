@@ -45,6 +45,11 @@ const communitySchema = new mongoose.Schema(
       ref: "ShortVideo",
       default: [],
     },
+    series: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Series",
+      default: [],
+    },
     bio: {
       type: String,
       default: "",

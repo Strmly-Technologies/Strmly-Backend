@@ -22,6 +22,10 @@ const shortVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    views: {
+      type: Number,
+      default: 0,
+    },
     comments: {
       type: [
         {
@@ -59,6 +63,10 @@ const shortVideoSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+shortVideoSchema.index({ community: 1 });
+shortVideoSchema.index({ created_by: 1 });
+shortVideoSchema.index({ name: "text", description: "text" });
 
 const ShortVideo = mongoose.model("ShortVideo", shortVideoSchema);
 

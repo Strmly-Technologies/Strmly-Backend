@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema(
       ref: "LongVideo",
       default: [],
     },
+    saved_series: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Series",
+      default: [],
+    },
     profile_photo: {
       type: String,
       default: "",
