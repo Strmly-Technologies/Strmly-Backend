@@ -25,7 +25,7 @@ const userAccessSchema=new mongoose.Schema({
     payment_id:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"Payment",
-        requireed:function(){
+        required:function(){
             return this.access_type==='paid';
         }
     },
