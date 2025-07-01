@@ -34,7 +34,7 @@ const paymentSchema=new mongoose.Schema({
     },
     payment_for:{
         type:String,
-        requuired:true,
+        required:true,
         enum:["series","standalone_video","subscription"],
         default:"series"
     },
