@@ -9,6 +9,7 @@ const userRoutes = require("./routes/user.routes");
 const communityRoutes = require("./routes/community.routes");
 const interactionRoutes = require("./routes/interaction.routes");
 const cautionRoutes = require("./routes/caution.routes");
+const searchRoutes = require("./routes/search.routes");
 const cors = require("cors");
 const validateEnv = require("./config/validateEnv");
 const { testS3Connection } = require("./utils/connection_testing");
@@ -32,6 +33,7 @@ app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/community", communityRoutes);
 app.use("/api/v1/interaction", interactionRoutes);
 app.use("/api/v1/caution", cautionRoutes);
+app.use("/api/v1/search", searchRoutes);
 
 app.get("/health", (req, res) => {
   res.send("Server is healthy");
