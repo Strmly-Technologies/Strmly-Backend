@@ -3,9 +3,12 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/database");
 const authRoutes = require("./routes/auth.routes");
 const videoRoutes = require("./routes/video.routes");
+const seriesRoutes = require("./routes/series.routes");
+const shortsRoutes = require("./routes/shorts.routes");
 const userRoutes = require("./routes/user.routes");
 const communityRoutes = require("./routes/community.routes");
 const interactionRoutes = require("./routes/interaction.routes");
+const cautionRoutes = require("./routes/caution.routes");
 const cors = require("cors");
 const validateEnv = require("./config/validateEnv");
 const { testS3Connection } = require("./utils/connection_testing");
@@ -23,9 +26,12 @@ const PORT = process.env.PORT;
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/videos", videoRoutes);
+app.use("/api/v1/series", seriesRoutes);
+app.use("/api/v1/shorts", shortsRoutes);
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/community", communityRoutes);
 app.use("/api/v1/interaction", interactionRoutes);
+app.use("/api/v1/caution", cautionRoutes);
 
 app.get("/health", (req, res) => {
   res.send("Server is healthy");
