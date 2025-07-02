@@ -87,59 +87,6 @@ const FollowCommunity = async (req, res, next) => {
   }
 };
 
-const AddLongVideoToCommunity = async (req, res, next) => {
-  const { communityId, videoId } = req.body;
-
-  const userId = req.user.id;
-  if (!communityId || !videoId) {
-    return res.status(400).json({ message: "Community ID and video ID are required" });
-  }
-
-  try {
-    const community = await Community.findById(communityId);
-    if (!community) {
-      return res.status(404).json({ message: "Community not found" });
-    }
-    if (!community.followers.includes(userId) && !community.founder.equals(userId)) {
-      return res.status(403).json({ message: "You are not a follower of this community" });
-    }
-
-    community.long_videos.push(videoId);
-    await community.save();
-
-    res.status(200).json({ message: "Video added to community successfully", community });
-  } catch (error) {
-    handleError(error, req, res, next);
-  }
-};
-
-const AddShortVideoToCommunity = async (req, res, next) => {
-  const { communityId, videoId } = req.body;
-  const userId = req.user.id;
-
-  if (!communityId || !videoId) {
-    return res.status(400).json({ message: "Community ID and video ID are required" });
-  }
-
-  try {
-    const community = await Community.findById(communityId);
-    if (!community) {
-      return res.status(404).json({ message: "Community not found" });
-    }
-
-    if (!community.followers.includes(userId) && !community.founder.equals(userId)) {
-      return res.status(403).json({ message: "You are not a follower of this community" });
-    }
-
-    community.short_videos.push(videoId);
-    await community.save();
-
-    res.status(200).json({ message: "Video added to community successfully", community });
-  } catch (error) {
-    handleError(error, req, res, next);
-  }
-};
-
 const AddBioToCommunity = async (req, res, next) => {
   const { communityId, bio } = req.body;
   const userId = req.user.id;
@@ -165,8 +112,6 @@ module.exports = {
   FollowCommunity,
   CreateCommunity,
   RenameCommunity,
-  AddLongVideoToCommunity,
-  AddShortVideoToCommunity,
   ChangeCommunityProfilePhoto,
   AddBioToCommunity,
 };
