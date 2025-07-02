@@ -1,78 +1,107 @@
-const Video = require("../models/video.model");
+const LongVideo = require("../models/LongVideo");
+const ShortVideo = require("../models/ShortVideos");
 const { handleError } = require("../utils/utils");
 
 const LikeVideo = async (req, res, next) => {
-  const { videoId } = req.body;
+  const { videoId, videoType } = req.body;
   const userId = req.user.id;
 
-  if (!videoId) {
-    return res.status(400).json({ message: "Video ID is required" });
+  if (!videoId || !videoType) {
+    return res.status(400).json({ message: "Video ID and video type are required" });
+  }
+
+  if (!["long", "short"].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long' or 'short'" });
   }
 
   try {
-    const video = await Video.findById(videoId);
+    const VideoModel = videoType === "long" ? LongVideo : ShortVideo;
+    const video = await VideoModel.findById(videoId);
+
     if (!video) {
       return res.status(404).json({ message: "Video not found" });
     }
 
-    if (video.likes.includes(userId)) {
-      return res.status(400).json({ message: "You have already liked this video" });
-    }
-
-    video.likes.push(userId);
+    video.likes += 1;
     await video.save();
 
-    res.status(200).json({ message: "Video liked successfully", likes: video.likes.length });
+    const user = await User.findById(userId);
+    if (!user.likedVideos.includes(videoId)) {
+      user.likedVideos.push(videoId);
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Video liked successfully", likes: video.likes });
   } catch (error) {
     handleError(error, req, res, next);
   }
 };
 
 const ShareVideo = async (req, res, next) => {
-  const { videoId } = req.body;
+  const { videoId, videoType } = req.body;
   const userId = req.user.id;
 
-  if (!videoId) {
-    return res.status(400).json({ message: "Video ID is required" });
+  if (!videoId || !videoType) {
+    return res.status(400).json({ message: "Video ID and video type are required" });
+  }
+
+  if (!["long", "short"].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long' or 'short'" });
   }
 
   try {
-    const video = await Video.findById(videoId);
+    const VideoModel = videoType === "long" ? LongVideo : ShortVideo;
+    const video = await VideoModel.findById(videoId);
+
     if (!video) {
       return res.status(404).json({ message: "Video not found" });
     }
 
-    if (video.shares.includes(userId)) {
-      return res.status(400).json({ message: "You have already shared this video" });
-    }
-
-    video.shares.push(userId);
+    video.shares += 1;
     await video.save();
 
-    res.status(200).json({ message: "Video shared successfully", shares: video.shares.length });
+    const user = await User.findById(userId);
+    if (!user.sharedVideos.includes(videoId)) {
+      user.sharedVideos.push(videoId);
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Video shared successfully", shares: video.shares });
   } catch (error) {
     handleError(error, req, res, next);
   }
 };
 
 const CommentOnVideo = async (req, res, next) => {
-  const { videoId, comment } = req.body;
+  const { videoId, videoType, comment } = req.body;
   const userId = req.user.id;
 
-  if (!videoId || !comment) {
-    return res.status(400).json({ message: "Video ID and comment are required" });
+  if (!videoId || !videoType || !comment) {
+    return res.status(400).json({ message: "Video ID, video type, and comment are required" });
+  }
+
+  if (!["long", "short"].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long' or 'short'" });
   }
 
   try {
-    const video = await Video.findById(videoId);
+    const VideoModel = videoType === "long" ? LongVideo : ShortVideo;
+    const video = await VideoModel.findById(videoId);
+
     if (!video) {
       return res.status(404).json({ message: "Video not found" });
     }
 
-    video.comments.push({ userId, comment });
+    video.comments.push({ user: userId, comment });
     await video.save();
 
-    res.status(200).json({ message: "Comment added successfully", comments: video.comments });
+    const user = await User.findById(userId);
+    if (!user.commentedVideos.includes(videoId)) {
+      user.commentedVideos.push(videoId);
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Comment added successfully", comments: video.comments.length });
   } catch (error) {
     handleError(error, req, res, next);
   }

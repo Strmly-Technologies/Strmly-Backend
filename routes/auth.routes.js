@@ -21,9 +21,6 @@ router.post("/login/username", LoginUserWithUsername);
 // Logout a user
 router.post("/logout", LogoutUser);
 
-// Get current user profile (protected route)
-router.get("/profile", authenticateToken, GetCurrentUser);
-
 // Refresh JWT token (protected route)
 router.post("/refresh", authenticateToken, RefreshToken);
 

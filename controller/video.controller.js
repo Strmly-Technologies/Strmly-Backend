@@ -1,5 +1,6 @@
 const ShortVideo = require("../models/ShortVideos");
 const User = require("../models/User");
+const Community = require("../models/Community");
 const { uploadVideoToS3, handleError } = require("../utils/utils");
 const LongVideo = require("../models/LongVideo");
 const Series = require("../models/Series");
@@ -9,11 +10,13 @@ const uploadVideo = async (req, res, next) => {
     const videoType = req.videoType;
     const videoFile = req.file;
     const userId = req.user.id;
-    const { name, description, genre, type, language, age_restriction } = req.body;
+    const { name, description, genre, type, language, age_restriction, communityId } = req.body;
+
     if (!userId) {
       console.error(" User ID not found in request");
       return res.status(400).json({ error: "User ID is required" });
     }
+
     if (!videoFile) {
       console.error(" No video file found in request");
       return res.status(400).json({ error: "No video file uploaded" });
@@ -23,6 +26,22 @@ const uploadVideo = async (req, res, next) => {
       console.error(" No video type found in request");
       return res.status(400).json({ error: "Video type is required. Use ?type=short or ?type=long" });
     }
+
+    if (!communityId) {
+      return res.status(400).json({ error: "Community ID is required for all videos" });
+    }
+
+    if (communityId) {
+      const community = await Community.findById(communityId);
+      if (!community) {
+        return res.status(404).json({ error: "Community not found" });
+      }
+
+      if (!community.followers.includes(userId) && !community.founder.equals(userId)) {
+        return res.status(403).json({ error: "You must be a follower or founder of the community to upload videos" });
+      }
+    }
+
     const user = await User.findById(userId).select("-password");
     if (!user) {
       console.error(" User not found:", userId);
@@ -37,6 +56,7 @@ const uploadVideo = async (req, res, next) => {
         details: uploadResult.error || "Failed to upload video to S3",
       });
     }
+
     let savedVideo;
     if (videoType === "short") {
       const shortVideo = {
@@ -45,6 +65,7 @@ const uploadVideo = async (req, res, next) => {
         videoUrl: uploadResult.url,
         created_by: userId,
         updated_by: userId,
+        community: communityId,
       };
       savedVideo = new ShortVideo(shortVideo);
     } else if (videoType === "long") {
@@ -54,8 +75,9 @@ const uploadVideo = async (req, res, next) => {
         videoUrl: uploadResult.url,
         created_by: userId,
         updated_by: userId,
+        community: communityId,
         thumbnailUrl: "",
-        genre: genre || "Uncategorized",
+        genre: genre || "Action",
         type: type || "Free",
         age_restriction: age_restriction === "true" || age_restriction === true || false,
         language: language || "English",
@@ -63,7 +85,15 @@ const uploadVideo = async (req, res, next) => {
       };
       savedVideo = new LongVideo(longVideo);
     }
+
     await savedVideo.save();
+
+    if (videoType === "short") {
+      await Community.findByIdAndUpdate(communityId, { $push: { short_videos: savedVideo._id } });
+    } else if (videoType === "long") {
+      await Community.findByIdAndUpdate(communityId, { $push: { long_videos: savedVideo._id } });
+    }
+
     res.status(200).json({
       message: "Video uploaded successfully",
       videoType: videoType,
@@ -75,7 +105,7 @@ const uploadVideo = async (req, res, next) => {
       fileSize: videoFile.size,
 
       videoId: savedVideo._id,
-
+      
       videoData: {
         name: savedVideo.name,
         description: savedVideo.description,
