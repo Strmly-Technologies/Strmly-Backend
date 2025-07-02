@@ -1,4 +1,5 @@
-const Video = require("../models/video.model");
+const LongVideo = require("../models/LongVideo");
+const ShortVideo = require("../models/ShortVideos");
 const { handleError } = require("../utils/utils");
 
 const LikeVideo = async (req, res, next) => {
@@ -10,7 +11,12 @@ const LikeVideo = async (req, res, next) => {
   }
 
   try {
-    const video = await Video.findById(videoId);
+    let video = await ShortVideo.findById(videoId);
+
+    if (!video) {
+      video = await LongVideo.findById(videoId);
+    }
+
     if (!video) {
       return res.status(404).json({ message: "Video not found" });
     }
