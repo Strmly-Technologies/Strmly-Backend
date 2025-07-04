@@ -27,11 +27,7 @@ const uploadVideo = async (req, res, next) => {
       return res.status(400).json({ error: "Video type is required. Use ?type=short or ?type=long" });
     }
 
-    if (!communityId) {
-      return res.status(400).json({ error: "Community ID is required for all videos" });
-    }
-
-    if (communityId) {
+     if (communityId) {
       const community = await Community.findById(communityId);
       if (!community) {
         return res.status(404).json({ error: "Community not found" });
@@ -76,7 +72,7 @@ const uploadVideo = async (req, res, next) => {
         created_by: userId,
         updated_by: userId,
         community: communityId,
-        thumbnailUrl: "",
+        thumbnailUrl: "xyz.jpg", //TODO: Replace with actual thumbnail upload logic
         genre: genre || "Action",
         type: type || "Free",
         age_restriction: age_restriction === "true" || age_restriction === true || false,

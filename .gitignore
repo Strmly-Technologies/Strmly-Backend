@@ -3,3 +3,6 @@ node_modules/
 .DS_Store
 
 .env
+
+test-short.mp4
+test-long.mp4

@@ -8,6 +8,7 @@ const UserAccess = require('../models/UserAccess');
 const Series = require('../models/Series');
 const User = require('../models/User');
 const { handleError } = require('../utils/utils');
+const LongVideo = require('../models/LongVideo');
 
 const generateShortReceipt = (prefix, userId) => {
   const shortUserId = userId.toString().slice(-8);
@@ -495,7 +496,273 @@ const transferToCreatorForSeries = async (req, res, next) => {
   }
 };
 
+// const transferToCreatorForVideo = async (req, res, next) => {
+
+//   const{videoId,amount,transferNote}=req.body;
+//   const buyer_id= req.user.id;
+//   // Validate input
+//   if (!videoId || !amount) {
+//     return res.status(400).json({
+//       error: "Video ID and amount are required"
+//     });
+//   }
+//    const video=await LongVideo.findById(videoId).populate('created_by', 'username email');
+//   if (!video) {
+//     return res.status(404).json({ error: "Video not found" });
+//   }
+//   const creatorId = video.created_by._id;
+//   if (video.type !== "Paid") {
+//     return res.status(400).json({ error: "This video is free to watch" });
+//   }
+//   // Check if user already has access
+//   const existsingAccess=await UserAccess.findOne({
+//     user_id: buyer_id,
+//     content_id: videoId,
+//     content_type:"standalone_video"
+//   });
+//   if (existsingAccess) {
+//     return res.status(400).json({ error: "You already have access to this video" });
+//   }
+//   // Check if user is the creator
+//   if (creatorId.toString() === buyer_id) {
+//     return res.status(400).json({ error: "You cannot buy your own video" });
+//   }
+
+//   //get buyter and creator wallets
+//   const buyerWallet=await getOrCreateWallet(buyer_id, 'user');
+//   const creatorWallet=await getOrCreateWallet(creatorId, 'creator');
+
+//   // Check buyer wallet status and balance
+//   if (buyerWallet.status !== 'active') {
+//     return res.status(400).json({ error: "Your wallet is not active" });
+//   }
+//   if (buyerWallet.balance < amount) {
+//     return res.status(400).json({
+//       error: "Insufficient wallet balance",
+//       currentBalance: buyerWallet.balance,
+//       requiredAmount: amount,
+//       shortfall: amount - buyerWallet.balance,
+//       suggestion: "Please load more money to your wallet"
+//     });
+//   }
+//   // Check creator wallet status
+//   if (creatorWallet.status !== 'active') {
+//     return res.status(400).json({ error: "Creator's wallet is not active" });
+//   }
+
+//   //70/30 split
+//   const platformFeePercentage = 30;
+//   const creatorSharePercentage = 70;
+//   const platformAmount = Math.floor(amount * (platformFeePercentage / 100));
+//   const creatorAmount = amount - platformAmount;
+//   console.log(`💰 Revenue Split: Total: ₹${amount}, Creator: ₹${creatorAmount} (70%), Platform: ₹${platformAmount} (30%)`)
+  
+//   const session = await mongoose.startSession();
+//   const buyerBalanceBefore = buyerWallet.balance;
+//   const creatorBalanceBefore = creatorWallet.balance;
+//   const result = await session.withTransaction(async () => {
+//     // Calculate balances
+//     const buyerBalanceAfter = buyerBalanceBefore - amount;
+//     const creatorBalanceAfter = creatorBalanceBefore + creatorAmount;
+
+//     // Create wallet transfer record with 70/30 split
+//     const walletTransfer = new WalletTransfer({
+//       sender_id: buyer_id,
+//       receiver_id: creatorId,
+//       sender_wallet_id: buyerWallet._id,
+//       receiver_wallet_id: creatorWallet._id,
+//       total_amount: amount,
+//       creator_amount: creatorAmount,
+//       platform_amount: platformAmount,
+//       currency: 'INR',
+//       transfer_type: 'video_purchase',
+//       content_id: videoId,
+//       content_type: 'standalone_video',
+//       description: `Purchased video: ${video.title}`,
+//       sender_balance_before: buyerBalanceBefore,
+//       sender_balance_after: buyerBalanceAfter,
+//       receiver_balance_before: creatorBalanceBefore,
+//       receiver_balance_after: creatorBalanceAfter,
+//       platform_fee_percentage: platformFeePercentage,
+//       creator_share_percentage: creatorSharePercentage,
+//       status: 'completed',
+//       metadata: {
+//         video_title: video.title,
+//         creator_name: video.created_by.username,
+//         transfer_note: transferNote || '',
+//         commission_calculation: {
+//           total_amount: amount,
+//           platform_fee: platformAmount,
+//           creator_share: creatorAmount
+//         }
+//       }
+//     });
+
+//     await walletTransfer.save({ session });
+
+//     // Update buyer wallet
+//     buyerWallet.balance = buyerBalanceAfter;
+//     buyerWallet.total_spent += amount;
+//     buyerWallet.last_transaction_at = new Date();
+//     await buyerWallet.save({ session });
+
+//     // Update creator wallet (only 70% goes to creator wallet)
+//     creatorWallet.balance = creatorBalanceAfter;
+//     creatorWallet.total_received += creatorAmount;
+//     creatorWallet.last_transaction_at = new Date();
+//     await creatorWallet.save({ session });
+
+//     // Create buyer's wallet transaction record
+//     const buyerTransaction = new WalletTransaction({
+//       wallet_id: buyerWallet._id,
+//       user_id: buyer_id,
+//       transaction_type: 'debit',
+//       transaction_category: 'video_purchase',
+//       amount: amount,
+//       currency: 'INR',
+//       description: `Purchased video: ${video.title} (Total: ₹${amount})`,
+//       balance_before: buyerBalanceBefore,
+//       balance_after: buyerBalanceAfter,
+//       content_id: videoId,
+//       content_type: 'standalone_video',
+//       status: 'completed',
+//       metadata: {
+//         video_title: video.title,
+//         creator_name: video.created_by.username,
+//         transfer_id: walletTransfer._id,
+//         platform_fee: platformAmount,
+//         creator_share: creatorAmount
+//       }
+//     });
+//     await buyerTransaction.save({ session });
+
+//     // Create creator's wallet transaction record (70% share)
+//     const creatorTransaction = new WalletTransaction({
+//       wallet_id: creatorWallet._id,
+//       user_id: creatorId,
+//       transaction_type: 'credit',
+//       transaction_category: 'creator_earning',
+//       amount: creatorAmount,
+//       currency: 'INR',
+//       description: `Received 70% share for video: ${video.title} (₹${creatorAmount} of ₹${amount})`,
+//       balance_before: creatorBalanceBefore,
+//       balance_after: creatorBalanceAfter,
+//       content_id: videoId,
+//       content_type: 'standalone_video',
+//       status: 'completed',
+//       metadata: {
+//         video_title: video.title,
+//         buyer_name: req.user.username,
+//         transfer_id: walletTransfer._id,
+//         total_amount: amount,
+//         creator_share: creatorAmount,
+//         platform_fee: platformAmount
+//       }
+//     });
+//     await creatorTransaction.save({ session });
+//     const platformTransaction = new WalletTransaction({
+//       wallet_id: buyerWallet._id, 
+//       user_id: buyer_id,
+//       transaction_type: 'debit', 
+//       transaction_category: 'platform_commission',
+//       amount: platformAmount,
+//       currency: 'INR',
+//       description: `Platform commission (30%) for video: ${video.title}`,
+//       balance_before: buyerBalanceBefore,
+//       balance_after: buyerBalanceAfter, 
+//       content_id: videoId,
+//       content_type: 'standalone_video',
+//       status: 'completed',
+//       metadata: {
+//         video_title: video.title,
+//         buyer_name: req.user.username,
+//         creator_name: video.created_by.username,
+//         transfer_id: walletTransfer._id,
+//         commission_percentage: platformFeePercentage,
+//         commission_type: 'platform_fee',
+//         total_transaction_amount: amount,
+//         creator_share: creatorAmount
+//       }
+//     });
+//     await platformTransaction.save({ session });
+//     const userAccess = new UserAccess({
+//       user_id: buyer_id,
+//       content_id: videoId,
+//       content_type: 'standalone_video', 
+//       access_type: 'paid',
+//       payment_id: walletTransfer._id, 
+//       payment_method: 'wallet_transfer',
+//       payment_amount: amount,
+//       granted_at: new Date()
+//     });
+//     await userAccess.save({ session });
+
+//     // Update creator's profile earnings (70% share)
+//     await User.findByIdAndUpdate(
+//       creatorId,
+//       { $inc: { 'creator_profile.total_earned': creatorAmount } },
+//       { session }
+//     );
+//     // Update video earnings
+//     await LongVideo.findByIdAndUpdate(
+//       videoId,
+//       {
+//         $inc: {
+//           total_earned: creatorAmount, // Creator's share
+//           total_revenue: amount, // Total revenue
+//           platform_commission: platformAmount, // Platform's commission
+//           total_purchases: 1
+//         },
+//         $inc:{earned_till_date: creatorAmount } // Update total earned till date
+//       },
+//       { session }
+//     );
+//     console.log('✅ Wallet transfer completed with 70/30 split:', buyer_id, '→', creatorId, `Total: ₹${amount}, Creator: ₹${creatorAmount}, Platform: ₹${platformAmount}`);
+//     return { walletTransfer, buyerTransaction, creatorTransaction, platformTransaction };
+//   });
+//   // Always end session
+//   await session.endSession();
+
+//   res.status(200).json({
+//     message: "Video purchased successfully with 70/30 split!",
+//     transfer: {
+//       totalAmount: amount,
+//       creatorAmount: creatorAmount,
+//       platformAmount: platformAmount,
+//       splitPercentage: `Creator: ${creatorSharePercentage}%, Platform: ${platformFeePercentage
+//       }%`,
+//       from: req.user.username,
+//       to: video.created_by.username,
+//       video: video.title,
+//       transferType: 'video_purchase'
+//     },
+//     buyer: {
+//       balanceBefore: buyerBalanceBefore,
+//       balanceAfter: buyerWallet.balance,
+//       currentBalance: buyerWallet.balance
+//     },
+//     creator: {
+//       balanceBefore: creatorBalanceBefore,
+//       balanceAfter: creatorWallet.balance,
+//       currentBalance: creatorWallet.balance,
+//       earnedAmount: creatorAmount,
+//       sharePercentage: creatorSharePercentage
+//     },
+//     platform: {
+//       commissionAmount: platformAmount,
+//       commissionPercentage: platformFeePercentage
+//     },
+//     access: {
+//       contentId: videoId,
+//       contentType: 'standalone_video',
+//       accessType: 'paid',
+//       grantedAt: new Date()
+//     },
+//   });
+// }
+
 // Get wallet details with recent transfers
+
 const getWalletDetails = async (req, res, next) => {
   try {
     const userId = req.user.id;

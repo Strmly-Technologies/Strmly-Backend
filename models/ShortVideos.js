@@ -58,7 +58,7 @@ const shortVideoSchema = new mongoose.Schema(
     community: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Community",
-      required: true,
+      required: false,
     },
   },
   { timestamps: true }
