@@ -13,7 +13,6 @@ const searchRoutes = require("./routes/search.routes");
 
 const walletRoutes = require("./routes/wallet.routes");
 const withdrawalRoutes = require("./routes/withdrawal.routes");
-const paymentRoutes = require("./routes/payment.routes");
 
 const cors = require("cors");
 const validateEnv = require("./config/validateEnv");
@@ -50,7 +49,6 @@ app.use("/api/v1/search", searchRoutes);
 
 app.use("/api/v1/wallet", walletRoutes);
 app.use("/api/v1/withdrawals", withdrawalRoutes);
-app.use("/api/v1/payments", paymentRoutes);
 
 app.get("/health", (req, res) => {
   res.send("Server is healthy");
