@@ -135,6 +135,5 @@ module.exports = {
   LoginUserWithEmail,
   LoginUserWithUsername,
   LogoutUser,
-  GetCurrentUser,
   RefreshToken,
 };

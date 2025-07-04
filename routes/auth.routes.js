@@ -4,7 +4,6 @@ const {
   LoginUserWithEmail,
   LoginUserWithUsername,
   LogoutUser,
-  GetCurrentUser,
   RefreshToken,
 } = require("../controller/auth.controller");
 const { authenticateToken } = require("../middleware/auth");

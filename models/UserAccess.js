@@ -14,7 +14,7 @@ const userAccessSchema=new mongoose.Schema({
     content_type:{
         type:String,
         required:true,
-        enum:["series","standalone_video"]
+        enum:["series","standalone_video","Series"]
     },
     access_type:{
         type:String,

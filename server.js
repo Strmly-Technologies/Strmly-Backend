@@ -10,6 +10,11 @@ const communityRoutes = require("./routes/community.routes");
 const interactionRoutes = require("./routes/interaction.routes");
 const cautionRoutes = require("./routes/caution.routes");
 const searchRoutes = require("./routes/search.routes");
+
+const walletRoutes = require("./routes/wallet.routes");
+const withdrawalRoutes = require("./routes/withdrawal.routes");
+const paymentRoutes = require("./routes/payment.routes");
+
 const cors = require("cors");
 const validateEnv = require("./config/validateEnv");
 const { testS3Connection } = require("./utils/connection_testing");
@@ -19,7 +24,15 @@ validateEnv();
 
 const app = express();
 
-app.use(cors());
+const corsOptions = {
+  origin: ["http://localhost:3000"], // ✅ replace with your frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -34,6 +47,10 @@ app.use("/api/v1/community", communityRoutes);
 app.use("/api/v1/interaction", interactionRoutes);
 app.use("/api/v1/caution", cautionRoutes);
 app.use("/api/v1/search", searchRoutes);
+
+app.use("/api/v1/wallet", walletRoutes);
+app.use("/api/v1/withdrawals", withdrawalRoutes);
+app.use("/api/v1/payments", paymentRoutes);
 
 app.get("/health", (req, res) => {
   res.send("Server is healthy");
