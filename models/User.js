@@ -63,11 +63,6 @@ const userSchema = new mongoose.Schema(
       ref: "Community",
       default: [],
     },
-    playlist: {
-      type: [mongoose.Schema.Types.ObjectId],
-      ref: "LongVideo",
-      default: [],
-    },
     history: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: "LongVideo",
@@ -88,6 +83,42 @@ const userSchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.ObjectId],
       ref: "LongVideo",
       default: [],
+    },
+    creator_profile: {
+      bank_details: {
+        account_number: String,
+        ifsc_code: String,
+        beneficiary_name: String,
+        bank_name: String,
+        account_type: {
+          type: String,
+          enum: ["savings", "current"],
+          default: "savings",
+        },
+      },
+      fund_account_id: String,
+      withdrawal_enabled: {
+        type: Boolean,
+        default: false,
+      },
+      bank_verified: {
+        type: Boolean,
+        default: false,
+      },
+      total_earned: {
+        type: Number,
+        default: 0,
+      },
+      verification_status: {
+        type: String,
+        enum: ["unverified", "pending", "verified"],
+        default: "unverified",
+      },
+    },
+    phone: {
+      type: String,
+      trim: true,
+      match: /^[0-9]{10}$/,
     },
   },
   { timestamps: true }

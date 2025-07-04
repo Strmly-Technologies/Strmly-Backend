@@ -22,8 +22,6 @@ const walletTransferSchema = new mongoose.Schema(
       ref: "Wallet",
       required: true,
     },
-    
-    // Transfer details with 70/30 split
     total_amount: {
       type: Number,
       required: true,
@@ -31,11 +29,11 @@ const walletTransferSchema = new mongoose.Schema(
     },
     creator_amount: {
       type: Number,
-      required: true, // 70% of total
+      required: true,
     },
     platform_amount: {
       type: Number,
-      required: true, // 30% of total
+      required: true,
     },
     currency: {
       type: String,
@@ -47,8 +45,6 @@ const walletTransferSchema = new mongoose.Schema(
       required: true,
       enum: ["series_purchase", "video_purchase", "tip", "gift"],
     },
-    
-    // What was purchased
     content_id: {
       type: mongoose.Schema.Types.ObjectId,
     },
@@ -56,13 +52,11 @@ const walletTransferSchema = new mongoose.Schema(
       type: String,
       enum: ["Series", "LongVideo", "series"],
     },
-    
     description: {
       type: String,
       required: true,
       maxlength: 200,
     },
-    
     sender_balance_before: {
       type: Number,
       required: true,
@@ -79,28 +73,23 @@ const walletTransferSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    
     status: {
       type: String,
       enum: ["pending", "completed", "failed", "reversed"],
       default: "completed",
     },
-    
-    // Revenue split tracking
     platform_fee_percentage: {
       type: Number,
-      default: 30, // 30% platform fee
+      default: 30,
     },
     creator_share_percentage: {
       type: Number,
-      default: 70, // 70% to creator
+      default: 70,
     },
-    
     source_payment_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Payment",
     },
-    
     metadata: {
       series_title: String,
       video_title: String,
@@ -111,7 +100,6 @@ const walletTransferSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Indexes
 walletTransferSchema.index({ sender_id: 1, createdAt: -1 });
 walletTransferSchema.index({ receiver_id: 1, createdAt: -1 });
 walletTransferSchema.index({ content_id: 1, content_type: 1 });

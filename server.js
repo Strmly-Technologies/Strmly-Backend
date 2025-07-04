@@ -13,6 +13,7 @@ const searchRoutes = require("./routes/search.routes");
 
 const walletRoutes = require("./routes/wallet.routes");
 const withdrawalRoutes = require("./routes/withdrawal.routes");
+const webhookRoutes = require("./routes/webhook.routes");
 
 const cors = require("cors");
 const validateEnv = require("./config/validateEnv");
@@ -32,6 +33,9 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Raw body parser for webhooks (before express.json())
+app.use("/api/v1/webhooks", express.raw({ type: "application/json" }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -49,6 +53,7 @@ app.use("/api/v1/search", searchRoutes);
 
 app.use("/api/v1/wallet", walletRoutes);
 app.use("/api/v1/withdrawals", withdrawalRoutes);
+app.use("/api/v1/webhooks", webhookRoutes);
 
 app.get("/health", (req, res) => {
   res.send("Server is healthy");

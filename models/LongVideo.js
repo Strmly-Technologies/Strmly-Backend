@@ -43,7 +43,6 @@ const longVideoSchema = new mongoose.Schema(
     },
     thumbnailUrl: {
       type: String,
-      required: true,
       trim: true,
     },
     series: {
@@ -82,15 +81,6 @@ const longVideoSchema = new mongoose.Schema(
       required: true,
       trim: true,
       maxlength: 100,
-    },
-    subtitles: {
-      type: [
-        {
-          language: { type: String, required: true, trim: true, maxlength: 100 },
-          url: { type: String, required: true, trim: true },
-        },
-      ],
-      default: [],
     },
     earned_till_date: {
       type: Number,

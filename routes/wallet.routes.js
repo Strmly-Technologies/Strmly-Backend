@@ -7,18 +7,22 @@ const {
   getWalletTransactionHistory,
 } = require("../controller/wallet.controller");
 const { authenticateToken } = require("../middleware/auth");
+const { paymentRateLimiter, generalRateLimiter } = require("../middleware/rateLimiter");
+const { validateWalletLoad, validateSeriesPurchase } = require("../middleware/validation");
 
 // Get wallet details and recent transfers
-router.get("/", authenticateToken, getWalletDetails);
+router.get("/", authenticateToken, generalRateLimiter, getWalletDetails);
 
 // Load money from bank to wallet
-router.post("/load/create-order", authenticateToken, createWalletLoadOrder);
-router.post("/load/verify", authenticateToken, verifyWalletLoad);
+router.post("/load/create-order", authenticateToken, paymentRateLimiter, validateWalletLoad, createWalletLoadOrder);
+
+// Verify wallet load order
+router.post("/load/verify", authenticateToken, paymentRateLimiter, verifyWalletLoad);
 
 // Transfer money from user wallet to creator wallet (70/30 split)
-router.post("/transfer/series", authenticateToken, transferToCreatorForSeries);
+router.post("/transfer/series", authenticateToken, paymentRateLimiter, validateSeriesPurchase, transferToCreatorForSeries);
 
 // Get wallet transaction history
-router.get("/transactions", authenticateToken, getWalletTransactionHistory);
+router.get("/transactions", authenticateToken, generalRateLimiter, getWalletTransactionHistory);
 
 module.exports = router;

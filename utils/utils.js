@@ -104,8 +104,85 @@ const uploadVideoToS3 = async (file, videoType) => {
 };
 
 const handleError = (err, req, res, next) => {
-  console.error("Error occurred:", err);
-  res.status(500).json({ message: "Internal server error" });
+  // Log error for debugging (remove sensitive information)
+  const sanitizedError = {
+    message: err.message,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+    userAgent: req.get("User-Agent"),
+    timestamp: new Date().toISOString(),
+  };
+
+  console.error("API Error:", sanitizedError);
+
+  // Handle specific error types
+  if (err.name === "ValidationError") {
+    return res.status(400).json({
+      success: false,
+      error: "Validation failed",
+      details: Object.values(err.errors).map((e) => e.message),
+      code: "VALIDATION_ERROR",
+    });
+  }
+
+  if (err.name === "CastError") {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid ID format",
+      code: "INVALID_ID",
+    });
+  }
+
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      error: "Duplicate entry found",
+      code: "DUPLICATE_ENTRY",
+    });
+  }
+
+  if (err.name === "JsonWebTokenError") {
+    return res.status(401).json({
+      success: false,
+      error: "Invalid token",
+      code: "INVALID_TOKEN",
+    });
+  }
+
+  if (err.name === "TokenExpiredError") {
+    return res.status(401).json({
+      success: false,
+      error: "Token expired",
+      code: "TOKEN_EXPIRED",
+    });
+  }
+
+  // Mongoose connection errors
+  if (err.name === "MongoNetworkError" || err.name === "MongoTimeoutError") {
+    return res.status(503).json({
+      success: false,
+      error: "Database connection error",
+      code: "DATABASE_ERROR",
+    });
+  }
+
+  // Razorpay specific errors
+  if (err.message && err.message.includes("razorpay")) {
+    return res.status(400).json({
+      success: false,
+      error: "Payment processing error",
+      code: "PAYMENT_ERROR",
+    });
+  }
+
+  // Default error response
+  res.status(err.statusCode || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === "production" ? "Internal server error" : err.message,
+    code: "INTERNAL_SERVER_ERROR",
+  });
 };
 
 module.exports = {
