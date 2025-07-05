@@ -31,10 +31,20 @@ const longVideoSchema = new mongoose.Schema(
         {
           user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
           comment: { type: String, required: true, trim: true, maxlength: 500 },
+          likes: { type: Number, default: 0 },
+          replies: [
+            {
+              user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+              reply: { type: String, required: true, trim: true, maxlength: 500 },
+              likes: { type: Number, default: 0 },
+              replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+              createdAt: { type: Date, default: Date.now },
+            },
+          ],
+          default: [],
           createdAt: { type: Date, default: Date.now },
         },
       ],
-      default: [],
     },
     videoUrl: {
       type: String,

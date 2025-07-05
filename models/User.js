@@ -84,6 +84,18 @@ const userSchema = new mongoose.Schema(
       ref: "LongVideo",
       default: [],
     },
+    date_of_birth: {
+      type: Date,
+    },
+    interests: {
+      type: [String],
+      default: [],
+    },
+    liked_communities: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Community",
+      default: [],
+    },
     creator_profile: {
       bank_details: {
         account_number: String,
