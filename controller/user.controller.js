@@ -63,12 +63,13 @@ const GetUserProfile = async (req, res, next) => {
 const UpdateUserProfile = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const { username, bio, profile_photo } = req.body;
+    const { username, bio, profile_photo, date_of_birth } = req.body;
 
     const updateData = {};
     if (username) updateData.username = username;
     if (bio !== undefined) updateData.bio = bio;
     if (profile_photo !== undefined) updateData.profile_photo = profile_photo;
+    if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth;
 
     if (username) {
       const existingUser = await User.findOne({ username, _id: { $ne: userId } });
@@ -357,10 +358,35 @@ const GetUserNotifications = async (req, res, next) => {
   }
 };
 
+const UpdateUserInterests = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { interests } = req.body;
+
+    if (!Array.isArray(interests) || interests.length === 0) {
+      return res.status(400).json({ message: "Interests must be a non-empty array" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(userId, { interests }, { new: true, runValidators: true }).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User interests updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
 module.exports = {
   GetUserFeed,
   GetUserProfile,
   UpdateUserProfile,
+  UpdateUserInterests,
   GetUserCommunities,
   GetUserVideos,
   GetUserInteractions,

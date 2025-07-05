@@ -272,8 +272,26 @@ const GetContentByType = async (req, res, next) => {
   }
 };
 
+const GetTopCommunities = async (req, res, next) => {
+  try {
+    const communities = await Community.find({})
+      .populate("followers", "username profile_photo")
+      .populate("creators", "username profile_photo")
+      .sort({ createdAt: -1 })
+      .limit(25);
+
+    res.status(200).json({
+      message: "Top communities retrieved successfully",
+      communities,
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
 module.exports = {
   GlobalSearch,
   PersonalizedSearch,
   GetContentByType,
+  GetTopCommunities,
 };

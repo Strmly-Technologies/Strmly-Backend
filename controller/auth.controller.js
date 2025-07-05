@@ -3,9 +3,9 @@ const { generateToken } = require("../utils/jwt");
 const { handleError } = require("../utils/utils");
 
 const RegisterNewUser = async (req, res, next) => {
-  const { username, email, password } = req.body;
+  const { email, password } = req.body;
 
-  if (!username || !email || !password) {
+  if (!email || !password) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -13,6 +13,13 @@ const RegisterNewUser = async (req, res, next) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
+    }
+
+    let username = await User.findOne({ username: email.split("@")[0] });
+    if (!username) {
+      username = email.split("@")[0];
+    } else {
+      username = username.username + Math.floor(Math.random() * 100000);
     }
 
     const newUser = new User({

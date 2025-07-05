@@ -137,6 +137,7 @@ backend/
 | `/interactions`  | GET    | -                             | `{ interactions }`     | Get user interactions (Protected) |
 | `/earnings`      | GET    | -                             | `{ earnings }`         | Get user earnings (Protected)     |
 | `/notifications` | GET    | -                             | `{ notifications }`    | Get notifications (Protected)     |
+| `/interests`     | PUT    | `{ interests }`               | `{ message, user }`    | Update user interests             |
 
 ### Community Routes (`/api/v1/community`)
 
@@ -158,11 +159,37 @@ backend/
 
 ### Search Routes (`/api/v1/search`)
 
-| Route           | Method | Request Body                      | Response                  | Description                     |
-| --------------- | ------ | --------------------------------- | ------------------------- | ------------------------------- |
-| `/`             | GET    | Query params: `q`, `type`, `page` | `{ results, pagination }` | Global search (Protected)       |
-| `/personalized` | GET    | Query params: `page`, `limit`     | `{ results, pagination }` | Personalized search (Protected) |
-| `/by-type`      | GET    | Query params: `type`, `page`      | `{ results, pagination }` | Get content by type (Protected) |
+| Route              | Method | Request Body                      | Response                      | Description                     |
+| ------------------ | ------ | --------------------------------- | ----------------------------- | ------------------------------- |
+| `/`                | GET    | Query params: `q`, `type`, `page` | `{ results, pagination }`     | Global search (Protected)       |
+| `/personalized`    | GET    | Query params: `page`, `limit`     | `{ results, pagination }`     | Personalized search (Protected) |
+| `/by-type`         | GET    | Query params: `type`, `page`      | `{ results, pagination }`     | Get content by type (Protected) |
+| `/top-communities` | GET    | Query params: `page`, `limit`     | `{ communities, pagination }` | Get top communities (Protected) |
+
+### Wallet Routes (`/api/v1/wallet`)
+
+| Route                | Method | Request Body                        | Response                       | Description                                    |
+| -------------------- | ------ | ----------------------------------- | ------------------------------ | ---------------------------------------------- |
+| `/`                  | GET    | -                                   | `{ wallet, recentTransfers }`  | Get wallet details (Protected)                 |
+| `/load/create-order` | POST   | `{ amount }`                        | `{ order }`                    | Create wallet load order (Protected)           |
+| `/load/verify`       | POST   | `{ orderId, paymentId, signature }` | `{ message, transaction }`     | Verify wallet load payment (Protected)         |
+| `/transfer/series`   | POST   | `{ seriesId, amount }`              | `{ message, transfer }`        | Transfer money for series purchase (Protected) |
+| `/transactions`      | GET    | Query params: `page`, `limit`       | `{ transactions, pagination }` | Get transaction history (Protected)            |
+
+### Withdrawal Routes (`/api/v1/withdrawals`)
+
+| Route                   | Method | Request Body                           | Response                      | Description                           |
+| ----------------------- | ------ | -------------------------------------- | ----------------------------- | ------------------------------------- |
+| `/setup-bank`           | POST   | `{ accountNumber, ifsc, accountName }` | `{ message, bankAccount }`    | Setup bank account (Protected)        |
+| `/create`               | POST   | `{ amount }`                           | `{ message, withdrawal }`     | Create withdrawal request (Protected) |
+| `/history`              | GET    | Query params: `page`, `limit`          | `{ withdrawals, pagination }` | Get withdrawal history (Protected)    |
+| `/status/:withdrawalId` | GET    | -                                      | `{ withdrawal }`              | Check withdrawal status (Protected)   |
+
+### Webhook Routes (`/api/v1/webhooks`)
+
+| Route       | Method | Request Body          | Response       | Description              |
+| ----------- | ------ | --------------------- | -------------- | ------------------------ |
+| `/razorpay` | POST   | Razorpay webhook data | `{ received }` | Handle Razorpay webhooks |
 
 ### Caution Routes (`/api/v1/caution`)
 
