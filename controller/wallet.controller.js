@@ -796,6 +796,104 @@ const getWalletTransactionHistory = async (req, res, next) => {
   }
 };
 
+const getGiftHistory = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20, type = "all" } = req.query;
+
+    const userValidation = validateObjectId(userId, "User ID");
+    if (!userValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: userValidation.error,
+        code: "INVALID_USER_ID",
+      });
+    }
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    if (pageNum < 1 || pageNum > 1000) {
+      return res.status(400).json({
+        success: false,
+        error: "Page number must be between 1 and 1000",
+        code: "INVALID_PAGE_NUMBER",
+      });
+    }
+
+    if (limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({
+        success: false,
+        error: "Limit must be between 1 and 100",
+        code: "INVALID_LIMIT",
+      });
+    }
+
+    let filter = {};
+
+    if (type === "sent") {
+      filter = { sender_id: userId, transfer_type: "comment_gift" };
+    } else if (type === "received") {
+      filter = { receiver_id: userId, transfer_type: "comment_gift" };
+    } else if (type === "all") {
+      filter = { 
+        $or: [
+          { sender_id: userId, transfer_type: "comment_gift" },
+          { receiver_id: userId, transfer_type: "comment_gift" }
+        ]
+      };
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Type must be 'sent', 'received', or 'all'",
+        code: "INVALID_TYPE",
+      });
+    }
+
+    const gifts = await WalletTransfer.find(filter)
+      .populate("sender_id", "username profilePicture")
+      .populate("receiver_id", "username profilePicture")
+      .populate("content_id", "name title")
+      .sort({ createdAt: -1 })
+      .limit(limitNum)
+      .skip((pageNum - 1) * limitNum)
+      .lean();
+
+    const total = await WalletTransfer.countDocuments(filter);
+
+    res.status(200).json({
+      success: true,
+      message: "Gift history retrieved successfully",
+      gifts: gifts.map((gift) => ({
+        id: gift._id,
+        amount: gift.total_amount,
+        type: gift.sender_id._id.toString() === userId ? "sent" : "received",
+        from: gift.sender_id.username,
+        to: gift.receiver_id.username,
+        videoTitle: gift.content_id?.name || gift.content_id?.title || "Unknown Video",
+        commentPreview: gift.metadata?.comment_text || "",
+        giftNote: gift.metadata?.transfer_note || "",
+        date: gift.createdAt,
+        status: gift.status,
+      })),
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalGifts: total,
+        hasNextPage: pageNum < Math.ceil(total / limitNum),
+        hasPrevPage: pageNum > 1,
+        itemsPerPage: limitNum,
+      },
+      summary: {
+        totalSent: gifts.filter(g => g.sender_id._id.toString() === userId).reduce((sum, g) => sum + g.total_amount, 0),
+        totalReceived: gifts.filter(g => g.receiver_id._id.toString() === userId).reduce((sum, g) => sum + g.total_amount, 0),
+      },
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
 module.exports = {
   getWalletDetails,
   createWalletLoadOrder,
@@ -803,4 +901,5 @@ module.exports = {
   transferToCreatorForSeries,
   getWalletTransactionHistory,
   getOrCreateWallet,
+  getGiftHistory,
 };

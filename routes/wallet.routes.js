@@ -5,6 +5,7 @@ const {
   verifyWalletLoad,
   transferToCreatorForSeries,
   getWalletTransactionHistory,
+  getGiftHistory,
 } = require("../controller/wallet.controller");
 const { authenticateToken } = require("../middleware/auth");
 const { paymentRateLimiter, generalRateLimiter } = require("../middleware/rateLimiter");
@@ -24,5 +25,8 @@ router.post("/transfer/series", authenticateToken, paymentRateLimiter, validateS
 
 // Get wallet transaction history
 router.get("/transactions", authenticateToken, generalRateLimiter, getWalletTransactionHistory);
+
+// Get gift history
+router.get("/gifts", authenticateToken, generalRateLimiter, getGiftHistory);
 
 module.exports = router;

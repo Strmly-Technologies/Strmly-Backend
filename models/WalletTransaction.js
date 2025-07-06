@@ -26,7 +26,9 @@ const walletTransactionSchema = new mongoose.Schema(
         "creator_earning",    // Creator receives 70%
         "platform_commission", // Platform gets 30%
         "withdrawal_request", // Creator withdraws
-        "refund"
+        "refund",
+        "comment_gift",       // Gift to comment author
+        "gift_received"       // Received gift for comment
       ],
     },
     amount: {
@@ -80,6 +82,10 @@ const walletTransactionSchema = new mongoose.Schema(
       creator_name: String,
       platform_fee: Number,
       creator_share: Number,
+      comment_id: String,
+      comment_text: String,
+      video_id: String,
+      video_title: String,
     },
   },
   { timestamps: true }

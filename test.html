@@ -140,6 +140,33 @@
             <div id="walletResponse" class="output"></div>
         </div>
 
+        <!-- Step 7: Gift Comment -->
+        <div class="step">
+            <h3>Step 7: Gift Comment</h3>
+            <input type="text" id="videoIdForGift" placeholder="Video ID">
+            <select id="videoTypeForGift">
+                <option value="long">Long Video</option>
+                <option value="short">Short Video</option>
+            </select>
+            <input type="text" id="commentIdForGift" placeholder="Comment ID">
+            <input type="number" id="giftAmount" placeholder="Gift Amount (e.g., 50)" value="50">
+            <input type="text" id="giftNote" placeholder="Gift Note (optional)">
+            <button onclick="giftComment()">Send Gift</button>
+            <div id="giftResponse" class="output"></div>
+        </div>
+
+        <!-- Step 8: Gift History -->
+        <div class="step">
+            <h3>Step 8: Gift History</h3>
+            <select id="giftHistoryType">
+                <option value="all">All Gifts</option>
+                <option value="sent">Sent Gifts</option>
+                <option value="received">Received Gifts</option>
+            </select>
+            <button onclick="getGiftHistory()">Get Gift History</button>
+            <div id="giftHistoryResponse" class="output"></div>
+        </div>
+
         <!-- Auto-generated cURL commands -->
         <div class="step">
             <h3>📋 Generated cURL Commands</h3>
@@ -399,6 +426,87 @@ curl -X POST ${backendUrl}/api/v1/wallet/transfer/series \\
                 
             } catch (error) {
                 document.getElementById('walletResponse').textContent = 
+                    `Error: ${error.message}`;
+            }
+        }
+
+        // Gift comment
+        async function giftComment() {
+            const videoId = document.getElementById('videoIdForGift').value;
+            const videoType = document.getElementById('videoTypeForGift').value;
+            const commentId = document.getElementById('commentIdForGift').value;
+            const amount = document.getElementById('giftAmount').value;
+            const giftNote = document.getElementById('giftNote').value;
+            
+            if (!videoId || !commentId || !amount) {
+                alert('Please enter video ID, comment ID, and gift amount');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${backendUrl}/api/v1/interaction/gift-comment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`
+                    },
+                    body: JSON.stringify({
+                        videoId: videoId,
+                        videoType: videoType,
+                        commentId: commentId,
+                        amount: parseInt(amount),
+                        giftNote: giftNote
+                    })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('giftResponse').textContent = 
+                    JSON.stringify(data, null, 2);
+                
+                // Generate cURL command
+                updateCurlCommands('GIFT_COMMENT', `
+curl -X POST ${backendUrl}/api/v1/interaction/gift-comment \\
+  -H 'Authorization: Bearer ${userToken}' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "videoId": "${videoId}",
+    "videoType": "${videoType}",
+    "commentId": "${commentId}",
+    "amount": ${amount},
+    "giftNote": "${giftNote}"
+  }'`);
+                
+            } catch (error) {
+                document.getElementById('giftResponse').textContent = 
+                    `Error: ${error.message}`;
+            }
+        }
+
+        // Get gift history
+        async function getGiftHistory() {
+            const type = document.getElementById('giftHistoryType').value;
+            
+            try {
+                const response = await fetch(`${backendUrl}/api/v1/wallet/gifts?type=${type}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${userToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('giftHistoryResponse').textContent = 
+                    JSON.stringify(data, null, 2);
+                
+                // Generate cURL command
+                updateCurlCommands('GIFT_HISTORY', `
+curl -X GET ${backendUrl}/api/v1/wallet/gifts?type=${type} \\
+  -H 'Authorization: Bearer ${userToken}'`);
+                
+            } catch (error) {
+                document.getElementById('giftHistoryResponse').textContent = 
                     `Error: ${error.message}`;
             }
         }
