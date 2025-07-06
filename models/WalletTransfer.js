@@ -43,14 +43,14 @@ const walletTransferSchema = new mongoose.Schema(
     transfer_type: {
       type: String,
       required: true,
-      enum: ["series_purchase", "video_purchase", "tip", "gift", "comment_gift"],
+      enum: ["series_purchase", "video_purchase", "tip", "gift", "comment_gift", "community_fee"],
     },
     content_id: {
       type: mongoose.Schema.Types.ObjectId,
     },
     content_type: {
       type: String,
-      enum: ["Series", "LongVideo", "ShortVideo", "series", "comment"],
+      enum: ["Series", "LongVideo", "ShortVideo", "series", "comment", "Community"],
     },
     description: {
       type: String,
@@ -98,6 +98,8 @@ const walletTransferSchema = new mongoose.Schema(
       comment_id: String,
       comment_text: String,
       video_id: String,
+      community_name: String,
+      founder_name: String,
     },
   },
   { timestamps: true }

@@ -1,7 +1,9 @@
 const ShortVideo = require("../models/ShortVideos");
 const User = require("../models/User");
 const Community = require("../models/Community");
+const CommunityAccess = require("../models/CommunityAccess");
 const { uploadVideoToS3, handleError } = require("../utils/utils");
+const { checkCommunityUploadPermission } = require("./community.controller");
 const LongVideo = require("../models/LongVideo");
 const Series = require("../models/Series");
 
@@ -27,19 +29,27 @@ const uploadVideo = async (req, res, next) => {
       return res.status(400).json({ error: "Video type is required. Use ?type=short or ?type=long" });
     }
 
-    if (!communityId) {
-      return res.status(400).json({ error: "Community ID is required for all videos" });
+    // Check upload permission using the proper function
+    if(communityId){
+      const permissionCheck = await checkCommunityUploadPermission(userId, communityId);
+    
+    if (!permissionCheck.hasPermission) {
+      return res.status(403).json({
+        error: permissionCheck.error,
+        requiredFee: permissionCheck.requiredFee,
+        communityName: permissionCheck.communityName,
+      });
     }
 
-    if (communityId) {
+    // Check if user follows the community (only for non-founders)
+    if (permissionCheck.accessType !== "founder") {
       const community = await Community.findById(communityId);
-      if (!community) {
-        return res.status(404).json({ error: "Community not found" });
+      if (!community.followers.includes(userId)) {
+        return res.status(403).json({ 
+          error: "You must follow the community to upload videos" 
+        });
       }
-
-      if (!community.followers.includes(userId) && !community.founder.equals(userId)) {
-        return res.status(403).json({ error: "You must be a follower or founder of the community to upload videos" });
-      }
+    }
     }
 
     const user = await User.findById(userId).select("-password");

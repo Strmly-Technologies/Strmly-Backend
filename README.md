@@ -287,58 +287,6 @@ backend/
 |                |        |                                            | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                  |                               |
 |                |        |                                            | 404         | `{ message: "Video or comment not found" }`                                                                                                                                                                    |                               |
 |                |        |                                            | 500         | `{ message: "Server error" }`                                                                                                                                                                                  |                               |
-
-### Wallet Routes (`/api/v1/wallet`)
-
-| Route                | Method | Request Body                        | Status Code | Response Schema                                                                                                                                                                                                                                                                                | Description                                    |
-| -------------------- | ------ | ----------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `/`                  | GET    | -                                   | 200         | `{ wallet: { _id: "wallet_id", userId: "user_id", balance: "number", currency: "string", createdAt: "date", updatedAt: "date" }, recentTransfers: [{ _id: "transfer_id", type: "credit/debit", amount: "number", description: "string", date: "date", status: "completed/pending/failed" }] }` | Get wallet details (Protected)                 |
-|                      |        |                                     | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                                                                                                  |                                                |
-|                      |        |                                     | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                  |                                                |
-| `/load/create-order` | POST   | `{ amount }`                        | 201         | `{ order: { id: "order_id", amount: "number", currency: "string", receipt: "string", status: "created", createdAt: "date" } }`                                                                                                                                                                 | Create wallet load order (Protected)           |
-|                      |        |                                     | 400         | `{ message: "Invalid amount" }`                                                                                                                                                                                                                                                                |                                                |
-|                      |        |                                     | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                                                                                                  |                                                |
-|                      |        |                                     | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                  |                                                |
-| `/load/verify`       | POST   | `{ orderId, paymentId, signature }` | 200         | `{ message: "Payment verified successfully", transaction: { _id: "transaction_id", orderId: "string", paymentId: "string", amount: "number", status: "completed", walletBalance: "number", createdAt: "date" } }`                                                                              | Verify wallet load payment (Protected)         |
-|                      |        |                                     | 400         | `{ message: "Invalid payment details or signature verification failed" }`                                                                                                                                                                                                                      |                                                |
-|                      |        |                                     | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                                                                                                  |                                                |
-|                      |        |                                     | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                  |                                                |
-| `/transfer/series`   | POST   | `{ seriesId, amount }`              | 200         | `{ message: "Transfer completed successfully", transfer: { _id: "transfer_id", from: "user_id", to: "creator_id", amount: "number", seriesId: "series_id", status: "completed", createdAt: "date" }, remainingBalance: "number" }`                                                             | Transfer money for series purchase (Protected) |
-|                      |        |                                     | 400         | `{ message: "Insufficient balance or invalid amount" }`                                                                                                                                                                                                                                        |                                                |
-|                      |        |                                     | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                                                                                                  |                                                |
-|                      |        |                                     | 404         | `{ message: "Series not found" }`                                                                                                                                                                                                                                                              |                                                |
-|                      |        |                                     | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                  |                                                |
-| `/transactions`      | GET    | Query params: `page`, `limit`       | 200         | `{ transactions: [{ _id: "transaction_id", type: "credit/debit", amount: "number", description: "string", orderId: "string", status: "completed/pending/failed", createdAt: "date" }], pagination: { currentPage: "number", totalPages: "number", totalTransactions: "number" } }`             | Get transaction history (Protected)            |
-|                      |        |                                     | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                                                                                                  |                                                |
-|                      |        |                                     | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                  |                                                |
-| `/gifts`             | GET    | Query params: `page`, `limit`, `type` | 200         | `{ gifts: [{ _id: "gift_id", amount: "number", type: "sent/received", from: "string", to: "string", videoTitle: "string", commentPreview: "string", giftNote: "string", date: "date", status: "string" }], pagination: { currentPage: "number", totalPages: "number", totalGifts: "number" } }` | Get gift history (Protected)                   |
-|                      |        |                                     | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                                                                                                  |                                                |
-|                      |        |                                     | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                  |                                                |
-
-### Interaction Routes (`/api/v1/interaction`)
-
-| Route          | Method | Request Body                               | Status Code | Response Schema                                                                                                                                                                                                | Description                   |
-| -------------- | ------ | ------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `/like`        | POST   | `{ videoId, type }`                        | 200         | `{ message: "Video liked/unliked successfully", liked: "boolean", totalLikes: "number" }`                                                                                                                      | Like/unlike video (Protected) |
-|                |        |                                            | 400         | `{ message: "Invalid video ID or type" }`                                                                                                                                                                      |                               |
-|                |        |                                            | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                  |                               |
-|                |        |                                            | 404         | `{ message: "Video not found" }`                                                                                                                                                                               |                               |
-|                |        |                                            | 500         | `{ message: "Server error" }`                                                                                                                                                                                  |                               |
-| `/share`       | POST   | `{ videoId, platform }`                    | 200         | `{ message: "Video shared successfully", shareUrl: "string", totalShares: "number" }`                                                                                                                          | Share video (Protected)       |
-|                |        |                                            | 400         | `{ message: "Invalid video ID or platform" }`                                                                                                                                                                  |                               |
-|                |        |                                            | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                  |                               |
-|                |        |                                            | 404         | `{ message: "Video not found" }`                                                                                                                                                                               |                               |
-|                |        |                                            | 500         | `{ message: "Server error" }`                                                                                                                                                                                  |                               |
-| `/comment`     | POST   | `{ videoId, content }`                     | 201         | `{ message: "Comment added successfully", comment: { _id: "comment_id", content: "string", author: { _id: "user_id", username: "string", profilePicture: "string" }, video: "video_id", createdAt: "date" } }` | Comment on video (Protected)  |
-|                |        |                                            | 400         | `{ message: "Invalid video ID or empty content" }`                                                                                                                                                             |                               |
-|                |        |                                            | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                  |                               |
-|                |        |                                            | 404         | `{ message: "Video not found" }`                                                                                                                                                                               |                               |
-|                |        |                                            | 500         | `{ message: "Server error" }`                                                                                                                                                                                  |                               |
-| `/gift-comment` | POST   | `{ videoId, videoType, commentId, amount, giftNote }` | 200         | `{ message: "Gift sent successfully", gift: { amount: "number", from: "string", to: "string", videoTitle: "string", commentPreview: "string", giftNote: "string", transferType: "string" }, gifter: { balanceBefore: "number", balanceAfter: "number", currentBalance: "number" }, receiver: { balanceBefore: "number", balanceAfter: "number", currentBalance: "number", receivedAmount: "number" } }` | Gift comment (Protected)      |
-|                |        |                                            | 400         | `{ message: "Invalid input data or insufficient balance" }`                                                                                                                                                     |                               |
-|                |        |                                            | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                  |                               |
-|                |        |                                            | 404         | `{ message: "Video or comment not found" }`                                                                                                                                                                    |                               |
-|                |        |                                            | 500         | `{ message: "Server error" }`                                                                                                                                                                                  |                               |
 | `/history`              | GET    | Query params: `page`, `limit`          | 200         | `{ withdrawals: [{ _id: "withdrawal_id", amount: "number", status: "pending/completed/failed", bankAccount: { accountNumber: "string", ifsc: "string", accountName: "string" }, requestedAt: "date", processedAt: "date", failureReason: "string" }], pagination: { currentPage: "number", totalPages: "number", totalWithdrawals: "number" } }` | Get withdrawal history (Protected)    |
 |                         |        |                                        | 401         | `{ message: "Unauthorized" }`                                                                                                                                                                                                                                                                                                                    |                                       |
 |                         |        |                                        | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                                                                    |                                       |
@@ -399,6 +347,58 @@ backend/
 |                           |        |                            | 404         | `{ message: "Community not found or not following" }`                                       |                                         |
 |                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
 | `/community/remove-user`  | PATCH  | `{ communityId, userId }`  | 200         | `{ message: "User removed from community successfully" }`                                   | Remove user from community (Protected)  |
+|                           |        |                            | 400         | `{ message: "Invalid community or user ID" }`                                               |                                         |
+|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
+|                           |        |                            | 403         | `{ message: "Not authorized to modify this community" }`                                    |                                         |
+|                           |        |                            | 404         | `{ message: "Community or user not found" }`                                                |                                         |
+|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
+
+## Authentication
+
+Most endpoints require authentication. Include the JWT token in the Authorization header:
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+## Error Handling
+
+The API returns consistent error responses:
+
+```json
+{
+  "message": "Error description",
+  "error": "Detailed error information (in development)"
+}
+```
+
+## Status Codes
+
+- `200` - Success
+- `201` - Created
+- `400` - Bad Request
+- `401` - Unauthorized
+- `403` - Forbidden
+- `404` - Not Found
+- `500` - Internal Server Error
+
+## Health Check
+
+A health check endpoint is available at:
+
+```
+GET /health
+```
+
+Response: `"Server is healthy"`
+
+## Development
+
+For development, the server uses nodemon for automatic restarts:
+
+```bash
+npm run dev
+```
 |                           |        |                            | 400         | `{ message: "Invalid community or user ID" }`                                               |                                         |
 |                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
 |                           |        |                            | 403         | `{ message: "Not authorized to modify this community" }`                                    |                                         |

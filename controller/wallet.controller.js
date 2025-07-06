@@ -5,8 +5,10 @@ const Wallet = require("../models/Wallet");
 const WalletTransaction = require("../models/WalletTransaction");
 const WalletTransfer = require("../models/WalletTransfer");
 const UserAccess = require("../models/UserAccess");
+const CommunityAccess = require("../models/CommunityAccess");
 const Series = require("../models/Series");
 const User = require("../models/User");
+const Community = require("../models/Community");
 const { handleError } = require("../utils/utils");
 
 const MAX_WALLET_LOAD = 50000;
@@ -629,6 +631,320 @@ const transferToCreatorForSeries = async (req, res, next) => {
   }
 };
 
+const transferCommunityFee = async (req, res, next) => {
+  try {
+    const { communityId, amount, feeNote } = req.body;
+    const creatorId = req.user.id;
+
+    if (!communityId || !amount) {
+      return res.status(400).json({
+        success: false,
+        error: "Community ID and amount are required",
+        code: "MISSING_REQUIRED_FIELDS",
+      });
+    }
+
+    const communityValidation = validateObjectId(communityId, "Community ID");
+    if (!communityValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: communityValidation.error,
+        code: "INVALID_COMMUNITY_ID",
+      });
+    }
+
+    const amountValidation = validateAmount(amount, 1, 5000);
+    if (!amountValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error,
+        code: "INVALID_AMOUNT",
+      });
+    }
+
+    const sanitizedNote = sanitizeString(feeNote, MAX_DESCRIPTION_LENGTH);
+
+    // Find the community
+    const community = await Community.findById(communityId).populate("founder", "username email");
+    if (!community) {
+      return res.status(404).json({
+        success: false,
+        error: "Community not found",
+        code: "COMMUNITY_NOT_FOUND",
+      });
+    }
+
+    const founderId = community.founder._id;
+
+    // Check if community has upload fee
+    if (community.community_fee_type !== "paid") {
+      return res.status(400).json({
+        success: false,
+        error: "This community doesn't require upload fee",
+        code: "COMMUNITY_FREE_UPLOAD",
+      });
+    }
+
+    // Check if creator already has access
+    const existingAccess = await CommunityAccess.findOne({
+      user_id: creatorId,
+      community_id: communityId,
+      status: "active",
+    });
+
+    if (existingAccess) {
+      return res.status(400).json({
+        success: false,
+        error: "You already have upload access to this community",
+        code: "ALREADY_HAS_ACCESS",
+      });
+    }
+
+    // Check if creator is trying to pay themselves
+    if (founderId.toString() === creatorId) {
+      return res.status(400).json({
+        success: false,
+        error: "Community founder doesn't need to pay upload fee",
+        code: "FOUNDER_EXEMPT_FROM_FEE",
+      });
+    }
+
+    // Get wallets
+    const creatorWallet = await getOrCreateWallet(creatorId, "creator");
+    const founderWallet = await getOrCreateWallet(founderId, "creator");
+
+    // Check creator's wallet balance
+    if (creatorWallet.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        error: "Insufficient wallet balance",
+        currentBalance: creatorWallet.balance,
+        requiredAmount: amount,
+        shortfall: amount - creatorWallet.balance,
+        suggestion: "Please load more money to your wallet",
+        code: "INSUFFICIENT_BALANCE",
+      });
+    }
+
+    // Check wallet statuses
+    if (creatorWallet.status !== "active") {
+      return res.status(400).json({
+        success: false,
+        error: "Your wallet is not active",
+        code: "WALLET_INACTIVE",
+      });
+    }
+
+    if (founderWallet.status !== "active") {
+      return res.status(400).json({
+        success: false,
+        error: "Community founder's wallet is not active",
+        code: "FOUNDER_WALLET_INACTIVE",
+      });
+    }
+
+    // Calculate revenue sharing (currently 100% to founder, 0% to platform)
+    const founderAmount = Math.round(amount * (community.revenue_sharing.founder_percentage / 100));
+    const platformAmount = amount - founderAmount;
+
+    const session = await mongoose.startSession();
+
+    const creatorBalanceBefore = creatorWallet.balance;
+    const founderBalanceBefore = founderWallet.balance;
+
+    try {
+      await session.withTransaction(async () => {
+        const creatorBalanceAfter = creatorBalanceBefore - amount;
+        const founderBalanceAfter = founderBalanceBefore + founderAmount;
+
+        // Create wallet transfer record
+        const walletTransfer = new WalletTransfer({
+          sender_id: creatorId,
+          receiver_id: founderId,
+          sender_wallet_id: creatorWallet._id,
+          receiver_wallet_id: founderWallet._id,
+          total_amount: amount,
+          creator_amount: founderAmount,
+          platform_amount: platformAmount,
+          currency: "INR",
+          transfer_type: "community_fee",
+          content_id: communityId,
+          content_type: "Community",
+          description: `Community upload fee for: ${community.name}`,
+          sender_balance_before: creatorBalanceBefore,
+          sender_balance_after: creatorBalanceAfter,
+          receiver_balance_before: founderBalanceBefore,
+          receiver_balance_after: founderBalanceAfter,
+          platform_fee_percentage: community.revenue_sharing.platform_percentage,
+          creator_share_percentage: community.revenue_sharing.founder_percentage,
+          status: "completed",
+          metadata: {
+            community_name: community.name,
+            founder_name: community.founder.username,
+            transfer_note: sanitizedNote,
+            fee_type: "community_upload_fee",
+            revenue_split: {
+              founder_share: founderAmount,
+              platform_share: platformAmount,
+            },
+          },
+        });
+
+        await walletTransfer.save({ session });
+
+        // Update creator wallet
+        creatorWallet.balance = creatorBalanceAfter;
+        creatorWallet.total_spent += amount;
+        creatorWallet.last_transaction_at = new Date();
+        await creatorWallet.save({ session });
+
+        // Update founder wallet
+        founderWallet.balance = founderBalanceAfter;
+        founderWallet.total_received += founderAmount;
+        founderWallet.last_transaction_at = new Date();
+        await founderWallet.save({ session });
+
+        // Create creator transaction
+        const creatorTransaction = new WalletTransaction({
+          wallet_id: creatorWallet._id,
+          user_id: creatorId,
+          transaction_type: "debit",
+          transaction_category: "community_fee",
+          amount: amount,
+          currency: "INR",
+          description: `Community upload fee for "${community.name}" (₹${amount})`,
+          balance_before: creatorBalanceBefore,
+          balance_after: creatorBalanceAfter,
+          content_id: communityId,
+          content_type: "Community",
+          status: "completed",
+          metadata: {
+            community_name: community.name,
+            founder_name: community.founder.username,
+            transfer_id: walletTransfer._id,
+            founder_share: founderAmount,
+            platform_share: platformAmount,
+          },
+        });
+
+        await creatorTransaction.save({ session });
+
+        // Create founder transaction
+        const founderTransaction = new WalletTransaction({
+          wallet_id: founderWallet._id,
+          user_id: founderId,
+          transaction_type: "credit",
+          transaction_category: "community_fee_received",
+          amount: founderAmount,
+          currency: "INR",
+          description: `Community upload fee from ${req.user.username} for "${community.name}" (₹${founderAmount} of ₹${amount})`,
+          balance_before: founderBalanceBefore,
+          balance_after: founderBalanceAfter,
+          content_id: communityId,
+          content_type: "Community",
+          status: "completed",
+          metadata: {
+            community_name: community.name,
+            creator_name: req.user.username,
+            transfer_id: walletTransfer._id,
+            total_fee_paid: amount,
+            founder_share: founderAmount,
+            platform_share: platformAmount,
+          },
+        });
+
+        await founderTransaction.save({ session });
+
+        // Create community access record
+        const communityAccess = new CommunityAccess({
+          user_id: creatorId,
+          community_id: communityId,
+          access_type: "paid",
+          payment_id: walletTransfer._id,
+          payment_amount: amount,
+          payment_date: new Date(),
+          status: "active",
+          granted_at: new Date(),
+        });
+
+        await communityAccess.save({ session });
+
+        // Update community statistics
+        await Community.findByIdAndUpdate(
+          communityId,
+          {
+            $inc: {
+              total_fee_collected: founderAmount,
+              total_uploads: 1,
+            },
+          },
+          { session }
+        );
+
+        // Update user earnings
+        await User.findByIdAndUpdate(
+          founderId,
+          { $inc: { "creator_profile.total_earned": founderAmount } },
+          { session }
+        );
+      });
+
+      await session.endSession();
+
+      res.status(200).json({
+        success: true,
+        message: "Community upload fee paid successfully!",
+        transfer: {
+          totalAmount: amount,
+          founderAmount: founderAmount,
+          platformAmount: platformAmount,
+          revenueShare: `Founder: ${community.revenue_sharing.founder_percentage}%, Platform: ${community.revenue_sharing.platform_percentage}%`,
+          from: req.user.username,
+          to: community.founder.username,
+          community: community.name,
+          transferType: "community_fee",
+        },
+        creator: {
+          balanceBefore: creatorBalanceBefore,
+          balanceAfter: creatorWallet.balance,
+          currentBalance: creatorWallet.balance,
+        },
+        founder: {
+          balanceBefore: founderBalanceBefore,
+          balanceAfter: founderWallet.balance,
+          currentBalance: founderWallet.balance,
+          earnedAmount: founderAmount,
+        },
+        community: {
+          name: community.name,
+          feeAmount: community.community_fee_amount,
+          totalCollected: community.total_fee_collected + founderAmount,
+          totalUploads: community.total_uploads + 1,
+        },
+        access: {
+          communityId: communityId,
+          accessType: "paid",
+          uploadPermission: true,
+          grantedAt: new Date(),
+        },
+        nextSteps: {
+          message: "You can now upload videos to this community",
+          communityId: communityId,
+        },
+      });
+    } catch (transactionError) {
+      await session.abortTransaction();
+      throw transactionError;
+    } finally {
+      if (session.inTransaction()) {
+        await session.endSession();
+      }
+    }
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
 const getWalletDetails = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -899,6 +1215,7 @@ module.exports = {
   createWalletLoadOrder,
   verifyWalletLoad,
   transferToCreatorForSeries,
+  transferCommunityFee,
   getWalletTransactionHistory,
   getOrCreateWallet,
   getGiftHistory,

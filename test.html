@@ -167,6 +167,16 @@
             <div id="giftHistoryResponse" class="output"></div>
         </div>
 
+        <!-- Step 9: Community Fee -->
+        <div class="step">
+            <h3>Step 9: Community Fee Payment</h3>
+            <input type="text" id="communityId" placeholder="Community ID">
+            <input type="number" id="communityFeeAmount" placeholder="Community Fee Amount (e.g., 50)" value="50">
+            <input type="text" id="communityFeeNote" placeholder="Fee Note (optional)">
+            <button onclick="payCommunityFee()">Pay Community Fee</button>
+            <div id="communityFeeResponse" class="output"></div>
+        </div>
+
         <!-- Auto-generated cURL commands -->
         <div class="step">
             <h3>📋 Generated cURL Commands</h3>
@@ -510,6 +520,54 @@ curl -X GET ${backendUrl}/api/v1/wallet/gifts?type=${type} \\
                     `Error: ${error.message}`;
             }
         }
+
+        // Pay community fee
+        async function payCommunityFee() {
+            const communityId = document.getElementById('communityId').value;
+            const amount = document.getElementById('communityFeeAmount').value;
+            const feeNote = document.getElementById('communityFeeNote').value;
+            
+            if (!communityId || !amount) {
+                alert('Please enter community ID and fee amount');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${backendUrl}/api/v1/wallet/transfer/community-fee`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`
+                    },
+                    body: JSON.stringify({
+                        communityId: communityId,
+                        amount: parseInt(amount),
+                        feeNote: feeNote
+                    })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('communityFeeResponse').textContent = 
+                    JSON.stringify(data, null, 2);
+                
+                // Generate cURL command
+                updateCurlCommands('PAY_COMMUNITY_FEE', `
+curl -X POST ${backendUrl}/api/v1/wallet/transfer/community-fee \\
+  -H 'Authorization: Bearer ${userToken}' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "communityId": "${communityId}",
+    "amount": ${amount},
+    "feeNote": "${feeNote}"
+  }'`);
+                
+            } catch (error) {
+                document.getElementById('communityFeeResponse').textContent = 
+                    `Error: ${error.message}`;
+            }
+        }
+        
 
         // Update cURL commands
         function updateCurlCommands(step, command) {

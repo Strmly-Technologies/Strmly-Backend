@@ -28,7 +28,9 @@ const walletTransactionSchema = new mongoose.Schema(
         "withdrawal_request", // Creator withdraws
         "refund",
         "comment_gift",       // Gift to comment author
-        "gift_received"       // Received gift for comment
+        "gift_received",      // Received gift for comment
+        "community_fee",      // Creator pays community upload fee
+        "community_fee_received" // Founder receives community fee
       ],
     },
     amount: {
@@ -86,6 +88,8 @@ const walletTransactionSchema = new mongoose.Schema(
       comment_text: String,
       video_id: String,
       video_title: String,
+      community_name: String,
+      founder_name: String,
     },
   },
   { timestamps: true }

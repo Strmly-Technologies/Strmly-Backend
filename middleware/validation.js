@@ -1,4 +1,5 @@
 const validator = require("validator");
+const { body, validationResult } = require("express-validator");
 
 const validateAndSanitize = {
   amount: (amount) => {
@@ -254,10 +255,96 @@ const validateWithdrawal = (req, res, next) => {
   next();
 };
 
+const validateCommunityFee = [
+  body("communityId")
+    .notEmpty()
+    .withMessage("Community ID is required")
+    .isMongoId()
+    .withMessage("Invalid community ID"),
+  body("amount")
+    .isNumeric()
+    .withMessage("Amount must be a number")
+    .isFloat({ min: 1, max: 5000 })
+    .withMessage("Amount must be between ₹1 and ₹5000"),
+  body("feeNote")
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage("Fee note must be less than 200 characters"),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        details: errors.array(),
+        code: "VALIDATION_ERROR",
+      });
+    }
+    next();
+  },
+];
+
+const validateCommunitySettings = (req, res, next) => {
+  const { communityId, feeType, feeAmount, feeDescription } = req.body;
+
+  const communityValidation = validateAndSanitize.objectId(communityId);
+  if (!communityValidation.isValid) {
+    return res.status(400).json({
+      success: false,
+      error: communityValidation.error,
+      code: "VALIDATION_ERROR",
+    });
+  }
+
+  if (feeType && !["free", "paid"].includes(feeType)) {
+    return res.status(400).json({
+      success: false,
+      error: "Fee type must be 'free' or 'paid'",
+      code: "VALIDATION_ERROR",
+    });
+  }
+
+  if (feeAmount !== undefined) {
+    const amountValidation = validateAndSanitize.amount(feeAmount);
+    if (!amountValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error,
+        code: "VALIDATION_ERROR",
+      });
+    }
+    if (feeAmount > 5000) {
+      return res.status(400).json({
+        success: false,
+        error: "Community fee cannot exceed ₹5000",
+        code: "VALIDATION_ERROR",
+      });
+    }
+    req.body.feeAmount = amountValidation.value;
+  }
+
+  if (feeDescription) {
+    const descValidation = validateAndSanitize.string(feeDescription, 0, 200);
+    if (!descValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: descValidation.error,
+        code: "VALIDATION_ERROR",
+      });
+    }
+    req.body.feeDescription = descValidation.value;
+  }
+
+  req.body.communityId = communityValidation.value;
+  next();
+};
+
 module.exports = {
   validateAndSanitize,
   validateWalletLoad,
   validateSeriesPurchase,
   validateBankSetup,
   validateWithdrawal,
+  validateCommunityFee,
+  validateCommunitySettings,
 };

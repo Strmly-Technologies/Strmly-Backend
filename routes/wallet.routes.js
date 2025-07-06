@@ -4,12 +4,13 @@ const {
   createWalletLoadOrder,
   verifyWalletLoad,
   transferToCreatorForSeries,
+  transferCommunityFee,
   getWalletTransactionHistory,
   getGiftHistory,
 } = require("../controller/wallet.controller");
 const { authenticateToken } = require("../middleware/auth");
 const { paymentRateLimiter, generalRateLimiter } = require("../middleware/rateLimiter");
-const { validateWalletLoad, validateSeriesPurchase } = require("../middleware/validation");
+const { validateWalletLoad, validateSeriesPurchase, validateCommunityFee } = require("../middleware/validation");
 
 // Get wallet details and recent transfers
 router.get("/", authenticateToken, generalRateLimiter, getWalletDetails);
@@ -22,6 +23,9 @@ router.post("/load/verify", authenticateToken, paymentRateLimiter, verifyWalletL
 
 // Transfer money from user wallet to creator wallet (70/30 split)
 router.post("/transfer/series", authenticateToken, paymentRateLimiter, validateSeriesPurchase, transferToCreatorForSeries);
+
+// Transfer community fee from creator to founder
+router.post("/transfer/community-fee", authenticateToken, paymentRateLimiter, validateCommunityFee, transferCommunityFee);
 
 // Get wallet transaction history
 router.get("/transactions", authenticateToken, generalRateLimiter, getWalletTransactionHistory);

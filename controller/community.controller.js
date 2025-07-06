@@ -1,4 +1,5 @@
 const Community = require("../models/Community");
+const CommunityAccess = require("../models/CommunityAccess");
 const { handleError } = require("../utils/utils");
 
 const CreateCommunity = async (req, res, next) => {
@@ -108,10 +109,47 @@ const AddBioToCommunity = async (req, res, next) => {
   }
 };
 
+const checkCommunityUploadPermission = async (userId, communityId) => {
+  const community = await Community.findById(communityId);
+  
+  if (!community) {
+    return { hasPermission: false, error: "Community not found" };
+  }
+
+  // Community founder always has permission
+  if (community.founder.toString() === userId) {
+    return { hasPermission: true, accessType: "founder" };
+  }
+
+  // Check if community is free
+  if (community.community_fee_type === "free") {
+    return { hasPermission: true, accessType: "free" };
+  }
+
+  // Check paid access
+  const access = await CommunityAccess.findOne({
+    user_id: userId,
+    community_id: communityId,
+    status: "active",
+  });
+
+  if (!access) {
+    return { 
+      hasPermission: false, 
+      error: "Upload fee required to upload content",
+      requiredFee: community.community_fee_amount,
+      communityName: community.name 
+    };
+  }
+
+  return { hasPermission: true, accessType: "paid", access };
+};
+
 module.exports = {
   FollowCommunity,
   CreateCommunity,
   RenameCommunity,
   ChangeCommunityProfilePhoto,
   AddBioToCommunity,
+  checkCommunityUploadPermission,
 };
