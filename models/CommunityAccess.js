@@ -1,25 +1,25 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const communityAccessSchema = new mongoose.Schema(
   {
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     community_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Community",
+      ref: 'Community',
       required: true,
     },
     access_type: {
       type: String,
-      enum: ["free", "paid"],
+      enum: ['free', 'paid'],
       required: true,
     },
     payment_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "WalletTransfer",
+      ref: 'WalletTransfer',
     },
     payment_amount: {
       type: Number,
@@ -39,8 +39,8 @@ const communityAccessSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "expired", "revoked"],
-      default: "active",
+      enum: ['active', 'expired', 'revoked'],
+      default: 'active',
     },
     granted_at: {
       type: Date,
@@ -51,11 +51,11 @@ const communityAccessSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
-);
+)
 
 // Compound index for efficient queries
-communityAccessSchema.index({ user_id: 1, community_id: 1 }, { unique: true });
-communityAccessSchema.index({ community_id: 1, access_type: 1 });
+communityAccessSchema.index({ user_id: 1, community_id: 1 }, { unique: true })
+communityAccessSchema.index({ community_id: 1, access_type: 1 })
 
-const CommunityAccess = mongoose.model("CommunityAccess", communityAccessSchema);
-module.exports = CommunityAccess;
+const CommunityAccess = mongoose.model('CommunityAccess', communityAccessSchema)
+module.exports = CommunityAccess

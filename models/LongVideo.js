@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const longVideoSchema = new mongoose.Schema(
   {
@@ -29,15 +29,20 @@ const longVideoSchema = new mongoose.Schema(
     comments: {
       type: [
         {
-          user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
           comment: { type: String, required: true, trim: true, maxlength: 500 },
           likes: { type: Number, default: 0 },
           replies: [
             {
-              user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-              reply: { type: String, required: true, trim: true, maxlength: 500 },
+              user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+              reply: {
+                type: String,
+                required: true,
+                trim: true,
+                maxlength: 500,
+              },
               likes: { type: Number, default: 0 },
-              replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+              replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
               createdAt: { type: Date, default: Date.now },
             },
           ],
@@ -57,7 +62,7 @@ const longVideoSchema = new mongoose.Schema(
     },
     series: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Series",
+      ref: 'Series',
       default: null,
     },
     episode_number: {
@@ -79,12 +84,23 @@ const longVideoSchema = new mongoose.Schema(
     genre: {
       type: String,
       required: true,
-      enum: ["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Romance", "Documentary", "Thriller", "Fantasy", "Animation"],
+      enum: [
+        'Action',
+        'Comedy',
+        'Drama',
+        'Horror',
+        'Sci-Fi',
+        'Romance',
+        'Documentary',
+        'Thriller',
+        'Fantasy',
+        'Animation',
+      ],
     },
     type: {
       type: String,
       required: true,
-      enum: ["Free", "Paid"],
+      enum: ['Free', 'Paid'],
     },
     language: {
       type: String,
@@ -98,42 +114,46 @@ const longVideoSchema = new mongoose.Schema(
     },
     created_by: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     updated_by: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     community: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Community",
+      ref: 'Community',
       required: true,
     },
   },
   { timestamps: true }
-);
+)
 
-longVideoSchema.index({ community: 1, genre: 1 });
-longVideoSchema.index({ series: 1, season_number: 1, episode_number: 1 });
-longVideoSchema.index({ created_by: 1 });
-longVideoSchema.index({ is_standalone: 1 });
-longVideoSchema.index({ name: "text", description: "text" });
+longVideoSchema.index({ community: 1, genre: 1 })
+longVideoSchema.index({ series: 1, season_number: 1, episode_number: 1 })
+longVideoSchema.index({ created_by: 1 })
+longVideoSchema.index({ is_standalone: 1 })
+longVideoSchema.index({ name: 'text', description: 'text' })
 
-longVideoSchema.pre("save", function (next) {
+longVideoSchema.pre('save', function (next) {
   if (!this.is_standalone) {
     if (!this.series || !this.episode_number) {
-      return next(new Error("Series and episode number are required for non-standalone videos"));
+      return next(
+        new Error(
+          'Series and episode number are required for non-standalone videos'
+        )
+      )
     }
   } else {
-    this.series = null;
-    this.episode_number = null;
-    this.season_number = 1;
+    this.series = null
+    this.episode_number = null
+    this.season_number = 1
   }
-  next();
-});
+  next()
+})
 
-const LongVideo = mongoose.model("LongVideo", longVideoSchema);
+const LongVideo = mongoose.model('LongVideo', longVideoSchema)
 
-module.exports = LongVideo;
+module.exports = LongVideo

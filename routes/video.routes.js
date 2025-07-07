@@ -1,4 +1,4 @@
-const router = require("express").Router();
+const router = require('express').Router()
 const {
   uploadVideo,
   searchVideos,
@@ -9,35 +9,41 @@ const {
   getVideosByGenre,
   incrementVideoView,
   getRelatedVideos,
-} = require("../controller/video.controller");
-const { dynamicVideoUpload, handleMulterError } = require("../utils/utils");
-const { authenticateToken } = require("../middleware/auth");
+} = require('../controller/video.controller')
+const { dynamicVideoUpload, handleMulterError } = require('../utils/utils')
+const { authenticateToken } = require('../middleware/auth')
 
 // Route to upload a new video
-router.post("/upload", authenticateToken, dynamicVideoUpload, uploadVideo, handleMulterError);
+router.post(
+  '/upload',
+  authenticateToken,
+  dynamicVideoUpload,
+  uploadVideo,
+  handleMulterError
+)
 
 // Route to search for videos with pagination
-router.get("/search", searchVideos);
+router.get('/search', searchVideos)
 
 // Route to get trending videos
-router.get("/trending", getTrendingVideos);
+router.get('/trending', getTrendingVideos)
 
 // Route to get videos by genre
-router.get("/by-genre/:genre", getVideosByGenre);
+router.get('/by-genre/:genre', getVideosByGenre)
 
 // Route to get a video by ID
-router.get("/:id", getVideoById);
+router.get('/:id', getVideoById)
 
 // Route to update a video by ID
-router.put("/:id", authenticateToken, updateVideo);
+router.put('/:id', authenticateToken, updateVideo)
 
 // Route to delete a video by ID
-router.delete("/:id", authenticateToken, deleteVideo);
+router.delete('/:id', authenticateToken, deleteVideo)
 
 // Route to increment video view count
-router.post("/:id/view", authenticateToken, incrementVideoView);
+router.post('/:id/view', authenticateToken, incrementVideoView)
 
 // Route to get related videos by video ID
-router.get("/:id/related", getRelatedVideos);
+router.get('/:id/related', getRelatedVideos)
 
-module.exports = router;
+module.exports = router

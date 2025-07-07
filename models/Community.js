@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 const communitySchema = new mongoose.Schema(
   {
     name: {
@@ -11,21 +11,21 @@ const communitySchema = new mongoose.Schema(
     },
     profile_photo: {
       type: String,
-      default: "",
+      default: '',
     },
     founder: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     followers: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "User",
+      ref: 'User',
       default: [],
     },
     creators: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "User",
+      ref: 'User',
       default: [],
     },
     creator_limit: {
@@ -36,22 +36,22 @@ const communitySchema = new mongoose.Schema(
     },
     long_videos: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "LongVideo",
+      ref: 'LongVideo',
       default: [],
     },
     short_videos: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "ShortVideo",
+      ref: 'ShortVideo',
       default: [],
     },
     series: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Series",
+      ref: 'Series',
       default: [],
     },
     bio: {
       type: String,
-      default: "",
+      default: '',
       trim: true,
       maxlength: 500,
     },
@@ -63,8 +63,8 @@ const communitySchema = new mongoose.Schema(
     },
     community_fee_type: {
       type: String,
-      enum: ["free", "paid"],
-      default: "free",
+      enum: ['free', 'paid'],
+      default: 'free',
     },
     community_fee_amount: {
       type: Number,
@@ -74,7 +74,7 @@ const communitySchema = new mongoose.Schema(
     },
     community_fee_description: {
       type: String,
-      default: "",
+      default: '',
       trim: true,
       maxlength: 200,
     },
@@ -102,21 +102,21 @@ const communitySchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
-);
+)
 
 // Add validation for revenue sharing percentages
-communitySchema.pre("save", function (next) {
+communitySchema.pre('save', function (next) {
   if (
     this.revenue_sharing.founder_percentage +
       this.revenue_sharing.platform_percentage !==
     100
   ) {
-    this.revenue_sharing.founder_percentage = 100;
-    this.revenue_sharing.platform_percentage = 0;
+    this.revenue_sharing.founder_percentage = 100
+    this.revenue_sharing.platform_percentage = 0
   }
-  next();
-});
+  next()
+})
 
-const Community = mongoose.model("Community", communitySchema);
+const Community = mongoose.model('Community', communitySchema)
 
-module.exports = Community;
+module.exports = Community

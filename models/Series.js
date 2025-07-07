@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const seriesSchema = new mongoose.Schema(
   {
@@ -22,12 +22,23 @@ const seriesSchema = new mongoose.Schema(
     bannerUrl: {
       type: String,
       trim: true,
-      default: "",
+      default: '',
     },
     genre: {
       type: String,
       required: true,
-      enum: ["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Romance", "Documentary", "Thriller", "Fantasy", "Animation"],
+      enum: [
+        'Action',
+        'Comedy',
+        'Drama',
+        'Horror',
+        'Sci-Fi',
+        'Romance',
+        'Documentary',
+        'Thriller',
+        'Fantasy',
+        'Animation',
+      ],
     },
     language: {
       type: String,
@@ -42,13 +53,13 @@ const seriesSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ["Free", "Paid"],
+      enum: ['Free', 'Paid'],
     },
     status: {
       type: String,
       required: true,
-      enum: ["Ongoing", "Completed", "Cancelled", "On Hold"],
-      default: "Ongoing",
+      enum: ['Ongoing', 'Completed', 'Cancelled', 'On Hold'],
+      default: 'Ongoing',
     },
     total_episodes: {
       type: Number,
@@ -57,7 +68,7 @@ const seriesSchema = new mongoose.Schema(
     episodes: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "LongVideo",
+        ref: 'LongVideo',
       },
     ],
     release_date: {
@@ -87,27 +98,27 @@ const seriesSchema = new mongoose.Schema(
     },
     created_by: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     updated_by: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     community: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Community",
+      ref: 'Community',
       required: true,
     },
   },
   { timestamps: true }
-);
+)
 
-seriesSchema.index({ community: 1, genre: 1 });
-seriesSchema.index({ created_by: 1 });
-seriesSchema.index({ title: "text", description: "text" });
+seriesSchema.index({ community: 1, genre: 1 })
+seriesSchema.index({ created_by: 1 })
+seriesSchema.index({ title: 'text', description: 'text' })
 
-const Series = mongoose.model("Series", seriesSchema);
+const Series = mongoose.model('Series', seriesSchema)
 
-module.exports = Series;
+module.exports = Series

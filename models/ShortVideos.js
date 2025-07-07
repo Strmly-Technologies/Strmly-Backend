@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const shortVideoSchema = new mongoose.Schema(
   {
@@ -29,15 +29,20 @@ const shortVideoSchema = new mongoose.Schema(
     comments: {
       type: [
         {
-          user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
           comment: { type: String, required: true, trim: true, maxlength: 500 },
           likes: { type: Number, default: 0 },
           replies: [
             {
-              user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-              reply: { type: String, required: true, trim: true, maxlength: 500 },
+              user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+              reply: {
+                type: String,
+                required: true,
+                trim: true,
+                maxlength: 500,
+              },
               likes: { type: Number, default: 0 },
-              replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+              replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
               createdAt: { type: Date, default: Date.now },
             },
           ],
@@ -57,26 +62,26 @@ const shortVideoSchema = new mongoose.Schema(
     },
     created_by: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     updated_by: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     community: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Community",
+      ref: 'Community',
     },
   },
   { timestamps: true }
-);
+)
 
-shortVideoSchema.index({ community: 1 });
-shortVideoSchema.index({ created_by: 1 });
-shortVideoSchema.index({ name: "text", description: "text" });
+shortVideoSchema.index({ community: 1 })
+shortVideoSchema.index({ created_by: 1 })
+shortVideoSchema.index({ name: 'text', description: 'text' })
 
-const ShortVideo = mongoose.model("ShortVideo", shortVideoSchema);
+const ShortVideo = mongoose.model('ShortVideo', shortVideoSchema)
 
-module.exports = ShortVideo;
+module.exports = ShortVideo

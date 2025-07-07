@@ -1,25 +1,25 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const walletTransferSchema = new mongoose.Schema(
   {
     sender_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     receiver_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     sender_wallet_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Wallet",
+      ref: 'Wallet',
       required: true,
     },
     receiver_wallet_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Wallet",
+      ref: 'Wallet',
       required: true,
     },
     total_amount: {
@@ -38,19 +38,33 @@ const walletTransferSchema = new mongoose.Schema(
     currency: {
       type: String,
       required: true,
-      default: "INR",
+      default: 'INR',
     },
     transfer_type: {
       type: String,
       required: true,
-      enum: ["series_purchase", "video_purchase", "tip", "gift", "comment_gift", "community_fee"],
+      enum: [
+        'series_purchase',
+        'video_purchase',
+        'tip',
+        'gift',
+        'comment_gift',
+        'community_fee',
+      ],
     },
     content_id: {
       type: mongoose.Schema.Types.ObjectId,
     },
     content_type: {
       type: String,
-      enum: ["Series", "LongVideo", "ShortVideo", "series", "comment", "Community"],
+      enum: [
+        'Series',
+        'LongVideo',
+        'ShortVideo',
+        'series',
+        'comment',
+        'Community',
+      ],
     },
     description: {
       type: String,
@@ -75,8 +89,8 @@ const walletTransferSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "completed", "failed", "reversed"],
-      default: "completed",
+      enum: ['pending', 'completed', 'failed', 'reversed'],
+      default: 'completed',
     },
     platform_fee_percentage: {
       type: Number,
@@ -88,7 +102,7 @@ const walletTransferSchema = new mongoose.Schema(
     },
     source_payment_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Payment",
+      ref: 'Payment',
     },
     metadata: {
       series_title: String,
@@ -103,11 +117,11 @@ const walletTransferSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
-);
+)
 
-walletTransferSchema.index({ sender_id: 1, createdAt: -1 });
-walletTransferSchema.index({ receiver_id: 1, createdAt: -1 });
-walletTransferSchema.index({ content_id: 1, content_type: 1 });
+walletTransferSchema.index({ sender_id: 1, createdAt: -1 })
+walletTransferSchema.index({ receiver_id: 1, createdAt: -1 })
+walletTransferSchema.index({ content_id: 1, content_type: 1 })
 
-const WalletTransfer = mongoose.model("WalletTransfer", walletTransferSchema);
-module.exports = WalletTransfer;
+const WalletTransfer = mongoose.model('WalletTransfer', walletTransferSchema)
+module.exports = WalletTransfer

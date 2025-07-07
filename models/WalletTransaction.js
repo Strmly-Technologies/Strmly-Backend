@@ -1,36 +1,36 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const walletTransactionSchema = new mongoose.Schema(
   {
     wallet_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Wallet",
+      ref: 'Wallet',
       required: true,
     },
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     transaction_type: {
       type: String,
       required: true,
-      enum: ["credit", "debit"],
+      enum: ['credit', 'debit'],
     },
     transaction_category: {
       type: String,
       required: true,
       enum: [
-        "wallet_load",        // User loads money from bank
-        "series_purchase",    // User buys series
-        "creator_earning",    // Creator receives 70%
-        "platform_commission", // Platform gets 30%
-        "withdrawal_request", // Creator withdraws
-        "refund",
-        "comment_gift",       // Gift to comment author
-        "gift_received",      // Received gift for comment
-        "community_fee",      // Creator pays community upload fee
-        "community_fee_received" // Founder receives community fee
+        'wallet_load', // User loads money from bank
+        'series_purchase', // User buys series
+        'creator_earning', // Creator receives 70%
+        'platform_commission', // Platform gets 30%
+        'withdrawal_request', // Creator withdraws
+        'refund',
+        'comment_gift', // Gift to comment author
+        'gift_received', // Received gift for comment
+        'community_fee', // Creator pays community upload fee
+        'community_fee_received', // Founder receives community fee
       ],
     },
     amount: {
@@ -41,7 +41,7 @@ const walletTransactionSchema = new mongoose.Schema(
     currency: {
       type: String,
       required: true,
-      default: "INR",
+      default: 'INR',
     },
     description: {
       type: String,
@@ -62,11 +62,11 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     content_type: {
       type: String,
-      enum: ["Series", "LongVideo","series"],
+      enum: ['Series', 'LongVideo', 'series'],
     },
     transfer_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "WalletTransfer",
+      ref: 'WalletTransfer',
     },
     razorpay_payment_id: {
       type: String,
@@ -76,8 +76,8 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "completed", "failed", "cancelled"],
-      default: "completed",
+      enum: ['pending', 'completed', 'failed', 'cancelled'],
+      default: 'completed',
     },
     metadata: {
       series_title: String,
@@ -93,12 +93,15 @@ const walletTransactionSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
-);
+)
 
 // Indexes for better performance
-walletTransactionSchema.index({ wallet_id: 1, createdAt: -1 });
-walletTransactionSchema.index({ user_id: 1, transaction_type: 1 });
-walletTransactionSchema.index({ transaction_category: 1, createdAt: -1 });
+walletTransactionSchema.index({ wallet_id: 1, createdAt: -1 })
+walletTransactionSchema.index({ user_id: 1, transaction_type: 1 })
+walletTransactionSchema.index({ transaction_category: 1, createdAt: -1 })
 
-const WalletTransaction = mongoose.model("WalletTransaction", walletTransactionSchema);
-module.exports = WalletTransaction;
+const WalletTransaction = mongoose.model(
+  'WalletTransaction',
+  walletTransactionSchema
+)
+module.exports = WalletTransaction

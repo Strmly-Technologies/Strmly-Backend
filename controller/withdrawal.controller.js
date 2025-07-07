@@ -1,118 +1,127 @@
-const mongoose = require("mongoose");
-const razorpay = require("../config/razorpay");
-const Wallet = require("../models/Wallet");
-const Withdrawal = require("../models/Withdrawal");
-const WalletTransaction = require("../models/WalletTransaction");
-const User = require("../models/User");
-const { handleError } = require("../utils/utils");
+const mongoose = require('mongoose')
+const razorpay = require('../config/razorpay')
+const Wallet = require('../models/Wallet')
+const Withdrawal = require('../models/Withdrawal')
+const WalletTransaction = require('../models/WalletTransaction')
+const User = require('../models/User')
+const { handleError } = require('../utils/utils')
 
-const MIN_WITHDRAWAL_AMOUNT = 100;
-const MAX_WITHDRAWAL_AMOUNT = 100000;
-const MAX_NOTES_LENGTH = 200;
-const RAZORPAY_FEE_PERCENTAGE = 0.5;
+const MIN_WITHDRAWAL_AMOUNT = 100
+const MAX_WITHDRAWAL_AMOUNT = 100000
+const MAX_NOTES_LENGTH = 200
+const RAZORPAY_FEE_PERCENTAGE = 0.5
 
 const validateAmount = (amount) => {
-  if (!amount || typeof amount !== "number") {
-    return { isValid: false, error: "Amount is required and must be a number" };
+  if (!amount || typeof amount !== 'number') {
+    return {
+      isValid: false,
+      error: 'Amount is required and must be a number',
+    }
   }
   if (amount < MIN_WITHDRAWAL_AMOUNT) {
-    return { isValid: false, error: `Minimum withdrawal amount is ₹${MIN_WITHDRAWAL_AMOUNT}` };
+    return {
+      isValid: false,
+      error: `Minimum withdrawal amount is ₹${MIN_WITHDRAWAL_AMOUNT}`,
+    }
   }
   if (amount > MAX_WITHDRAWAL_AMOUNT) {
-    return { isValid: false, error: `Maximum withdrawal amount is ₹${MAX_WITHDRAWAL_AMOUNT} per transaction` };
+    return {
+      isValid: false,
+      error: `Maximum withdrawal amount is ₹${MAX_WITHDRAWAL_AMOUNT} per transaction`,
+    }
   }
-  return { isValid: true };
-};
+  return { isValid: true }
+}
 
-const validateObjectId = (id, fieldName = "ID") => {
+const validateObjectId = (id, fieldName = 'ID') => {
   if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-    return { isValid: false, error: `Invalid ${fieldName}` };
+    return { isValid: false, error: `Invalid ${fieldName}` }
   }
-  return { isValid: true };
-};
+  return { isValid: true }
+}
 
 const generateReferenceId = (creatorId) => {
-  const shortId = creatorId.toString().slice(-8);
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.random().toString(36).substr(2, 4);
-  return `WD_${shortId}_${timestamp}_${random}`;
-};
+  const shortId = creatorId.toString().slice(-8)
+  const timestamp = Date.now().toString().slice(-6)
+  const random = Math.random().toString(36).substr(2, 4)
+  return `WD_${shortId}_${timestamp}_${random}`
+}
 
 const createWithdrawalRequest = async (req, res, next) => {
   try {
-    const { amount, notes } = req.body;
-    const creatorId = req.user.id;
+    const { amount, notes } = req.body
+    const creatorId = req.user.id
 
-    const amountValidation = validateAmount(amount);
+    const amountValidation = validateAmount(amount)
     if (!amountValidation.isValid) {
       return res.status(400).json({
         success: false,
         error: amountValidation.error,
-        code: "INVALID_AMOUNT",
-      });
+        code: 'INVALID_AMOUNT',
+      })
     }
 
     if (notes && notes.length > MAX_NOTES_LENGTH) {
       return res.status(400).json({
         success: false,
         error: `Notes must be less than ${MAX_NOTES_LENGTH} characters`,
-        code: "INVALID_NOTES_LENGTH",
-      });
+        code: 'INVALID_NOTES_LENGTH',
+      })
     }
 
-    const creator = await User.findById(creatorId);
+    const creator = await User.findById(creatorId)
     if (!creator) {
       return res.status(404).json({
         success: false,
-        error: "Creator not found",
-        code: "CREATOR_NOT_FOUND",
-      });
+        error: 'Creator not found',
+        code: 'CREATOR_NOT_FOUND',
+      })
     }
 
     if (!creator.creator_profile?.fund_account_id) {
       return res.status(400).json({
         success: false,
-        error: "Bank account not setup. Please add your bank details first.",
-        action: "setup_bank_account",
-        code: "BANK_ACCOUNT_NOT_SETUP",
-      });
+        error: 'Bank account not setup. Please add your bank details first.',
+        action: 'setup_bank_account',
+        code: 'BANK_ACCOUNT_NOT_SETUP',
+      })
     }
 
-    const wallet = await Wallet.findOne({ user_id: creatorId });
+    const wallet = await Wallet.findOne({ user_id: creatorId })
     if (!wallet) {
       return res.status(404).json({
         success: false,
-        error: "Wallet not found",
-        code: "WALLET_NOT_FOUND",
-      });
+        error: 'Wallet not found',
+        code: 'WALLET_NOT_FOUND',
+      })
     }
 
-    if (wallet.status !== "active") {
+    if (wallet.status !== 'active') {
       return res.status(400).json({
         success: false,
-        error: "Wallet is not active",
-        code: "WALLET_INACTIVE",
-      });
+        error: 'Wallet is not active',
+        code: 'WALLET_INACTIVE',
+      })
     }
 
     if (wallet.balance < amount) {
       return res.status(400).json({
         success: false,
-        error: "Insufficient wallet balance",
+        error: 'Insufficient wallet balance',
         currentBalance: wallet.balance,
         requestedAmount: amount,
         shortfall: amount - wallet.balance,
-        code: "INSUFFICIENT_BALANCE",
-      });
+        code: 'INSUFFICIENT_BALANCE',
+      })
     }
 
-    const platformFee = 0;
-    const razorpayFee = Math.ceil((amount * RAZORPAY_FEE_PERCENTAGE) / 100);
-    const finalAmount = amount - platformFee - razorpayFee;
+    const platformFee = 0
+    const razorpayFee = Math.ceil((amount * RAZORPAY_FEE_PERCENTAGE) / 100)
+    const finalAmount = amount - platformFee - razorpayFee
 
-    const referenceId = generateReferenceId(creatorId);
+    const referenceId = generateReferenceId(creatorId)
 
-    const session = await mongoose.startSession();
+    const session = await mongoose.startSession()
 
     try {
       await session.withTransaction(async () => {
@@ -120,9 +129,9 @@ const createWithdrawalRequest = async (req, res, next) => {
           creator_id: creatorId,
           wallet_id: wallet._id,
           amount: amount,
-          currency: "INR",
+          currency: 'INR',
           fund_account_id: creator.creator_profile.fund_account_id,
-          status: "pending",
+          status: 'pending',
           bank_details: creator.creator_profile.bank_details,
           wallet_balance_before: wallet.balance,
           wallet_balance_after: wallet.balance - amount,
@@ -130,44 +139,45 @@ const createWithdrawalRequest = async (req, res, next) => {
           razorpay_fee: razorpayFee,
           final_amount: finalAmount,
           reference_id: referenceId,
-          internal_notes: notes || "",
+          internal_notes: notes || '',
           requested_at: new Date(),
-        });
+        })
 
-        await withdrawal.save({ session });
+        await withdrawal.save({ session })
 
-        wallet.balance -= amount;
-        wallet.total_withdrawn += amount;
-        wallet.last_transaction_at = new Date();
-        await wallet.save({ session });
+        wallet.balance -= amount
+        wallet.total_withdrawn += amount
+        wallet.last_transaction_at = new Date()
+        await wallet.save({ session })
 
         const walletTransaction = new WalletTransaction({
           wallet_id: wallet._id,
           user_id: creatorId,
-          transaction_type: "debit",
-          transaction_category: "withdrawal_request",
+          transaction_type: 'debit',
+          transaction_category: 'withdrawal_request',
           amount: amount,
-          currency: "INR",
+          currency: 'INR',
           description: `Withdrawal request: ₹${amount} to bank account`,
           balance_before: wallet.balance + amount,
           balance_after: wallet.balance,
-          status: "pending",
+          status: 'pending',
           metadata: {
             withdrawal_id: withdrawal._id,
             reference_id: referenceId,
-            bank_account: creator.creator_profile.bank_details.account_number?.slice(-4),
+            bank_account:
+              creator.creator_profile.bank_details.account_number?.slice(-4),
           },
-        });
+        })
 
-        await walletTransaction.save({ session });
+        await walletTransaction.save({ session })
 
         try {
           const payout = await razorpay.payouts.create({
             fund_account_id: creator.creator_profile.fund_account_id,
             amount: finalAmount * 100,
-            currency: "INR",
-            mode: "IMPS",
-            purpose: "payout",
+            currency: 'INR',
+            mode: 'IMPS',
+            purpose: 'payout',
             queue_if_low_balance: true,
             reference_id: referenceId,
             narration: `Strmly Creator Withdrawal - ${referenceId}`,
@@ -177,39 +187,41 @@ const createWithdrawalRequest = async (req, res, next) => {
               withdrawal_amount: amount,
               platform_fee: platformFee,
             },
-          });
+          })
 
-          withdrawal.razorpay_payout_id = payout.id;
-          withdrawal.status = payout.status;
-          if (payout.status === "processed") {
-            withdrawal.processed_at = new Date();
-            withdrawal.utr = payout.utr;
+          withdrawal.razorpay_payout_id = payout.id
+          withdrawal.status = payout.status
+          if (payout.status === 'processed') {
+            withdrawal.processed_at = new Date()
+            withdrawal.utr = payout.utr
           }
-          await withdrawal.save({ session });
+          await withdrawal.save({ session })
 
-          walletTransaction.status = "completed";
-          await walletTransaction.save({ session });
+          walletTransaction.status = 'completed'
+          await walletTransaction.save({ session })
         } catch (payoutError) {
-          wallet.balance += amount;
-          wallet.total_withdrawn -= amount;
-          await wallet.save({ session });
+          wallet.balance += amount
+          wallet.total_withdrawn -= amount
+          await wallet.save({ session })
 
-          withdrawal.status = "failed";
-          withdrawal.failure_reason = payoutError.message;
-          await withdrawal.save({ session });
+          withdrawal.status = 'failed'
+          withdrawal.failure_reason = payoutError.message
+          await withdrawal.save({ session })
 
-          walletTransaction.status = "failed";
-          await walletTransaction.save({ session });
+          walletTransaction.status = 'failed'
+          await walletTransaction.save({ session })
 
-          throw new Error(`Payout initiation failed: ${payoutError.message}`);
+          throw new Error(`Payout initiation failed: ${payoutError.message}`)
         }
-      });
+      })
 
-      const finalWithdrawal = await Withdrawal.findOne({ reference_id: referenceId }).populate("creator_id", "username email");
+      const finalWithdrawal = await Withdrawal.findOne({
+        reference_id: referenceId,
+      }).populate('creator_id', 'username email')
 
       res.status(201).json({
         success: true,
-        message: "Withdrawal request submitted successfully",
+        message: 'Withdrawal request submitted successfully',
         withdrawal: {
           id: finalWithdrawal._id,
           referenceId: finalWithdrawal.reference_id,
@@ -221,7 +233,8 @@ const createWithdrawalRequest = async (req, res, next) => {
           requestedAt: finalWithdrawal.requested_at,
           processedAt: finalWithdrawal.processed_at,
           bankDetails: {
-            accountNumber: finalWithdrawal.bank_details.account_number?.slice(-4),
+            accountNumber:
+              finalWithdrawal.bank_details.account_number?.slice(-4),
             ifscCode: finalWithdrawal.bank_details.ifsc_code,
             beneficiaryName: finalWithdrawal.bank_details.beneficiary_name,
           },
@@ -232,73 +245,83 @@ const createWithdrawalRequest = async (req, res, next) => {
           currentBalance: wallet.balance,
         },
         timeline: {
-          estimatedDelivery: "2-3 business days",
-          trackingInfo: finalWithdrawal.razorpay_payout_id ? `Track with ID: ${finalWithdrawal.razorpay_payout_id}` : "Processing...",
+          estimatedDelivery: '2-3 business days',
+          trackingInfo: finalWithdrawal.razorpay_payout_id
+            ? `Track with ID: ${finalWithdrawal.razorpay_payout_id}`
+            : 'Processing...',
         },
-      });
+      })
     } catch (error) {
-      await session.abortTransaction();
-      throw error;
+      await session.abortTransaction()
+      throw error
     } finally {
       if (session.inTransaction()) {
-        await session.endSession();
+        await session.endSession()
       }
     }
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const getWithdrawalHistory = async (req, res, next) => {
   try {
-    const creatorId = req.user.id;
-    const { page = 1, limit = 20, status } = req.query;
+    const creatorId = req.user.id
+    const { page = 1, limit = 20, status } = req.query
 
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
+    const pageNum = parseInt(page)
+    const limitNum = parseInt(limit)
 
     if (pageNum < 1 || pageNum > 1000) {
       return res.status(400).json({
         success: false,
-        error: "Page number must be between 1 and 1000",
-        code: "INVALID_PAGE_NUMBER",
-      });
+        error: 'Page number must be between 1 and 1000',
+        code: 'INVALID_PAGE_NUMBER',
+      })
     }
 
     if (limitNum < 1 || limitNum > 100) {
       return res.status(400).json({
         success: false,
-        error: "Limit must be between 1 and 100",
-        code: "INVALID_LIMIT",
-      });
+        error: 'Limit must be between 1 and 100',
+        code: 'INVALID_LIMIT',
+      })
     }
 
-    const filter = { creator_id: creatorId };
+    const filter = { creator_id: creatorId }
 
     if (status) {
-      const validStatuses = ["pending", "queued", "processing", "processed", "cancelled", "failed", "reversed"];
+      const validStatuses = [
+        'pending',
+        'queued',
+        'processing',
+        'processed',
+        'cancelled',
+        'failed',
+        'reversed',
+      ]
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           success: false,
-          error: `Status must be one of: ${validStatuses.join(", ")}`,
-          code: "INVALID_STATUS",
-        });
+          error: `Status must be one of: ${validStatuses.join(', ')}`,
+          code: 'INVALID_STATUS',
+        })
       }
-      filter.status = status;
+      filter.status = status
     }
 
     const withdrawals = await Withdrawal.find(filter)
       .sort({ createdAt: -1 })
       .limit(limitNum)
       .skip((pageNum - 1) * limitNum)
-      .select("-bank_details.account_number")
-      .lean();
+      .select('-bank_details.account_number')
+      .lean()
 
-    const total = await Withdrawal.countDocuments(filter);
+    const total = await Withdrawal.countDocuments(filter)
 
     res.status(200).json({
       success: true,
-      message: "Withdrawal history retrieved successfully",
+      message: 'Withdrawal history retrieved successfully',
       withdrawals: withdrawals.map((wd) => ({
         id: wd._id,
         referenceId: wd.reference_id,
@@ -323,60 +346,74 @@ const getWithdrawalHistory = async (req, res, next) => {
         itemsPerPage: limitNum,
       },
       summary: {
-        totalWithdrawn: withdrawals.reduce((sum, wd) => (wd.status === "processed" ? sum + wd.final_amount : sum), 0),
-        pendingAmount: withdrawals.reduce((sum, wd) => (["pending", "queued", "processing"].includes(wd.status) ? sum + wd.amount : sum), 0),
+        totalWithdrawn: withdrawals.reduce(
+          (sum, wd) =>
+            wd.status === 'processed' ? sum + wd.final_amount : sum,
+          0
+        ),
+        pendingAmount: withdrawals.reduce(
+          (sum, wd) =>
+            ['pending', 'queued', 'processing'].includes(wd.status)
+              ? sum + wd.amount
+              : sum,
+          0
+        ),
       },
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const checkWithdrawalStatus = async (req, res, next) => {
   try {
-    const { withdrawalId } = req.params;
-    const creatorId = req.user.id;
+    const { withdrawalId } = req.params
+    const creatorId = req.user.id
 
-    const withdrawalValidation = validateObjectId(withdrawalId, "Withdrawal ID");
+    const withdrawalValidation = validateObjectId(withdrawalId, 'Withdrawal ID')
     if (!withdrawalValidation.isValid) {
       return res.status(400).json({
         success: false,
         error: withdrawalValidation.error,
-        code: "INVALID_WITHDRAWAL_ID",
-      });
+        code: 'INVALID_WITHDRAWAL_ID',
+      })
     }
 
     const withdrawal = await Withdrawal.findOne({
       _id: withdrawalId,
       creator_id: creatorId,
-    });
+    })
 
     if (!withdrawal) {
       return res.status(404).json({
         success: false,
-        error: "Withdrawal not found",
-        code: "WITHDRAWAL_NOT_FOUND",
-      });
+        error: 'Withdrawal not found',
+        code: 'WITHDRAWAL_NOT_FOUND',
+      })
     }
 
     if (withdrawal.razorpay_payout_id) {
       try {
-        const payout = await razorpay.payouts.fetch(withdrawal.razorpay_payout_id);
+        const payout = await razorpay.payouts.fetch(
+          withdrawal.razorpay_payout_id
+        )
 
         if (payout.status !== withdrawal.status) {
-          withdrawal.status = payout.status;
-          if (payout.status === "processed" && !withdrawal.processed_at) {
-            withdrawal.processed_at = new Date();
-            withdrawal.utr = payout.utr;
+          withdrawal.status = payout.status
+          if (payout.status === 'processed' && !withdrawal.processed_at) {
+            withdrawal.processed_at = new Date()
+            withdrawal.utr = payout.utr
           }
-          await withdrawal.save();
+          await withdrawal.save()
         }
-      } catch (razorpayError) {}
+      } catch (razorpayError) {
+        console.error('Error fetching payout:', razorpayError)
+      }
     }
 
     res.status(200).json({
       success: true,
-      message: "Withdrawal status retrieved",
+      message: 'Withdrawal status retrieved',
       withdrawal: {
         id: withdrawal._id,
         referenceId: withdrawal.reference_id,
@@ -389,27 +426,27 @@ const checkWithdrawalStatus = async (req, res, next) => {
         failureReason: withdrawal.failure_reason,
         timeline: getWithdrawalTimeline(withdrawal.status),
       },
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const getWithdrawalTimeline = (status) => {
   const timelines = {
-    pending: "Withdrawal request received, processing...",
-    queued: "Withdrawal queued, will be processed shortly",
-    processing: "Payment is being processed by bank",
-    processed: "Money transferred successfully to your bank account",
-    failed: "Withdrawal failed, money refunded to wallet",
-    cancelled: "Withdrawal cancelled, money refunded to wallet",
-  };
+    pending: 'Withdrawal request received, processing...',
+    queued: 'Withdrawal queued, will be processed shortly',
+    processing: 'Payment is being processed by bank',
+    processed: 'Money transferred successfully to your bank account',
+    failed: 'Withdrawal failed, money refunded to wallet',
+    cancelled: 'Withdrawal cancelled, money refunded to wallet',
+  }
 
-  return timelines[status] || "Status unknown";
-};
+  return timelines[status] || 'Status unknown'
+}
 
 module.exports = {
   createWithdrawalRequest,
   getWithdrawalHistory,
   checkWithdrawalStatus,
-};
+}

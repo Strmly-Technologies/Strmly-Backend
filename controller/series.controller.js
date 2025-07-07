@@ -1,23 +1,45 @@
-const Series = require("../models/Series");
-const LongVideo = require("../models/LongVideo");
-const { handleError } = require("../utils/utils");
+const Series = require('../models/Series')
+const LongVideo = require('../models/LongVideo')
+const { handleError } = require('../utils/utils')
 
 const createSeries = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const { title, description, posterUrl, bannerUrl, genre, language, age_restriction, type, release_date, seasons, communityId } = req.body;
+    const userId = req.user.id
+    const {
+      title,
+      description,
+      posterUrl,
+      bannerUrl,
+      genre,
+      language,
+      age_restriction,
+      type,
+      release_date,
+      seasons,
+      communityId,
+    } = req.body
 
-    if (!title || !description || !posterUrl || !genre || !language || !type || !release_date || !communityId) {
+    if (
+      !title ||
+      !description ||
+      !posterUrl ||
+      !genre ||
+      !language ||
+      !type ||
+      !release_date ||
+      !communityId
+    ) {
       return res.status(400).json({
-        error: "Required fields: title, description, posterUrl, genre, language, type, release_date, communityId",
-      });
+        error:
+          'Required fields: title, description, posterUrl, genre, language, type, release_date, communityId',
+      })
     }
 
     const series = new Series({
       title,
       description,
       posterUrl,
-      bannerUrl: bannerUrl || "",
+      bannerUrl: bannerUrl || '',
       genre,
       language,
       age_restriction: age_restriction || false,
@@ -27,61 +49,64 @@ const createSeries = async (req, res, next) => {
       created_by: userId,
       updated_by: userId,
       community: communityId,
-    });
+    })
 
-    await series.save();
+    await series.save()
 
     res.status(201).json({
-      message: "Series created successfully",
+      message: 'Series created successfully',
       data: series,
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const getSeriesById = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params
 
     const series = await Series.findById(id)
-      .populate("created_by", "username email")
-      .populate("community", "name")
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
       .populate({
-        path: "episodes",
+        path: 'episodes',
         populate: {
-          path: "created_by",
-          select: "username email",
+          path: 'created_by',
+          select: 'username email',
         },
         options: { sort: { season_number: 1, episode_number: 1 } },
-      });
+      })
 
     if (!series) {
-      return res.status(404).json({ error: "Series not found" });
+      return res.status(404).json({ error: 'Series not found' })
     }
 
     res.status(200).json({
-      message: "Series retrieved successfully",
+      message: 'Series retrieved successfully',
       data: series,
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const updateSeries = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const userId = req.user.id;
-    const { title, description, posterUrl, bannerUrl, status, seasons } = req.body;
+    const { id } = req.params
+    const userId = req.user.id
+    const { title, description, posterUrl, bannerUrl, status, seasons } =
+      req.body
 
-    const series = await Series.findById(id);
+    const series = await Series.findById(id)
     if (!series) {
-      return res.status(404).json({ error: "Series not found" });
+      return res.status(404).json({ error: 'Series not found' })
     }
 
     if (series.created_by.toString() !== userId) {
-      return res.status(403).json({ error: "Not authorized to update this series" });
+      return res
+        .status(403)
+        .json({ error: 'Not authorized to update this series' })
     }
 
     const updateData = {
@@ -92,31 +117,35 @@ const updateSeries = async (req, res, next) => {
       ...(status && { status }),
       ...(seasons && { seasons }),
       updated_by: userId,
-    };
+    }
 
-    const updatedSeries = await Series.findByIdAndUpdate(id, updateData, { new: true });
+    const updatedSeries = await Series.findByIdAndUpdate(id, updateData, {
+      new: true,
+    })
 
     res.status(200).json({
-      message: "Series updated successfully",
+      message: 'Series updated successfully',
       data: updatedSeries,
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const deleteSeries = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const userId = req.user.id;
+    const { id } = req.params
+    const userId = req.user.id
 
-    const series = await Series.findById(id);
+    const series = await Series.findById(id)
     if (!series) {
-      return res.status(404).json({ error: "Series not found" });
+      return res.status(404).json({ error: 'Series not found' })
     }
 
     if (series.created_by.toString() !== userId) {
-      return res.status(403).json({ error: "Not authorized to delete this series" });
+      return res
+        .status(403)
+        .json({ error: 'Not authorized to delete this series' })
     }
 
     await LongVideo.updateMany(
@@ -129,56 +158,60 @@ const deleteSeries = async (req, res, next) => {
           season_number: 1,
         },
       }
-    );
+    )
 
-    await Series.findByIdAndDelete(id);
+    await Series.findByIdAndDelete(id)
 
     res.status(200).json({
-      message: "Series deleted successfully",
-    });
+      message: 'Series deleted successfully',
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const addEpisodeToSeries = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const userId = req.user.id;
-    const { videoId, episodeNumber, seasonNumber = 1 } = req.body;
+    const { id } = req.params
+    const userId = req.user.id
+    const { videoId, episodeNumber, seasonNumber = 1 } = req.body
 
     if (!videoId || !episodeNumber) {
-      return res.status(400).json({ error: "videoId and episodeNumber are required" });
+      return res
+        .status(400)
+        .json({ error: 'videoId and episodeNumber are required' })
     }
 
-    const series = await Series.findById(id);
+    const series = await Series.findById(id)
     if (!series) {
-      return res.status(404).json({ error: "Series not found" });
+      return res.status(404).json({ error: 'Series not found' })
     }
 
     if (series.created_by.toString() !== userId) {
-      return res.status(403).json({ error: "Not authorized to modify this series" });
+      return res
+        .status(403)
+        .json({ error: 'Not authorized to modify this series' })
     }
 
-    const video = await LongVideo.findById(videoId);
+    const video = await LongVideo.findById(videoId)
     if (!video) {
-      return res.status(404).json({ error: "Video not found" });
+      return res.status(404).json({ error: 'Video not found' })
     }
 
     if (video.created_by.toString() !== userId) {
-      return res.status(403).json({ error: "Not authorized to use this video" });
+      return res.status(403).json({ error: 'Not authorized to use this video' })
     }
 
     const existingEpisode = await LongVideo.findOne({
       series: id,
       season_number: seasonNumber,
       episode_number: episodeNumber,
-    });
+    })
 
     if (existingEpisode) {
       return res.status(400).json({
         error: `Episode ${episodeNumber} of season ${seasonNumber} already exists`,
-      });
+      })
     }
 
     await LongVideo.findByIdAndUpdate(videoId, {
@@ -186,42 +219,46 @@ const addEpisodeToSeries = async (req, res, next) => {
       episode_number: episodeNumber,
       season_number: seasonNumber,
       is_standalone: false,
-    });
+    })
 
     await Series.findByIdAndUpdate(id, {
       $addToSet: { episodes: videoId },
       $inc: { total_episodes: 1 },
-    });
+    })
 
     res.status(200).json({
-      message: "Episode added to series successfully",
-    });
+      message: 'Episode added to series successfully',
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const removeEpisodeFromSeries = async (req, res, next) => {
   try {
-    const { seriesId, episodeId } = req.params;
-    const userId = req.user.id;
+    const { seriesId, episodeId } = req.params
+    const userId = req.user.id
 
-    const series = await Series.findById(seriesId);
+    const series = await Series.findById(seriesId)
     if (!series) {
-      return res.status(404).json({ error: "Series not found" });
+      return res.status(404).json({ error: 'Series not found' })
     }
 
     if (series.created_by.toString() !== userId) {
-      return res.status(403).json({ error: "Not authorized to modify this series" });
+      return res
+        .status(403)
+        .json({ error: 'Not authorized to modify this series' })
     }
 
-    const video = await LongVideo.findById(episodeId);
+    const video = await LongVideo.findById(episodeId)
     if (!video) {
-      return res.status(404).json({ error: "Episode not found" });
+      return res.status(404).json({ error: 'Episode not found' })
     }
 
     if (video.series.toString() !== seriesId) {
-      return res.status(400).json({ error: "Episode does not belong to this series" });
+      return res
+        .status(400)
+        .json({ error: 'Episode does not belong to this series' })
     }
 
     await LongVideo.findByIdAndUpdate(episodeId, {
@@ -231,91 +268,96 @@ const removeEpisodeFromSeries = async (req, res, next) => {
         episode_number: null,
         season_number: 1,
       },
-    });
+    })
 
     await Series.findByIdAndUpdate(seriesId, {
       $pull: { episodes: episodeId },
       $inc: { total_episodes: -1 },
-    });
+    })
 
     res.status(200).json({
-      message: "Episode removed from series successfully",
-    });
+      message: 'Episode removed from series successfully',
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const searchSeries = async (req, res, next) => {
   try {
-    const { query, genre, page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const { query, genre, page = 1, limit = 10 } = req.query
+    const skip = (page - 1) * limit
 
     if (!query && !genre) {
-      return res.status(400).json({ error: "Search query or genre is required" });
+      return res
+        .status(400)
+        .json({ error: 'Search query or genre is required' })
     }
 
-    let searchCriteria = {};
+    let searchCriteria = {}
 
     if (query) {
-      const searchRegex = new RegExp(query, "i");
-      searchCriteria.$or = [{ title: searchRegex }, { description: searchRegex }];
+      const searchRegex = new RegExp(query, 'i')
+      searchCriteria.$or = [
+        { title: searchRegex },
+        { description: searchRegex },
+      ]
     }
 
     if (genre) {
-      searchCriteria.genre = genre;
+      searchCriteria.genre = genre
     }
 
     const series = await Series.find(searchCriteria)
-      .populate("created_by", "username email")
-      .populate("community", "name")
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
       .skip(skip)
       .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
 
-    const total = await Series.countDocuments(searchCriteria);
+    const total = await Series.countDocuments(searchCriteria)
 
     res.status(200).json({
-      message: "Series search results retrieved successfully",
+      message: 'Series search results retrieved successfully',
       data: series,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / limit),
         totalResults: total,
       },
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const getAllSeries = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const { page = 1, limit = 10 } = req.query
+    const skip = (page - 1) * limit
 
     const series = await Series.find()
-      .populate("created_by", "username email")
-      .populate("community", "name")
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
       .skip(skip)
       .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
 
-    const total = await Series.countDocuments();
+    const total = await Series.countDocuments()
 
     res.status(200).json({
-      message: "All series retrieved successfully",
+      message: 'All series retrieved successfully',
       data: series,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / limit),
         totalResults: total,
       },
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 module.exports = {
   createSeries,
@@ -326,4 +368,4 @@ module.exports = {
   removeEpisodeFromSeries,
   searchSeries,
   getAllSeries,
-};
+}

@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
+const mongoose = require('mongoose')
+const bcrypt = require('bcrypt')
 
 const userSchema = new mongoose.Schema(
   {
@@ -16,7 +16,6 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
-      match: /.+\@.+\..+/,
     },
     password: {
       type: String,
@@ -26,62 +25,62 @@ const userSchema = new mongoose.Schema(
     },
     saved_items: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Community",
+      ref: 'Community',
       default: [],
     },
     saved_videos: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "LongVideo",
+      ref: 'LongVideo',
       default: [],
     },
     saved_series: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Series",
+      ref: 'Series',
       default: [],
     },
     profile_photo: {
       type: String,
-      default: "",
+      default: '',
     },
     followers: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "User",
+      ref: 'User',
       default: [],
     },
     community: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Community",
+      ref: 'Community',
       default: [],
     },
     following: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "User",
+      ref: 'User',
       default: [],
     },
     my_communities: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Community",
+      ref: 'Community',
       default: [],
     },
     history: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "LongVideo",
+      ref: 'LongVideo',
       default: [],
     },
     bio: {
       type: String,
-      default: "",
+      default: '',
       trim: true,
       maxlength: 500,
     },
     liked_videos: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "LongVideo",
+      ref: 'LongVideo',
       default: [],
     },
     video_frame: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "LongVideo",
+      ref: 'LongVideo',
       default: [],
     },
     date_of_birth: {
@@ -93,7 +92,7 @@ const userSchema = new mongoose.Schema(
     },
     liked_communities: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Community",
+      ref: 'Community',
       default: [],
     },
     creator_profile: {
@@ -104,8 +103,8 @@ const userSchema = new mongoose.Schema(
         bank_name: String,
         account_type: {
           type: String,
-          enum: ["savings", "current"],
-          default: "savings",
+          enum: ['savings', 'current'],
+          default: 'savings',
         },
       },
       fund_account_id: String,
@@ -123,8 +122,8 @@ const userSchema = new mongoose.Schema(
       },
       verification_status: {
         type: String,
-        enum: ["unverified", "pending", "verified"],
-        default: "unverified",
+        enum: ['unverified', 'pending', 'verified'],
+        default: 'unverified',
       },
     },
     phone: {
@@ -134,24 +133,24 @@ const userSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
-);
+)
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next()
 
   try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
+    const salt = await bcrypt.genSalt(10)
+    this.password = await bcrypt.hash(this.password, salt)
+    next()
   } catch (error) {
-    next(error);
+    next(error)
   }
-});
+})
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
-};
+  return bcrypt.compare(candidatePassword, this.password)
+}
 
-const User = mongoose.model("User", userSchema);
+const User = mongoose.model('User', userSchema)
 
-module.exports = User;
+module.exports = User

@@ -1,15 +1,15 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const withdrawalSchema = new mongoose.Schema(
   {
     creator_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     wallet_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Wallet",
+      ref: 'Wallet',
       required: true,
     },
     amount: {
@@ -20,9 +20,9 @@ const withdrawalSchema = new mongoose.Schema(
     currency: {
       type: String,
       required: true,
-      default: "INR",
+      default: 'INR',
     },
-    
+
     razorpay_payout_id: {
       type: String,
       unique: true,
@@ -32,21 +32,29 @@ const withdrawalSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    
+
     // Withdrawal status
     status: {
       type: String,
-      enum: ["pending", "queued", "processing", "processed", "cancelled", "failed", "reversed"],
-      default: "pending",
+      enum: [
+        'pending',
+        'queued',
+        'processing',
+        'processed',
+        'cancelled',
+        'failed',
+        'reversed',
+      ],
+      default: 'pending',
     },
-    
+
     bank_details: {
       account_number: String,
       ifsc_code: String,
       beneficiary_name: String,
       bank_name: String,
     },
-    
+
     wallet_balance_before: {
       type: Number,
       required: true,
@@ -55,7 +63,7 @@ const withdrawalSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    
+
     platform_fee: {
       type: Number,
       default: 0,
@@ -68,7 +76,7 @@ const withdrawalSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    
+
     requested_at: {
       type: Date,
       default: Date.now,
@@ -76,12 +84,12 @@ const withdrawalSchema = new mongoose.Schema(
     processed_at: {
       type: Date,
     },
-    
+
     // Failure details
     failure_reason: {
       type: String,
     },
-    
+
     reference_id: {
       type: String,
       unique: true,
@@ -89,19 +97,19 @@ const withdrawalSchema = new mongoose.Schema(
     internal_notes: {
       type: String,
     },
-    
+
     utr: {
       type: String,
     },
   },
   { timestamps: true }
-);
+)
 
 // Indexes
-withdrawalSchema.index({ creator_id: 1, status: 1 });
-withdrawalSchema.index({ razorpay_payout_id: 1 });
-withdrawalSchema.index({ status: 1, createdAt: -1 });
+withdrawalSchema.index({ creator_id: 1, status: 1 })
+withdrawalSchema.index({ razorpay_payout_id: 1 })
+withdrawalSchema.index({ status: 1, createdAt: -1 })
 
-const Withdrawal = mongoose.model("Withdrawal", withdrawalSchema);
+const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema)
 
-module.exports = Withdrawal;
+module.exports = Withdrawal

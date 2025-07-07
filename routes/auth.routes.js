@@ -1,26 +1,26 @@
-const router = require("express").Router();
+const router = require('express').Router()
 const {
   RegisterNewUser,
   LoginUserWithEmail,
   LoginUserWithUsername,
   LogoutUser,
   RefreshToken,
-} = require("../controller/auth.controller");
-const { authenticateToken } = require("../middleware/auth");
+} = require('../controller/auth.controller')
+const { authenticateToken } = require('../middleware/auth')
 
 // Register a new user
-router.post("/register", RegisterNewUser);
+router.post('/register', RegisterNewUser)
 
 // Login an existing user using email
-router.post("/login/email", LoginUserWithEmail);
+router.post('/login/email', LoginUserWithEmail)
 
 // Login an existing user using username
-router.post("/login/username", LoginUserWithUsername);
+router.post('/login/username', LoginUserWithUsername)
 
 // Logout a user
-router.post("/logout", LogoutUser);
+router.post('/logout', LogoutUser)
 
 // Refresh JWT token (protected route)
-router.post("/refresh", authenticateToken, RefreshToken);
+router.post('/refresh', authenticateToken, RefreshToken)
 
-module.exports = router;
+module.exports = router
