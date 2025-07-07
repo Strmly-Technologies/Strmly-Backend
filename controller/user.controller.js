@@ -412,6 +412,40 @@ const UpdateUserInterests = async (req, res, next) => {
   }
 }
 
+const GetUserFollowers = async (req, res, next) => {
+  try {
+    const userId = req.params.id || req.user._id
+    const user = await User.findById(userId).populate('followers', 'username profile_photo')
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    res.status(200).json({
+      message: 'User followers retrieved successfully',
+      followers: user.followers,
+      count: user.followers.length,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const GetUserFollowing = async (req, res, next) => {
+  try {
+    const userId = req.params.id || req.user._id
+    const user = await User.findById(userId).populate('following', 'username profile_photo')
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    res.status(200).json({
+      message: 'User following retrieved successfully',
+      following: user.following,
+      count: user.following.length,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   GetUserFeed,
   GetUserProfile,
@@ -422,4 +456,6 @@ module.exports = {
   GetUserInteractions,
   GetUserEarnings,
   GetUserNotifications,
+  GetUserFollowers,
+  GetUserFollowing,
 }
