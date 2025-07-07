@@ -180,7 +180,75 @@ const checkCommunityUploadPermission = async (userId, communityId) => {
   return { hasPermission: true, accessType: 'paid', access }
 }
 
+const getAllCommunities = async () => {
+  try {
+    const communities = await Community.find().populate('founder', 'username profile_photo')
+    .populate('followers', 'username profile_photo')
+    .populate('creators', 'username profile_photo')
+    const communitiesLength = communities.length
+    if (communitiesLength === 0) {
+      return { message: 'No communities found' }
+    }
+    return communities
+  } catch (error) {
+    throw new Error('Error fetching communities: ' + error.message)
+  }
+}
+
+const getCommunityById = async (communityId) => {
+  try {
+    const community = await Community.findById(communityId).populate('founder', 'username profile_photo')
+    .populate('followers', 'username profile_photo')
+    .populate('creators', 'username profile_photo')
+    if (!community) {
+      return { message: 'Community not found' }
+    }
+    return community
+  } catch (error) {
+    throw new Error('Error fetching community: ' + error.message)
+  }
+}
+
+const getUserJoinedCommunities = async (userId) => {
+  try {
+    const communities = await Community.find({ followers: userId })
+      .populate('founder', 'username profile_photo')
+      .populate('followers', 'username profile_photo')
+      .populate('creators', 'username profile_photo')
+
+    if (communities.length === 0) {
+      return { message: 'No communities found for this user' }
+    }
+    return communities
+  }
+  catch(error){
+    throw new Error('Error fetching user communities: ' + error.message)
+  }
+}
+
+
+const getUserCreatedCommunities = async (userId) => {
+  try {
+    const communities = await Community.find({ founder: userId })
+      .populate('founder', 'username profile_photo')
+      .populate('followers', 'username profile_photo')
+      .populate('creators', 'username profile_photo')
+
+    if (communities.length === 0) {
+      return { message: 'No communities created by this user' }
+    }
+    return communities
+  } catch (error) {
+    throw new Error('Error fetching user created communities: ' + error.message)
+  }
+}
+
+
 module.exports = {
+  getAllCommunities,
+  getCommunityById,
+  getUserJoinedCommunities,
+  getUserCreatedCommunities,
   FollowCommunity,
   CreateCommunity,
   RenameCommunity,
