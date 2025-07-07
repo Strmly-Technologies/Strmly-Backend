@@ -412,6 +412,8 @@ const UpdateUserInterests = async (req, res, next) => {
   }
 }
 
+const getUserFollowers=async(r)
+
 module.exports = {
   GetUserFeed,
   GetUserProfile,
