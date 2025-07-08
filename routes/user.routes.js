@@ -1,5 +1,5 @@
-const router = require('express').Router()
-const { authenticateToken } = require('../middleware/auth')
+const router = require('express').Router();
+const { authenticateToken } = require('../middleware/auth');
 const {
   GetUserFeed,
   GetUserProfile,
@@ -13,43 +13,50 @@ const {
   GetUserFollowers,
   GetUserFollowing,
   getUserProfileDetails,
-} = require('../controller/user.controller')
+  GetUserProfileById,
+  GetUserVideosById,
+} = require('../controller/user.controller');
 
 // Get user feed
-router.get('/feed', authenticateToken, GetUserFeed)
+router.get('/feed', authenticateToken, GetUserFeed);
 
 // Get user profile
-router.get('/profile', authenticateToken, GetUserProfile)
+router.get('/profile', authenticateToken, GetUserProfile);
 
 // Update user profile
-router.put('/profile', authenticateToken, UpdateUserProfile)
+router.put('/profile', authenticateToken, UpdateUserProfile);
 
 // Get user communities
-router.get('/communities', authenticateToken, GetUserCommunities)
+router.get('/communities', authenticateToken, GetUserCommunities);
 
 // Get user videos
-router.get('/videos', authenticateToken, GetUserVideos)
+router.get('/videos', authenticateToken, GetUserVideos);
 
 // Get user interactions
-router.get('/interactions', authenticateToken, GetUserInteractions)
+router.get('/interactions', authenticateToken, GetUserInteractions);
 
 // Get user earnings
-router.get('/earnings', authenticateToken, GetUserEarnings)
+router.get('/earnings', authenticateToken, GetUserEarnings);
 
 // Get user notifications
-router.get('/notifications', authenticateToken, GetUserNotifications)
+router.get('/notifications', authenticateToken, GetUserNotifications);
 
 // Update user interests
-router.put('/interests', UpdateUserInterests)
+router.put('/interests', UpdateUserInterests);
 
 // Get all user followers
-router.get('/followers', authenticateToken, GetUserFollowers)
+router.get('/followers', authenticateToken, GetUserFollowers);
 
 // Get all user following
-router.get('/following', authenticateToken, GetUserFollowing)
+router.get('/following', authenticateToken, GetUserFollowing);
 
-//get user profile details
-router.get('/profile-details', authenticateToken, getUserProfileDetails)
+// Get user profile details
+router.get('/profile-details', authenticateToken, getUserProfileDetails);
 
-module.exports = router
-module.exports = router
+// Get user profile by ID
+router.get('/profile/:id', authenticateToken, GetUserProfileById);
+
+// Get user videos by ID
+router.get('/videos/:id', authenticateToken, GetUserVideosById);
+
+module.exports = router;

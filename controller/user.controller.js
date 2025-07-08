@@ -476,6 +476,120 @@ const getUserProfileDetails = async (req, res, next) => {
   }
 };
 
+const GetUserProfileById=async(req,res,next)=>{
+  try {
+    const userId = req.params.id;
+    const userDetails = await User.findById(userId)
+      .select('username profile_photo followers following my_communities');
+
+    if (!userDetails) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const totalFollowers = userDetails.followers?.length || 0;
+    const totalFollowing = userDetails.following?.length || 0;
+    const totalCommunities = userDetails.my_communities?.length || 0;
+
+    res.status(200).json({
+      message: 'User profile details retrieved successfully',
+      user: {
+        username: userDetails.username,
+        profile_photo: userDetails.profile_photo,
+        totalFollowers,
+        totalFollowing,
+        totalCommunities,
+      }
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+const GetUserVideosById=async(req,res,next)=>{
+   try {
+    const userId = req.params.id;
+    const { type = 'uploaded', page = 1, limit = 10 } = req.query
+    const skip = (page - 1) * limit
+
+    let videos
+
+    if (type === 'saved') {
+      const user = await User.findById(userId).populate({
+        path: 'saved_videos',
+        populate: {
+          path: 'creator',
+          select: 'username profile_photo',
+        },
+        options: {
+          skip: skip,
+          limit: parseInt(limit),
+          sort: { createdAt: -1 },
+        },
+      })
+      videos = user.saved_videos
+    } else if (type === 'liked') {
+      const user = await User.findById(userId).populate({
+        path: 'liked_videos',
+        populate: {
+          path: 'creator',
+          select: 'username profile_photo',
+        },
+        options: {
+          skip: skip,
+          limit: parseInt(limit),
+          sort: { createdAt: -1 },
+        },
+      })
+      videos = user.liked_videos
+    } else if (type === 'history') {
+      const user = await User.findById(userId).populate({
+        path: 'history',
+        populate: {
+          path: 'creator',
+          select: 'username profile_photo',
+        },
+        options: {
+          skip: skip,
+          limit: parseInt(limit),
+          sort: { createdAt: -1 },
+        },
+      })
+      videos = user.history
+    } else if (type === 'playlist') {
+      const user = await User.findById(userId).populate({
+        path: 'playlist',
+        populate: {
+          path: 'creator',
+          select: 'username profile_photo',
+        },
+        options: {
+          skip: skip,
+          limit: parseInt(limit),
+          sort: { createdAt: -1 },
+        },
+      })
+      videos = user.playlist
+    } else {
+      videos = await LongVideo.find({ creator: userId })
+        .populate('creator', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+    }
+
+    res.status(200).json({
+      message: 'User videos retrieved successfully',
+      videos,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        hasMore: videos && videos.length === parseInt(limit),
+      },
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -489,4 +603,6 @@ module.exports = {
   GetUserNotifications,
   GetUserFollowers,
   GetUserFollowing,
+  GetUserVideosById,
+  GetUserProfileById
 }
