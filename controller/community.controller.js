@@ -3,11 +3,16 @@ const CommunityAccess = require('../models/CommunityAccess')
 const { handleError } = require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
-  const { name, bio } = req.body
+  const { name, bio, type, amount, fee_description } = req.body
   const userId = req.user.id
 
   if (!name) {
     return res.status(400).json({ message: 'Name is required' })
+  }
+  if (!type || !['free', 'paid'].includes(type)) {
+    return res.status(400).json({
+      message: 'Community type must be "free" or "paid"',
+    })
   }
 
   try {
@@ -16,6 +21,9 @@ const CreateCommunity = async (req, res, next) => {
       bio: bio || '',
       founder: userId,
       followers: [userId],
+      community_fee_type: type,
+      community_fee_amount: type === 'paid' ? (amount || 0) : 0,
+      community_fee_description: type === 'paid' ? (fee_description || '') : '',
     })
 
     await newCommunity.save()
