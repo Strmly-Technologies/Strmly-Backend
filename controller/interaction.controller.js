@@ -67,12 +67,6 @@ const LikeVideo = async (req, res, next) => {
       .json({ message: 'Video ID and video type are required' })
   }
 
-  if (!['long', 'short'].includes(videoType)) {
-    return res
-      .status(400)
-      .json({ message: "Video type must be 'long' or 'short'" })
-  }
-
   try {
     let video = await ShortVideo.findById(videoId)
 
@@ -88,8 +82,8 @@ const LikeVideo = async (req, res, next) => {
     await video.save()
 
     const user = await User.findById(userId)
-    if (!user.likedVideos.includes(videoId)) {
-      user.likedVideos.push(videoId)
+    if (!user.liked_videos.includes(videoId)) {
+      user.liked_videos.push(videoId)
       await user.save()
     }
 
@@ -172,8 +166,11 @@ const CommentOnVideo = async (req, res, next) => {
     await video.save()
 
     const user = await User.findById(userId)
-    if (!user.commentedVideos.includes(videoId)) {
-      user.commentedVideos.push(videoId)
+    if (!Array.isArray(user.commented_videos)) {
+      user.commented_videos = []
+    }
+    if (!user.commented_videos.map(id => id.toString()).includes(videoId.toString())) {
+      user.commented_videos.push(videoId)
       await user.save()
     }
 
