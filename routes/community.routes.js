@@ -10,6 +10,7 @@ const {
   getUserJoinedCommunities,
   getUserCreatedCommunities,
   getUploadPermissionForCommunity,
+  getCommunityProfileDetails
 } = require('../controller/community.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -46,5 +47,8 @@ router.get('/user/created-communities', authenticateToken, getUserCreatedCommuni
 
 // API to get upload permission for a community
 router.post('/upload-permission', authenticateToken, getUploadPermissionForCommunity)
+
+// API to get community profile details
+router.get('/profile/:id', authenticateToken, getCommunityProfileDetails)
 
 module.exports = router
