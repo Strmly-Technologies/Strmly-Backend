@@ -3,11 +3,16 @@ const CommunityAccess = require('../models/CommunityAccess')
 const { handleError } = require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
-  const { name, bio } = req.body
+  const { name, bio, type, amount, fee_description } = req.body
   const userId = req.user.id
 
   if (!name) {
     return res.status(400).json({ message: 'Name is required' })
+  }
+  if (!type || !['free', 'paid'].includes(type)) {
+    return res.status(400).json({
+      message: 'Community type must be "free" or "paid"',
+    })
   }
 
   try {
@@ -16,6 +21,9 @@ const CreateCommunity = async (req, res, next) => {
       bio: bio || '',
       founder: userId,
       followers: [userId],
+      community_fee_type: type,
+      community_fee_amount: type === 'paid' ? (amount || 0) : 0,
+      community_fee_description: type === 'paid' ? (fee_description || '') : '',
     })
 
     await newCommunity.save()
@@ -295,8 +303,48 @@ const getUploadPermissionForCommunity = async (req, res, next) => {
  }
 }
 
+const getCommunityProfileDetails=async(req,res,next)=>{
+  try {
+    const communityId=req.params.id
+    if (!communityId) {
+      return res.status(400).json({ message: 'Community ID is required to proceed' })
+    }
+    const community = await Community.findById(communityId)
+     if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    const totalFollowers = community.followers.length
+    const totalCreators = community.creators.length
+    const totalVideos = community.long_videos.length + community.short_videos.length + community.series.length
+    const totalContent = {
+      longVideos: community.long_videos.length,
+      shortVideos: community.short_videos.length,
+      series: community.series.length,
+    }
+    return res.status(200).json({
+      communityId: community._id,
+      name: community.name,
+      bio: community.bio,
+      profilePhoto: community.profile_photo,
+      totalFollowers,
+      totalCreators,
+      totalVideos,
+      totalContent,
+      founder: {
+        id: community.founder._id,
+        username: community.founder.username,
+        profilePhoto: community.founder.profile_photo,
+      },
+    })
+    
+  } catch (error) {
+    handleError(error, req, res, next)
+    
+  }
+}
 
 module.exports = {
+  getCommunityProfileDetails,
   getAllCommunities,
   getCommunityById,
   getUserJoinedCommunities,
