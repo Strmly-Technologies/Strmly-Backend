@@ -445,7 +445,6 @@ const GetUserFollowing = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
-
 module.exports = {
   GetUserFeed,
   GetUserProfile,

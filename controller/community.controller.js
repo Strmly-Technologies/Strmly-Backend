@@ -155,7 +155,7 @@ const checkCommunityUploadPermission = async (userId, communityId) => {
   if (community.founder.toString() === userId) {
     return { hasPermission: true, accessType: 'founder' }
   }
-
+ 
   // Check if community is free
   if (community.community_fee_type === 'free') {
     return { hasPermission: true, accessType: 'free' }
@@ -180,11 +180,132 @@ const checkCommunityUploadPermission = async (userId, communityId) => {
   return { hasPermission: true, accessType: 'paid', access }
 }
 
+const getAllCommunities = async (req, res, next) => {
+  try {
+    const communities = await Community.find()
+      .populate('founder', 'username profile_photo')
+      .populate('followers', 'username profile_photo')
+      .populate('creators', 'username profile_photo');
+
+    if (communities.length === 0) {
+      return res.status(404).json({ message: 'No communities found' });
+    }
+    
+    return res.status(200).json({
+    communities,
+    count: communities.length,
+    message: 'Communities fetched successfully'
+});
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+
+const getCommunityById = async (req, res,next) => {
+  const communityId = req.params.id;
+  try {
+    const community = await Community.findById(communityId)
+      .populate('founder', 'username profile_photo')
+      .populate('followers', 'username profile_photo')
+      .populate('creators', 'username profile_photo');
+    
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' });
+    }
+
+    return res.status(200).json(community);
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+const getUserJoinedCommunities = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    const communities = await Community.find({ followers: userId })
+      .populate('founder', 'username profile_photo')
+      .populate('followers', 'username profile_photo')
+      .populate('creators', 'username profile_photo');
+
+    return res.status(200).json({
+      communities,
+      count: communities.length,
+      message: communities.length === 0 ? 'No communities found for this user' : 'Communities fetched successfully',
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+
+
+const getUserCreatedCommunities = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    const communities = await Community.find({ founder: userId })
+      .populate('founder', 'username profile_photo')
+      .populate('followers', 'username profile_photo')
+      .populate('creators', 'username profile_photo');
+
+    return res.status(200).json({
+      communities,
+      count: communities.length,
+      message:
+        communities.length === 0
+          ? 'No communities created by this user'
+          : 'Communities fetched successfully',
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+
+const getUploadPermissionForCommunity = async (req, res, next) => {
+ try {
+   const { communityId } = req.body
+   const userId = req.user.id
+   if (!communityId) {
+     return res.status(400).json({ message: 'Community ID is required' })
+   }
+   const permission = await checkCommunityUploadPermission(userId, communityId)
+   if (!permission.hasPermission) {
+     return res.status(403).json({
+       message: permission.error || 'You do not have permission to upload content',
+       requiredFee: permission.requiredFee,
+       communityName: permission.communityName,
+     })
+   }
+   return res.status(200).json({
+     message: 'You have permission to upload content',
+     accessType: permission.accessType,
+     access: permission.access || null,
+   })
+ } catch (error) {
+   handleError(error, req, res, next)
+ }
+}
+
+
 module.exports = {
+  getAllCommunities,
+  getCommunityById,
+  getUserJoinedCommunities,
+  getUserCreatedCommunities,
   FollowCommunity,
   CreateCommunity,
   RenameCommunity,
   ChangeCommunityProfilePhoto,
   AddBioToCommunity,
   checkCommunityUploadPermission,
+  getUploadPermissionForCommunity
 }
