@@ -9,6 +9,7 @@ const {
   getVideosByGenre,
   incrementVideoView,
   getRelatedVideos,
+  uploadVideoToCommunity,
 } = require('../controller/video.controller')
 const { dynamicVideoUpload, handleMulterError } = require('../utils/utils')
 const { authenticateToken } = require('../middleware/auth')
@@ -45,5 +46,8 @@ router.post('/:id/view', authenticateToken, incrementVideoView)
 
 // Route to get related videos by video ID
 router.get('/:id/related', getRelatedVideos)
+
+//add video to community
+router.post('/upload/community',authenticateToken, uploadVideoToCommunity)
 
 module.exports = router
