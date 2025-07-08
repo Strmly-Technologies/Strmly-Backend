@@ -18,11 +18,11 @@ const GetUserFeed = async (req, res, next) => {
 
     const feedVideos = await LongVideo.find({
       $or: [
-        { creator: { $in: followingIds } },
+        { created_by: { $in: followingIds } },
         { community: { $in: communityIds } },
       ],
     })
-      .populate('creator', 'username profile_photo')
+      .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -166,7 +166,7 @@ const GetUserVideos = async (req, res, next) => {
       const user = await User.findById(userId).populate({
         path: 'saved_videos',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -180,7 +180,7 @@ const GetUserVideos = async (req, res, next) => {
       const user = await User.findById(userId).populate({
         path: 'liked_videos',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -194,7 +194,7 @@ const GetUserVideos = async (req, res, next) => {
       const user = await User.findById(userId).populate({
         path: 'history',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -208,7 +208,7 @@ const GetUserVideos = async (req, res, next) => {
       const user = await User.findById(userId).populate({
         path: 'playlist',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -219,8 +219,8 @@ const GetUserVideos = async (req, res, next) => {
       })
       videos = user.playlist
     } else {
-      videos = await LongVideo.find({ creator: userId })
-        .populate('creator', 'username profile_photo')
+      videos = await LongVideo.find({ created_by: userId })
+        .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -516,7 +516,7 @@ const GetUserVideosById=async(req,res,next)=>{
       const user = await User.findById(userId).populate({
         path: 'saved_videos',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -530,7 +530,7 @@ const GetUserVideosById=async(req,res,next)=>{
       const user = await User.findById(userId).populate({
         path: 'liked_videos',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -544,7 +544,7 @@ const GetUserVideosById=async(req,res,next)=>{
       const user = await User.findById(userId).populate({
         path: 'history',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -558,7 +558,7 @@ const GetUserVideosById=async(req,res,next)=>{
       const user = await User.findById(userId).populate({
         path: 'playlist',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
         options: {
@@ -569,8 +569,8 @@ const GetUserVideosById=async(req,res,next)=>{
       })
       videos = user.playlist
     } else {
-      videos = await LongVideo.find({ creator: userId })
-        .populate('creator', 'username profile_photo')
+      videos = await LongVideo.find({ created_by: userId })
+        .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
         .sort({ createdAt: -1 })
         .skip(skip)
