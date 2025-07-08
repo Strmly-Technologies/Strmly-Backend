@@ -12,6 +12,7 @@ const {
   UpdateUserInterests,
   GetUserFollowers,
   GetUserFollowing,
+  getUserProfileDetails,
 } = require('../controller/user.controller')
 
 // Get user feed
@@ -46,6 +47,9 @@ router.get('/followers', authenticateToken, GetUserFollowers)
 
 // Get all user following
 router.get('/following', authenticateToken, GetUserFollowing)
+
+//get user profile details
+router.get('/profile-details', authenticateToken, getUserProfileDetails)
 
 module.exports = router
 module.exports = router

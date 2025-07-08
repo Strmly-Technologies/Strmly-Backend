@@ -445,7 +445,39 @@ const GetUserFollowing = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
+
+const getUserProfileDetails = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const userDetails = await User.findById(userId)
+      .select('username profile_photo followers following my_communities');
+
+    if (!userDetails) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const totalFollowers = userDetails.followers?.length || 0;
+    const totalFollowing = userDetails.following?.length || 0;
+    const totalCommunities = userDetails.my_communities?.length || 0;
+
+    res.status(200).json({
+      message: 'User profile details retrieved successfully',
+      user: {
+        username: userDetails.username,
+        profile_photo: userDetails.profile_photo,
+        totalFollowers,
+        totalFollowing,
+        totalCommunities,
+      }
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
 module.exports = {
+  getUserProfileDetails,
   GetUserFeed,
   GetUserProfile,
   UpdateUserProfile,
