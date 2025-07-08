@@ -307,7 +307,7 @@ const getCommunityProfileDetails=async(req,res,next)=>{
   try {
     const communityId=req.params.id
     if (!communityId) {
-      return res.status(400).json({ message: 'Community ID is required' })
+      return res.status(400).json({ message: 'Community ID is required to proceed' })
     }
     const community = await Community.findById(communityId)
      if (!community) {
