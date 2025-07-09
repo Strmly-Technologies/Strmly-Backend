@@ -16,8 +16,8 @@ const seriesSchema = new mongoose.Schema(
     },
     posterUrl: {
       type: String,
-      required: true,
-      trim: true,
+      required: false,
+      trim: false,
     },
     bannerUrl: {
       type: String,
@@ -73,7 +73,7 @@ const seriesSchema = new mongoose.Schema(
     ],
     release_date: {
       type: Date,
-      required: true,
+      required: false,
     },
     seasons: {
       type: Number,
@@ -109,7 +109,7 @@ const seriesSchema = new mongoose.Schema(
     community: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Community',
-      required: true,
+      required: false,
     },
   },
   { timestamps: true }

@@ -22,16 +22,12 @@ const createSeries = async (req, res, next) => {
     if (
       !title ||
       !description ||
-      !posterUrl ||
       !genre ||
       !language ||
-      !type ||
-      !release_date ||
-      !communityId
-    ) {
+      !type     ) {
       return res.status(400).json({
         error:
-          'Required fields: title, description, posterUrl, genre, language, type, release_date, communityId',
+          'Required fields: title, description, type',
       })
     }
 
@@ -44,7 +40,7 @@ const createSeries = async (req, res, next) => {
       language,
       age_restriction: age_restriction || false,
       type,
-      release_date: new Date(release_date),
+      release_date: release_date ? release_date : new Date(),
       seasons: seasons || 1,
       created_by: userId,
       updated_by: userId,
@@ -86,6 +82,29 @@ const getSeriesById = async (req, res, next) => {
       message: 'Series retrieved successfully',
       data: series,
     })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getUserSeries=async(req,res,next)=>{
+  const userId=req.user.id
+  if(!userId){
+    return res.status(400).json({ error: 'User ID is required' })
+  }
+  try {
+    const series=await Series.find({created_by:userId})
+    .populate('created_by', 'username email')
+    .populate('community', 'name')
+
+    if(!series || series.length === 0){
+      return res.status(404).json({ error: 'No series found for this user' })
+    }
+    res.status(200).json({
+      message: 'User series retrieved successfully',
+      data: series,
+    })
+    
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -187,7 +206,10 @@ const addEpisodeToSeries = async (req, res, next) => {
       return res.status(404).json({ error: 'Series not found' })
     }
 
-    if (series.created_by.toString() !== userId) {
+    if (series.created_by.toString() !== userId.toString()) {
+      console.error(
+        `User ${userId.toString()} is not authorized to modify series ${id}--> ${series.created_by.toString()}`
+      )
       return res
         .status(403)
         .json({ error: 'Not authorized to modify this series' })
@@ -198,7 +220,8 @@ const addEpisodeToSeries = async (req, res, next) => {
       return res.status(404).json({ error: 'Video not found' })
     }
 
-    if (video.created_by.toString() !== userId) {
+    if (video.created_by.toString() !== userId.toString()) {
+      console.error(`${video.created_by.toString()} is not authorized to use video ${videoId} by user ${userId.toString()}`)
       return res.status(403).json({ error: 'Not authorized to use this video' })
     }
 
@@ -360,6 +383,7 @@ const getAllSeries = async (req, res, next) => {
 }
 
 module.exports = {
+  getUserSeries,
   createSeries,
   getSeriesById,
   updateSeries,
