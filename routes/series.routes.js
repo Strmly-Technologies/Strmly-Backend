@@ -8,6 +8,7 @@ const {
   removeEpisodeFromSeries,
   searchSeries,
   getAllSeries,
+  getUserSeries
 } = require('../controller/series.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -38,5 +39,8 @@ router.delete(
   authenticateToken,
   removeEpisodeFromSeries
 )
+
+// Route to get all series created by a user
+router.get('/user', authenticateToken, getUserSeries)
 
 module.exports = router

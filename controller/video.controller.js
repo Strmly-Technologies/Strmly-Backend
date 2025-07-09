@@ -6,6 +6,49 @@ const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
 
+const uploadVideoToCommunity=async(req,res,next)=>{
+  try {
+    const {communityId, videoId}=req.body
+    const userId = req.user.id  
+
+    const hasPermission = await checkCommunityUploadPermission(userId, communityId)
+    if (!hasPermission.hasPermission) {
+      return res.status(403).json({
+        error: hasPermission.error,
+        requiredFee: hasPermission.requiredFee,
+        communityName: hasPermission.communityName,
+      })
+    }
+    const updatedCommunity = await Community.findByIdAndUpdate(
+      communityId,
+      {
+        $addToSet: {
+          [`long_videos`]: videoId,
+          [`short_videos`]: videoId,
+        },
+      },
+      { new: true }
+    )
+    if (!updatedCommunity) {
+      return res.status(404).json({ error: 'Community not found' })
+    }
+     
+    res.status(200).json({
+      message: 'Video added to community successfully',
+      community: {
+        id: updatedCommunity._id,
+        name: updatedCommunity.name,
+        short_videos: updatedCommunity.short_videos,
+        long_videos: updatedCommunity.long_videos,
+      },
+    })
+
+    
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 const uploadVideo = async (req, res, next) => {
   try {
     const videoType = req.videoType
@@ -533,4 +576,5 @@ module.exports = {
   getVideosByGenre,
   incrementVideoView,
   getRelatedVideos,
+  uploadVideoToCommunity
 }
