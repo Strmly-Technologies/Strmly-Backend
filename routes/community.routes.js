@@ -10,7 +10,10 @@ const {
   getUserJoinedCommunities,
   getUserCreatedCommunities,
   getUploadPermissionForCommunity,
-  getCommunityProfileDetails
+  getCommunityProfileDetails,
+  getTrendingCommunityVideos,
+  getTrendingVideosByCommunity,
+  getCommunityVideos
 } = require('../controller/community.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -50,5 +53,14 @@ router.post('/upload-permission', authenticateToken, getUploadPermissionForCommu
 
 // API to get community profile details
 router.get('/profile/:id', authenticateToken, getCommunityProfileDetails)
+
+//API to get community videos
+ router.get('/:id/videos', authenticateToken, getCommunityVideos)
+
+// Get trending videos from all communities
+router.get('/trending-videos', getTrendingCommunityVideos)
+
+// Get trending videos from a specific community
+router.get('/:id/trending-videos', getTrendingVideosByCommunity)
 
 module.exports = router

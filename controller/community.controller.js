@@ -342,6 +342,284 @@ const getCommunityProfileDetails=async(req,res,next)=>{
     
   }
 }
+const getCommunityVideos = async (req, res, next) => {
+  try {
+    const communityId = req.params.id;
+    const { videoType } = req.query;
+
+    if (!communityId) {
+      return res.status(400).json({ message: 'Community ID is required' });
+    }
+
+    const community = await Community.findById(communityId);
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' });
+    }
+
+    let videos;
+
+    if (videoType === 'long') {
+      const populated = await Community.findById(communityId).populate({
+        path: 'long_videos',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      });
+      videos = populated.long_videos;
+
+    } else if (videoType === 'short') {
+      const populated = await Community.findById(communityId).populate({
+        path: 'short_videos',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      });
+      videos = populated.short_videos;
+
+    } else if (videoType === 'series') {
+      const populated = await Community.findById(communityId).populate({
+        path: 'series',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      });
+      videos = populated.series;
+
+    } else {
+      return res.status(400).json({ message: 'Invalid video type' });
+    }
+
+    return res.status(200).json({
+      videos,
+      count: videos.length,
+      message: videos.length === 0 ? 'No videos found in this community' : 'Videos fetched successfully',
+    });
+
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+const getTrendingCommunityVideos = async (req, res, next) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      videoType = 'all', 
+      communityId 
+    } = req.query;
+    
+    const skip = (page - 1) * limit;
+    const limitNum = parseInt(limit);
+
+    let query = {};
+    if (communityId) {
+      query.community = communityId;
+    }
+
+    let trendingVideos = [];
+
+    if (videoType === 'long' || videoType === 'all') {
+      const longVideos = await LongVideo.find(query)
+        .populate('created_by', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort({ likes: -1, views: -1, createdAt: -1 })
+        .skip(videoType === 'all' ? 0 : skip)
+        .limit(videoType === 'all' ? Math.ceil(limitNum / 2) : limitNum);
+
+      trendingVideos = trendingVideos.concat(
+        longVideos.map(video => ({
+          ...video.toObject(),
+          videoType: 'long'
+        }))
+      );
+    }
+
+    if (videoType === 'short' || videoType === 'all') {
+      const shortVideos = await ShortVideo.find(query)
+        .populate('created_by', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort({ likes: -1, views: -1, createdAt: -1 })
+        .skip(videoType === 'all' ? 0 : skip)
+        .limit(videoType === 'all' ? Math.floor(limitNum / 2) : limitNum);
+
+      trendingVideos = trendingVideos.concat(
+        shortVideos.map(video => ({
+          ...video.toObject(),
+          videoType: 'short'
+        }))
+      );
+    }
+
+    // If getting all types, sort combined results and apply pagination
+    if (videoType === 'all') {
+      trendingVideos.sort((a, b) => {
+        if (b.likes !== a.likes) return b.likes - a.likes;
+        if (b.views !== a.views) return b.views - a.views;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+      
+      trendingVideos = trendingVideos.slice(skip, skip + limitNum);
+    }
+
+    // Get total counts for pagination
+    const totalLongVideos = await LongVideo.countDocuments(query);
+    const totalShortVideos = await ShortVideo.countDocuments(query);
+    const totalVideos = totalLongVideos + totalShortVideos;
+
+    res.status(200).json({
+      message: 'Trending community videos retrieved successfully',
+      videos: trendingVideos,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalVideos / limitNum),
+        totalVideos,
+        limit: limitNum,
+        hasMore: parseInt(page) < Math.ceil(totalVideos / limitNum),
+      },
+      filters: {
+        videoType,
+        communityId: communityId || 'all',
+        sortBy: 'likes_desc',
+      },
+      stats: {
+        totalLongVideos,
+        totalShortVideos,
+        totalCommunities: communityId ? 1 : await Community.countDocuments(),
+      },
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+const getTrendingVideosByCommunity = async (req, res, next) => {
+  try {
+    const { id: communityId } = req.params;
+    const { 
+      page = 1, 
+      limit = 10, 
+      videoType = 'all',
+      sortBy = 'likes' 
+    } = req.query;
+    
+    const skip = (page - 1) * limit;
+    const limitNum = parseInt(limit);
+
+    // Check if community exists
+    const community = await Community.findById(communityId);
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' });
+    }
+
+    let sortObject = {};
+    switch (sortBy) {
+      case 'likes':
+        sortObject = { likes: -1, views: -1, createdAt: -1 };
+        break;
+      case 'views':
+        sortObject = { views: -1, likes: -1, createdAt: -1 };
+        break;
+      case 'recent':
+        sortObject = { createdAt: -1, likes: -1, views: -1 };
+        break;
+      default:
+        sortObject = { likes: -1, views: -1, createdAt: -1 };
+    }
+
+    let trendingVideos = [];
+
+    if (videoType === 'long' || videoType === 'all') {
+      const longVideos = await LongVideo.find({ community: communityId })
+        .populate('created_by', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort(sortObject)
+        .skip(videoType === 'all' ? 0 : skip)
+        .limit(videoType === 'all' ? Math.ceil(limitNum / 2) : limitNum);
+
+      trendingVideos = trendingVideos.concat(
+        longVideos.map(video => ({
+          ...video.toObject(),
+          videoType: 'long'
+        }))
+      );
+    }
+
+    if (videoType === 'short' || videoType === 'all') {
+      const shortVideos = await ShortVideo.find({ community: communityId })
+        .populate('created_by', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort(sortObject)
+        .skip(videoType === 'all' ? 0 : skip)
+        .limit(videoType === 'all' ? Math.floor(limitNum / 2) : limitNum);
+
+      trendingVideos = trendingVideos.concat(
+        shortVideos.map(video => ({
+          ...video.toObject(),
+          videoType: 'short'
+        }))
+      );
+    }
+
+    // Sort combined results if getting all types
+    if (videoType === 'all') {
+      trendingVideos.sort((a, b) => {
+        switch (sortBy) {
+          case 'views':
+            if (b.views !== a.views) return b.views - a.views;
+            if (b.likes !== a.likes) return b.likes - a.likes;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          case 'recent':
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          default: // likes
+            if (b.likes !== a.likes) return b.likes - a.likes;
+            if (b.views !== a.views) return b.views - a.views;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+      });
+      
+      trendingVideos = trendingVideos.slice(skip, skip + limitNum);
+    }
+
+    // Get totals for this community
+    const totalLongVideos = await LongVideo.countDocuments({ community: communityId });
+    const totalShortVideos = await ShortVideo.countDocuments({ community: communityId });
+    const totalVideos = totalLongVideos + totalShortVideos;
+
+    res.status(200).json({
+      message: `Trending videos from ${community.name} retrieved successfully`,
+      community: {
+        id: community._id,
+        name: community.name,
+        profilePhoto: community.profile_photo,
+        followers: community.followers.length,
+      },
+      videos: trendingVideos,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalVideos / limitNum),
+        totalVideos,
+        limit: limitNum,
+        hasMore: parseInt(page) < Math.ceil(totalVideos / limitNum),
+      },
+      filters: {
+        videoType,
+        sortBy,
+        communityId,
+      },
+      stats: {
+        totalLongVideos,
+        totalShortVideos,
+        communityFollowers: community.followers.length,
+      },
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
 
 module.exports = {
   getCommunityProfileDetails,
@@ -355,5 +633,8 @@ module.exports = {
   ChangeCommunityProfilePhoto,
   AddBioToCommunity,
   checkCommunityUploadPermission,
-  getUploadPermissionForCommunity
+  getUploadPermissionForCommunity,
+  getTrendingCommunityVideos,
+  getTrendingVideosByCommunity,
+  getCommunityVideos,
 }

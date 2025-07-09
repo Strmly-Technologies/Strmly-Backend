@@ -2,6 +2,7 @@ const User = require('../models/User')
 const Community = require('../models/Community')
 const LongVideo = require('../models/LongVideo')
 const { handleError } = require('../utils/utils')
+const ShortVideo = require('../models/ShortVideos')
 
 const GetUserFeed = async (req, res, next) => {
   try {
@@ -218,7 +219,7 @@ const GetUserVideos = async (req, res, next) => {
         },
       })
       videos = user.playlist
-    } else {
+    } else if(type==='long'){
       videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
@@ -226,7 +227,14 @@ const GetUserVideos = async (req, res, next) => {
         .skip(skip)
         .limit(parseInt(limit))
     }
-
+    else {
+      videos= await ShortVideo.find({ created_by: userId })
+        .populate('created_by', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+    }
     res.status(200).json({
       message: 'User videos retrieved successfully',
       videos,
