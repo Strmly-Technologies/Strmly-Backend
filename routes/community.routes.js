@@ -7,13 +7,12 @@ const {
   AddBioToCommunity,
   getAllCommunities,
   getCommunityById,
-  getUserJoinedCommunities,
-  getUserCreatedCommunities,
   getUploadPermissionForCommunity,
   getCommunityProfileDetails,
   getTrendingCommunityVideos,
   getTrendingVideosByCommunity,
-  getCommunityVideos
+  getCommunityVideos,
+  getUserCommunities
 } = require('../controller/community.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -42,11 +41,8 @@ router.get('/all', authenticateToken , getAllCommunities)
 // API to get community by ID
 router.get('/:id', authenticateToken, getCommunityById)
 
-// API to get communities user is part of
-router.get('/user/communities', authenticateToken, getUserJoinedCommunities)
-
-// API to get communities created by user
-router.get('/user/created-communities', authenticateToken, getUserCreatedCommunities)
+// API to get user communities
+router.get('/my-communities', authenticateToken, getUserCommunities)
 
 // API to get upload permission for a community
 router.post('/upload-permission', authenticateToken, getUploadPermissionForCommunity)

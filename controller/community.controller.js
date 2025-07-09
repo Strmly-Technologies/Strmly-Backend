@@ -228,49 +228,53 @@ const getCommunityById = async (req, res,next) => {
   }
 };
 
-const getUserJoinedCommunities = async (req, res, next) => {
+const getUserCommunities = async (req, res, next) => {
   try {
     const userId = req.user.id;
+    const { type = 'all' } = req.query;
+
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
     }
 
-    const communities = await Community.find({ followers: userId })
-      .populate('founder', 'username profile_photo')
-      .populate('followers', 'username profile_photo')
-      .populate('creators', 'username profile_photo');
+    let created = [];
+    let joined = [];
 
-    return res.status(200).json({
-      communities,
-      count: communities.length,
-      message: communities.length === 0 ? 'No communities found for this user' : 'Communities fetched successfully',
-    });
-  } catch (error) {
-    handleError(error, req, res, next);
-  }
-};
-
-
-
-const getUserCreatedCommunities = async (req, res, next) => {
-  try {
-    const userId = req.user.id;
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
+    if (type === 'created' || type === 'all') {
+      created = await Community.find({ founder: userId })
+        .populate('founder', 'username profile_photo')
+        .populate('followers', 'username profile_photo')
+        .populate('creators', 'username profile_photo');
     }
 
-    const communities = await Community.find({ founder: userId })
-      .populate('founder', 'username profile_photo')
-      .populate('followers', 'username profile_photo')
-      .populate('creators', 'username profile_photo');
+    if (type === 'joined' || type === 'all') {
+      joined = await Community.find({ followers: userId })
+        .populate('founder', 'username profile_photo')
+        .populate('followers', 'username profile_photo')
+        .populate('creators', 'username profile_photo');
+    }
 
-    return res.status(200).json({
-      communities,
-      count: communities.length,
-      message:
-        communities.length === 0
-          ? 'No communities created by this user'
-          : 'Communities fetched successfully',
+    let combined = [];
+
+    if (type === 'all') {
+      const combinedMap = new Map();
+
+      [...created, ...joined].forEach((comm) => {
+        combinedMap.set(comm._id.toString(), comm);
+      });
+
+      combined = Array.from(combinedMap.values());
+    }
+
+    res.status(200).json({
+      communities:
+        type === 'created' ? created :
+        type === 'joined' ? joined :
+        combined,
+      createdCount: created.length,
+      joinedCount: joined.length,
+      totalCount: type === 'all' ? combined.length : (type === 'created' ? created.length : joined.length),
+      message: 'Communities fetched successfully',
     });
   } catch (error) {
     handleError(error, req, res, next);
@@ -625,8 +629,7 @@ module.exports = {
   getCommunityProfileDetails,
   getAllCommunities,
   getCommunityById,
-  getUserJoinedCommunities,
-  getUserCreatedCommunities,
+  getUserCommunities,
   FollowCommunity,
   CreateCommunity,
   RenameCommunity,
