@@ -27,7 +27,7 @@ const createSeries = async (req, res, next) => {
       !type     ) {
       return res.status(400).json({
         error:
-          'Required fields: title, description, posterUrl, genre, language, type, release_date, communityId',
+          'Required fields: title, description, type',
       })
     }
 
