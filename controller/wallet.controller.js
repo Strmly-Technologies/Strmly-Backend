@@ -447,7 +447,6 @@ const transferToCreatorForSeries = async (req, res, next) => {
         content_id: seriesId,
         content_type: "series",
         access_type: "creator_pass",
-        payment_id: null,
         payment_method: "creator_pass",
         payment_amount: 0,
         granted_at: new Date(),
