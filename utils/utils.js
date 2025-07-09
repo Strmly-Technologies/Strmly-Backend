@@ -86,7 +86,7 @@ const uploadVideoToS3 = async (file, videoType) => {
       Key: fileName,
       Body: file.buffer,
       ContentType: file.mimetype,
-      ACL: 'private',
+      ACL: 'public-read',
       Metadata: {
         videoType: videoType,
         originalName: file.originalname,

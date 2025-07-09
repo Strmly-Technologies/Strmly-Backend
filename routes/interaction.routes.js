@@ -11,7 +11,8 @@ const {
   downvoteComment,
   statusOfLike,
   saveVideo,
-  getTotalSharesByVideoId
+  getTotalSharesByVideoId,
+  checkForSaveVideo
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -49,6 +50,9 @@ router.post('/gift-short-video', authenticateToken, paymentRateLimiter, GiftShor
 
 // API to save a video/series
 router.post('/save', authenticateToken, generalRateLimiter, saveVideo)
+
+//check if video is saved
+router.post('/saved/status',authenticateToken, checkForSaveVideo);
 
 // get status of like video
 router.post('/like/status', authenticateToken, generalRateLimiter, statusOfLike)

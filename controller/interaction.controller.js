@@ -1028,7 +1028,36 @@ const saveVideo = async (req, res, next) => {
   }
 }
 
+const checkForSaveVideo=async(req,res,next)=>{
+  const { videoId, videoType, seriesId } = req.body
+  const userId = req.user.id
+  if (!videoId || !videoType) {
+    return res.status(400).json({ message: "Video ID and video type are required" })
+  }
+  if (!['long', 'series', 'short'].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long', 'series' or 'short'" })
+  }
+  try {
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+    let isSaved = false
+    if (videoType === 'series') {
+      isSaved = user.saved_series.includes(seriesId)
+    } else if (videoType === 'long') {
+      isSaved = user.saved_videos.includes(videoId)
+    } else if (videoType === 'short') {
+      isSaved = user.saved_short_videos.includes(videoId)
+    }
+    res.status(200).json({ isSaved })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
+  checkForSaveVideo,
   LikeVideo,
   ShareVideo,
   CommentOnVideo,
