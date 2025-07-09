@@ -32,6 +32,11 @@ const shortVideoSchema = new mongoose.Schema(
           user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
           comment: { type: String, required: true, trim: true, maxlength: 500 },
           likes: { type: Number, default: 0 },
+          upvotes: { type: Number, default: 0 },
+          downvotes: { type: Number, default: 0 },
+          donations: { type: Number, default: 0 },
+          upvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+          downvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
           replies: [
             {
               user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -42,6 +47,11 @@ const shortVideoSchema = new mongoose.Schema(
                 maxlength: 500,
               },
               likes: { type: Number, default: 0 },
+              upvotes: { type: Number, default: 0 },
+              downvotes: { type: Number, default: 0 },
+              donations: { type: Number, default: 0 },
+              upvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+              downvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
               replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
               createdAt: { type: Date, default: Date.now },
             },
@@ -51,6 +61,7 @@ const shortVideoSchema = new mongoose.Schema(
         },
       ],
     },
+    liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {
       type: String,
       required: true,

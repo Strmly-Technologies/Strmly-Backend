@@ -21,19 +21,19 @@ const walletTransactionSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        'wallet_load', // User loads money from bank
-        'series_purchase', // User buys series
-        'video_purchase', // User buys individual video
-        'creator_pass_purchase', // User buys creator pass
-        'creator_earning', // Creator receives 70%
-        'platform_commission', // Platform gets 30%
-        'withdrawal_request', // Creator withdraws
+        'wallet_load',
+        'series_purchase',
+        'video_purchase',
+        'creator_pass_purchase',
+        'creator_earning',
+        'platform_commission',
+        'withdrawal_request',
         'refund',
-        'comment_gift', // Gift to comment author
-        'gift_received', // Received gift for comment
-        'community_fee', // Creator pays community upload fee
-        'community_fee_received', // Founder receives community fee
-        'short_video_gift', // ADD THIS
+        'comment_gift',
+        'gift_received',
+        'community_fee',
+        'community_fee_received',
+        'short_video_gift',
       ],
     },
     amount: {

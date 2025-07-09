@@ -33,6 +33,11 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
+    saved_short_videos: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'ShortVideo',
+      default: [],
+    },
     saved_series: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Series',
@@ -74,6 +79,16 @@ const userSchema = new mongoose.Schema(
       maxlength: 500,
     },
     liked_videos: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'LongVideo',
+      default: [],
+    },
+    commented_videos: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'LongVideo',
+      default: [],
+    },
+    shared_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'LongVideo',
       default: [],
@@ -124,6 +139,12 @@ const userSchema = new mongoose.Schema(
         type: String,
         enum: ['unverified', 'pending', 'verified'],
         default: 'unverified',
+      },
+      creator_pass_price: {
+        type: Number,
+        default: 199,
+        min: 99,
+        max: 10000,
       },
     },
     phone: {
