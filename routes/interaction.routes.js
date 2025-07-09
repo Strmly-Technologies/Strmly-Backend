@@ -4,6 +4,7 @@ const {
   ShareVideo,
   CommentOnVideo,
   GiftComment,
+  GiftShortVideo,
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -22,5 +23,8 @@ router.post('/comment', authenticateToken, generalRateLimiter, CommentOnVideo)
 
 // API to gift a comment
 router.post('/gift-comment', authenticateToken, paymentRateLimiter, GiftComment)
+
+// Gift short video to creator
+router.post('/gift-short-video', authenticateToken, GiftShortVideo)
 
 module.exports = router

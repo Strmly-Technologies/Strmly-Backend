@@ -14,20 +14,25 @@ const userAccessSchema = new mongoose.Schema(
     content_type: {
       type: String,
       required: true,
-      enum: ['series', 'standalone_video', 'Series'],
+      enum: ['series', 'video', 'creator', 'Series'], // Added 'video' and 'creator'
     },
     access_type: {
       type: String,
       required: true,
-      enum: ['free', 'paid', 'subscription'],
+      enum: ['free', 'paid', 'subscription', 'creator_pass'], // Added missing types
       default: 'paid',
     },
-    payment_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Payment',
-      required: function () {
-        return this.access_type === 'paid'
-      },
+    payment_method: {
+      type: String,
+      enum: ['wallet_transfer', 'creator_pass', 'gift'],
+    },
+    payment_amount: {
+      type: Number,
+      default: 0,
+    },
+    metadata: {
+      type: Object,
+      default: {},
     },
     expires_at: {
       type: Date,

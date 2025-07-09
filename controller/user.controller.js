@@ -590,6 +590,49 @@ const GetUserVideosById=async(req,res,next)=>{
     handleError(error, req, res, next)
   }
 }
+
+const SetCreatorPassPrice = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { price } = req.body;
+    
+    if (typeof price !== 'number' || price < 99 || price > 10000) {
+      return res.status(400).json({ 
+        message: 'Invalid price. Must be between ₹99 and ₹10000' 
+      });
+    }
+    
+    await User.findByIdAndUpdate(userId, {
+      'creator_profile.creator_pass_price': price,
+    });
+    
+    res.status(200).json({ 
+      message: 'Creator pass price updated', 
+      price 
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+const HasCreatorPass = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { creatorId } = req.params;
+    
+    const access = await UserAccess.findOne({
+      user_id: userId,
+      content_id: creatorId,
+      content_type: 'creator',
+      access_type: 'creator_pass',
+    });
+    
+    res.status(200).json({ hasCreatorPass: !!access });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -604,5 +647,7 @@ module.exports = {
   GetUserFollowers,
   GetUserFollowing,
   GetUserVideosById,
-  GetUserProfileById
+  GetUserProfileById,
+  SetCreatorPassPrice,
+  HasCreatorPass,
 }
