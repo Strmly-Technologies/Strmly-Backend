@@ -17,6 +17,8 @@ const {
   GetUserVideosById,
   SetCreatorPassPrice,
   HasCreatorPass,
+  followUser,
+  unfollowUser,
 } = require('../controller/user.controller');
 
 // Get user feed
@@ -66,5 +68,11 @@ router.put('/creator-pass-price', authenticateToken, SetCreatorPassPrice);
 
 // Check if user has creator pass for specific creator
 router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass);
+
+// follow a user
+router.post('/follow', authenticateToken, followUser);
+
+// unfollow a user
+router.post('unfollow',authenticateToken, unfollowUser);
 
 module.exports = router;

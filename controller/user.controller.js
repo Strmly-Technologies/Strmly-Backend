@@ -633,6 +633,112 @@ const HasCreatorPass = async (req, res, next) => {
   }
 };
 
+
+const followUser = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { followUserId } = req.body;
+
+    if (!followUserId) {
+      return res.status(400).json({ message: 'Follow user ID is required' });
+    }
+
+    if (userId === followUserId) {
+      return res.status(400).json({ message: 'You cannot follow yourself' });
+    }
+
+    const user = await User.findById(userId);
+    const followUser = await User.findById(followUserId);
+
+    if (!user || !followUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isAlreadyFollowing = user.following.some(
+      (id) => id.toString() === followUserId
+    );
+    const isAlreadyFollowed = followUser.followers.some(
+      (id) => id.toString() === userId
+    );
+
+    if (isAlreadyFollowing && isAlreadyFollowed) {
+      return res
+        .status(400)
+        .json({ message: 'You are already following this user' });
+    }
+
+    // Add follow relationships
+    if (!isAlreadyFollowing) user.following.push(followUserId);
+    if (!isAlreadyFollowed) followUser.followers.push(userId);
+
+    await user.save();
+    await followUser.save();
+
+    res.status(200).json({
+      message: 'User followed successfully',
+      user: {
+        id: followUser._id,
+        username: followUser.username,
+        profile_photo: followUser.profile_photo,
+        followers: followUser.followers.length,
+        following: followUser.following.length,
+      },
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+
+const unfollowUser=async(req,res,next)=>{
+  try {
+    const userId = req.user.id;
+    const { unfollowUserId } = req.body;
+    if (!unfollowUserId) {
+      return res.status(400).json({ message: 'Unfollow user ID is required' });
+    }
+    if (userId === unfollowUserId) {
+      return res.status(400).json({ message: 'You cannot unfollow yourself' });
+    }
+    const user = await User.findById(userId);
+    const unfollowUser = await User.findById(unfollowUserId);
+    if (!user || !unfollowUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const isFollowing = user.following.some(
+      (id) => id.toString() === unfollowUserId
+    );
+    const isFollowed = unfollowUser.followers.some(
+      (id) => id.toString() === userId
+    );
+    if (!isFollowing || !isFollowed) {
+      return res.status(400).json({ message: 'You are not following this user' });
+    }
+    // Remove follow relationships
+    user.following = user.following.filter(
+      (id) => id.toString() !== unfollowUserId
+    );
+    unfollowUser.followers = unfollowUser.followers.filter(
+      (id) => id.toString() !== userId
+    );
+    await user.save();
+    await unfollowUser.save();
+    res.status(200).json({
+      message: 'User unfollowed successfully',
+      user: {
+        id: unfollowUser._id,
+        username: unfollowUser.username,
+        profile_photo: unfollowUser.profile_photo,
+        followers: unfollowUser.followers.length,
+        following: unfollowUser.following.length,
+      },
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+}
+
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -650,4 +756,6 @@ module.exports = {
   GetUserProfileById,
   SetCreatorPassPrice,
   HasCreatorPass,
+  followUser,
+  unfollowUser,
 }
