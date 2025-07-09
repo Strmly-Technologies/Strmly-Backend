@@ -77,6 +77,72 @@ const GlobalSearch = async (req, res, next) => {
   }
 }
 
+const searchFollowersOrFollowing = async (req, res, next) => {
+  try {
+    const { query, type, limit = 10, page = 1 } = req.query
+    const userId = req.user.id
+
+    if (!query || query.trim() === '') {
+      return res.status(400).json({ message: 'Search query is required' })
+    }
+
+    if (!type || !['followers', 'following'].includes(type)) {
+      return res.status(400).json({
+        message: 'Type is required and must be either "followers" or "following"',
+      })
+    }
+
+    const searchRegex = new RegExp(query, 'i')
+    const skip = (page - 1) * limit
+    const limitNum = parseInt(limit)
+
+    const user = await User.findById(userId)
+      .populate('followers', 'username profile_photo email')
+      .populate('following', 'username profile_photo email')
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    let allUsers = []
+    let totalCount = 0
+
+    if (type === 'followers') {
+      allUsers = user.followers.filter((follower) =>
+        follower.username.match(searchRegex) ||
+        (follower.email && follower.email.match(searchRegex))
+      )
+      totalCount = allUsers.length
+      allUsers = allUsers.slice(skip, skip + limitNum)
+    } else if (type === 'following') {
+      allUsers = user.following.filter((following) =>
+        following.username.match(searchRegex) ||
+        (following.email && following.email.match(searchRegex))
+      )
+      totalCount = allUsers.length
+      allUsers = allUsers.slice(skip, skip + limitNum)
+    }
+
+    res.status(200).json({
+      message: 'Search completed successfully',
+      query,
+      type,
+      totalResults: totalCount,
+      results: {
+        users: allUsers,
+      },
+      pagination: {
+        currentPage: parseInt(page),
+        limit: limitNum,
+        totalPages: Math.ceil(totalCount / limitNum),
+        hasMore: skip + limitNum < totalCount,
+      },
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 const PersonalizedSearch = async (req, res, next) => {
   try {
     const { query, limit = 10, page = 1 } = req.query
@@ -340,4 +406,5 @@ module.exports = {
   PersonalizedSearch,
   GetContentByType,
   GetTopCommunities,
+  searchFollowersOrFollowing,
 }

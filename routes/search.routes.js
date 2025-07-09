@@ -4,6 +4,7 @@ const {
   PersonalizedSearch,
   GetContentByType,
   GetTopCommunities,
+  searchFollowersOrFollowing
 } = require('../controller/search.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -18,5 +19,8 @@ router.get('/by-type', authenticateToken, GetContentByType)
 
 // API to get the top communities
 router.get('/top-communities', authenticateToken, GetTopCommunities)
+
+// API to search for followers or following users
+router.get('/search-relations', authenticateToken, searchFollowersOrFollowing)
 
 module.exports = router
