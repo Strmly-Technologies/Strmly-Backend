@@ -209,6 +209,46 @@ const ShareVideo = async (req, res, next) => {
   }
 }
 
+
+const getTotalSharesByVideoId=async(req,res,next)=>{
+  const { videoId } = req.params
+  const { videoType } = req.query
+  if (!videoId || !videoType) {
+    return res.status(400).json({
+      success: false,
+      error: 'Video ID and video type are required',
+      code: 'MISSING_REQUIRED_FIELDS',
+    })
+  }
+  if (!['long', 'short'].includes(videoType)) {
+    return res.status(400).json({
+      success: false,
+      error: "Video type must be 'long' or 'short'",
+      code: 'INVALID_VIDEO_TYPE',
+    })
+  }
+  try {
+    const VideoModel = videoType === 'long' ? LongVideo : ShortVideo
+    const video = await VideoModel.findById(videoId)
+    if (!video) {
+      return res.status(404).json({
+        success: false,
+        error: 'Video not found',
+        code: 'VIDEO_NOT_FOUND',
+      })
+    }
+    const totalShares=video.shares || 0
+    res.status(200).json({
+      success: true,
+      message: 'Total shares retrieved successfully',
+      totalShares,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+
+  }
+
 const CommentOnVideo = async (req, res, next) => {
   const { videoId, videoType, comment } = req.body
   const userId = req.user.id
@@ -1000,4 +1040,5 @@ module.exports = {
   downvoteComment,
   statusOfLike,
   saveVideo,
+  getTotalSharesByVideoId
 }

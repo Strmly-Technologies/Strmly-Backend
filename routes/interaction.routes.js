@@ -11,6 +11,7 @@ const {
   downvoteComment,
   statusOfLike,
   saveVideo,
+  getTotalSharesByVideoId
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -51,5 +52,8 @@ router.post('/save', authenticateToken, generalRateLimiter, saveVideo)
 
 // get status of like video
 router.post('/like/status', authenticateToken, generalRateLimiter, statusOfLike)
+
+// Get total shares by video ID
+router.get('/shares/:videoId', authenticateToken, generalRateLimiter, getTotalSharesByVideoId)
 
 module.exports = router
