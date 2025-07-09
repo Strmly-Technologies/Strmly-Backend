@@ -11,6 +11,11 @@ const {
   getRelatedVideos,
   uploadVideoToCommunity,
 } = require('../controller/video.controller')
+const {
+  checkVideoAccess,
+  streamVideo,
+  purchaseIndividualVideo,
+} = require('../controller/videoAccess.controller')
 const { dynamicVideoUpload, handleMulterError } = require('../utils/utils')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -47,7 +52,15 @@ router.post('/:id/view', authenticateToken, incrementVideoView)
 // Route to get related videos by video ID
 router.get('/:id/related', getRelatedVideos)
 
+// Video access control routes
+router.get('/:id/access-check', authenticateToken, checkVideoAccess)
+
+router.get('/:id/stream', authenticateToken, streamVideo)
+
+router.post('/:id/purchase', authenticateToken, purchaseIndividualVideo)
+
 //add video to community
 router.post('/upload/community',authenticateToken, uploadVideoToCommunity)
+
 
 module.exports = router

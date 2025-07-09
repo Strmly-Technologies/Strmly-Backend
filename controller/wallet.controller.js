@@ -10,6 +10,7 @@ const Series = require('../models/Series')
 const User = require('../models/User')
 const Community = require('../models/Community')
 const { handleError } = require('../utils/utils')
+const { checkCreatorPassAccess } = require("./creatorpass.controller");
 
 const MAX_WALLET_LOAD = 50000
 const MIN_WALLET_LOAD = 0
@@ -435,6 +436,44 @@ const transferToCreatorForSeries = async (req, res, next) => {
         error: "Creator's wallet is not active",
         code: 'CREATOR_WALLET_INACTIVE',
       })
+    }
+
+    // Check if user has active Creator Pass for this creator
+    const creatorPassCheck = await checkCreatorPassAccess(buyerId, creatorId);
+    if (creatorPassCheck.hasAccess) {
+      // Grant access directly without payment
+      const userAccess = new UserAccess({
+        user_id: buyerId,
+        content_id: seriesId,
+        content_type: "series",
+        access_type: "creator_pass",
+        payment_method: "creator_pass",
+        payment_amount: 0,
+        granted_at: new Date(),
+        metadata: {
+          creator_pass_id: creatorPassCheck.pass._id,
+        },
+      });
+
+      await userAccess.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Access granted via Creator Pass!",
+        accessType: "creator_pass",
+        series: {
+          id: seriesId,
+          title: series.title,
+        },
+        creatorPass: {
+          message: "This content is free with your Creator Pass",
+          creatorName: series.created_by.username,
+        },
+        nextSteps: {
+          message: "You can now watch all episodes of this series",
+          seriesId: seriesId,
+        },
+      });
     }
 
     const platformAmount = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))

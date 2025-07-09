@@ -41,7 +41,7 @@ router.post(
 
 // Transfer money from user wallet to creator wallet (70/30 split)
 router.post(
-  '/transfer/series',
+  '/transfer-series',
   authenticateToken,
   paymentRateLimiter,
   validateSeriesPurchase,

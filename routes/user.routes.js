@@ -15,6 +15,8 @@ const {
   getUserProfileDetails,
   GetUserProfileById,
   GetUserVideosById,
+  SetCreatorPassPrice,
+  HasCreatorPass,
 } = require('../controller/user.controller');
 
 // Get user feed
@@ -58,5 +60,11 @@ router.get('/profile/:id', authenticateToken, GetUserProfileById);
 
 // Get user videos by ID
 router.get('/videos/:id', authenticateToken, GetUserVideosById);
+
+// Set creator pass price
+router.put('/creator-pass-price', authenticateToken, SetCreatorPassPrice);
+
+// Check if user has creator pass for specific creator
+router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass);
 
 module.exports = router;

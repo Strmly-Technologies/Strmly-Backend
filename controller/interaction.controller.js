@@ -479,9 +479,169 @@ const GiftComment = async (req, res, next) => {
   }
 }
 
+const GiftShortVideo = async (req, res, next) => {
+  try {
+    const { videoId, amount, giftNote } = req.body
+    const gifterId = req.user.id
+
+    // Validation
+    if (!videoId || !amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Video ID and amount are required',
+        code: 'MISSING_REQUIRED_FIELDS',
+      })
+    }
+
+    const amountValidation = validateAmount(amount)
+    if (!amountValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error,
+        code: 'INVALID_AMOUNT',
+      })
+    }
+
+    // Find the short video
+    const video = await ShortVideo.findById(videoId).populate('created_by', 'username')
+    if (!video) {
+      return res.status(404).json({
+        success: false,
+        error: 'Short video not found',
+        code: 'VIDEO_NOT_FOUND',
+      })
+    }
+
+    const creatorId = video.created_by._id
+
+    // Check if user is trying to gift themselves
+    if (creatorId.toString() === gifterId) {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot gift yourself',
+        code: 'CANNOT_GIFT_SELF',
+      })
+    }
+
+    // Get wallets
+    const gifterWallet = await getOrCreateWallet(gifterId, 'user')
+    const creatorWallet = await getOrCreateWallet(creatorId, 'creator')
+
+    // Check gifter's wallet balance
+    if (gifterWallet.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient wallet balance',
+        currentBalance: gifterWallet.balance,
+        requiredAmount: amount,
+        code: 'INSUFFICIENT_BALANCE',
+      })
+    }
+
+    const session = await mongoose.startSession()
+
+    try {
+      await session.withTransaction(async () => {
+        // Create wallet transfer
+        const walletTransfer = new WalletTransfer({
+          sender_id: gifterId,
+          receiver_id: creatorId,
+          sender_wallet_id: gifterWallet._id,
+          receiver_wallet_id: creatorWallet._id,
+          total_amount: amount,
+          creator_amount: amount, // 100% to creator for gifts
+          platform_amount: 0,
+          currency: 'INR',
+          transfer_type: 'short_video_gift',
+          content_id: videoId,
+          content_type: 'ShortVideo',
+          description: `Gift for short video: ${video.name}`,
+          sender_balance_before: gifterWallet.balance,
+          sender_balance_after: gifterWallet.balance - amount,
+          receiver_balance_before: creatorWallet.balance,
+          receiver_balance_after: creatorWallet.balance + amount,
+          status: 'completed',
+          metadata: {
+            video_title: video.name,
+            creator_name: video.created_by.username,
+            gift_note: giftNote || '',
+          },
+        })
+
+        await walletTransfer.save({ session })
+
+        // Update wallets
+        gifterWallet.balance -= amount
+        gifterWallet.total_spent += amount
+        creatorWallet.balance += amount
+        creatorWallet.total_received += amount
+
+        await gifterWallet.save({ session })
+        await creatorWallet.save({ session })
+
+        // Create transactions
+        const gifterTransaction = new WalletTransaction({
+          wallet_id: gifterWallet._id,
+          user_id: gifterId,
+          transaction_type: 'debit',
+          transaction_category: 'short_video_gift',
+          amount: amount,
+          currency: 'INR',
+          description: `Gift sent to ${video.created_by.username} for short video "${video.name}"`,
+          balance_before: gifterWallet.balance + amount,
+          balance_after: gifterWallet.balance,
+          content_id: videoId,
+          content_type: 'ShortVideo',
+          status: 'completed',
+        })
+
+        const creatorTransaction = new WalletTransaction({
+          wallet_id: creatorWallet._id,
+          user_id: creatorId,
+          transaction_type: 'credit',
+          transaction_category: 'gift_received',
+          amount: amount,
+          currency: 'INR',
+          description: `Gift received from ${req.user.username} for short video "${video.name}"`,
+          balance_before: creatorWallet.balance - amount,
+          balance_after: creatorWallet.balance,
+          content_id: videoId,
+          content_type: 'ShortVideo',
+          status: 'completed',
+        })
+
+        await gifterTransaction.save({ session })
+        await creatorTransaction.save({ session })
+      })
+
+      res.status(200).json({
+        success: true,
+        message: 'Gift sent successfully!',
+        gift: {
+          amount: amount,
+          from: req.user.username,
+          to: video.created_by.username,
+          videoTitle: video.name,
+          giftNote: giftNote || '',
+        },
+      })
+
+    } catch (transactionError) {
+      await session.abortTransaction()
+      throw transactionError
+    } finally {
+      await session.endSession()
+    }
+
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   LikeVideo,
   ShareVideo,
   CommentOnVideo,
   GiftComment,
+  GiftShortVideo,
 }
