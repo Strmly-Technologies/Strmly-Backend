@@ -25,6 +25,6 @@ router.post('/comment', authenticateToken, generalRateLimiter, CommentOnVideo)
 router.post('/gift-comment', authenticateToken, paymentRateLimiter, GiftComment)
 
 // Gift short video to creator
-router.post('/gift-short-video', authenticateToken, GiftShortVideo)
+router.post('/gift-short-video', authenticateToken, paymentRateLimiter, GiftShortVideo)
 
 module.exports = router
