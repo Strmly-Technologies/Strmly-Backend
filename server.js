@@ -40,46 +40,29 @@ app.use(express.urlencoded({ extended: true }))
 const PORT = process.env.PORT
 
 // Add error handling for route registration
+const routes = [
+  { path: '/api/v1/auth', handler: authRoutes },
+  { path: '/api/v1/videos', handler: videoRoutes },
+  { path: '/api/v1/series', handler: seriesRoutes },
+  { path: '/api/v1/shorts', handler: shortsRoutes },
+  { path: '/api/v1/user', handler: userRoutes },
+  { path: '/api/v1/community', handler: communityRoutes },
+  { path: '/api/v1/interaction', handler: interactionRoutes },
+  { path: '/api/v1/caution', handler: cautionRoutes },
+  { path: '/api/v1/search', handler: searchRoutes },
+  { path: '/api/v1/wallet', handler: walletRoutes },
+  { path: '/api/v1/withdrawals', handler: withdrawalRoutes },
+  { path: '/api/v1/webhooks', handler: webhookRoutes },
+];
+
 try {
-  app.use('/api/v1/auth', authRoutes)
-  console.log('✓ Auth routes loaded')
-  
-  app.use('/api/v1/videos', videoRoutes)
-  console.log('✓ Video routes loaded')
-  
-  app.use('/api/v1/series', seriesRoutes)
-  console.log('✓ Series routes loaded')
-  
-  app.use('/api/v1/shorts', shortsRoutes)
-  console.log('✓ Shorts routes loaded')
-  
-  app.use('/api/v1/user', userRoutes)
-  console.log('✓ User routes loaded')
-  
-  app.use('/api/v1/community', communityRoutes)
-  console.log('✓ Community routes loaded')
-  
-  app.use('/api/v1/interaction', interactionRoutes)
-  console.log('✓ Interaction routes loaded')
-  
-  app.use('/api/v1/caution', cautionRoutes)
-  console.log('✓ Caution routes loaded')
-  
-  app.use('/api/v1/search', searchRoutes)
-  console.log('✓ Search routes loaded')
-  
-  app.use('/api/v1/wallet', walletRoutes)
-  console.log('✓ Wallet routes loaded')
-  
-  app.use('/api/v1/withdrawals', withdrawalRoutes)
-  console.log('✓ Withdrawal routes loaded')
-  
-  app.use('/api/v1/webhooks', webhookRoutes)
-  console.log('✓ Webhook routes loaded')
-  
+  routes.forEach(({ path, handler }) => {
+    app.use(path, handler);
+    console.log(`✓ ${path} routes loaded`);
+  });
 } catch (error) {
-  console.error('Error loading routes:', error.message)
-  process.exit(1)
+  console.error('Error loading routes:', error.message);
+  process.exit(1);
 }
 
 app.get('/health', (req, res) => {
