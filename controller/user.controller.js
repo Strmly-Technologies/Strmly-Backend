@@ -475,7 +475,7 @@ const getUserProfileDetails = async (req, res, next) => {
     const userId = req.user.id;
 
     const userDetails = await User.findById(userId)
-      .select('username profile_photo followers following my_communities');
+      .select('username profile_photo followers following my_communities interests onboarding_completed creator_profile');
 
     if (!userDetails) {
       return res.status(404).json({ message: 'User not found' });
@@ -493,7 +493,7 @@ const getUserProfileDetails = async (req, res, next) => {
         totalFollowers,
         totalFollowing,
         totalCommunities,
-        onboarding_completed: userDetails.onboarding_completed,
+        onboarding_completed: userDetails.onboarding_completed || false,
         tags: userDetails.interests || [],
         creator_pass_price: userDetails.creator_profile?.creator_pass_price || 0
       }

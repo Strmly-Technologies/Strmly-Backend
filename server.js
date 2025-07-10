@@ -25,14 +25,12 @@ validateEnv()
 const app = express()
 
 const corsOptions = {
-  origin: ['http://localhost:3000'], // ✅ replace with your frontend URL
+  origin: ['http://localhost:3000', 'https://strmly.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }
-
 app.use(cors(corsOptions))
-
 // Raw body parser for webhooks (before express.json())
 app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }))
 
@@ -41,19 +39,48 @@ app.use(express.urlencoded({ extended: true }))
 
 const PORT = process.env.PORT
 
-app.use('/api/v1/auth', authRoutes)
-app.use('/api/v1/videos', videoRoutes)
-app.use('/api/v1/series', seriesRoutes)
-app.use('/api/v1/shorts', shortsRoutes)
-app.use('/api/v1/user', userRoutes)
-app.use('/api/v1/community', communityRoutes)
-app.use('/api/v1/interaction', interactionRoutes)
-app.use('/api/v1/caution', cautionRoutes)
-app.use('/api/v1/search', searchRoutes)
-
-app.use('/api/v1/wallet', walletRoutes)
-app.use('/api/v1/withdrawals', withdrawalRoutes)
-app.use('/api/v1/webhooks', webhookRoutes)
+// Add error handling for route registration
+try {
+  app.use('/api/v1/auth', authRoutes)
+  console.log('✓ Auth routes loaded')
+  
+  app.use('/api/v1/videos', videoRoutes)
+  console.log('✓ Video routes loaded')
+  
+  app.use('/api/v1/series', seriesRoutes)
+  console.log('✓ Series routes loaded')
+  
+  app.use('/api/v1/shorts', shortsRoutes)
+  console.log('✓ Shorts routes loaded')
+  
+  app.use('/api/v1/user', userRoutes)
+  console.log('✓ User routes loaded')
+  
+  app.use('/api/v1/community', communityRoutes)
+  console.log('✓ Community routes loaded')
+  
+  app.use('/api/v1/interaction', interactionRoutes)
+  console.log('✓ Interaction routes loaded')
+  
+  app.use('/api/v1/caution', cautionRoutes)
+  console.log('✓ Caution routes loaded')
+  
+  app.use('/api/v1/search', searchRoutes)
+  console.log('✓ Search routes loaded')
+  
+  app.use('/api/v1/wallet', walletRoutes)
+  console.log('✓ Wallet routes loaded')
+  
+  app.use('/api/v1/withdrawals', withdrawalRoutes)
+  console.log('✓ Withdrawal routes loaded')
+  
+  app.use('/api/v1/webhooks', webhookRoutes)
+  console.log('✓ Webhook routes loaded')
+  
+} catch (error) {
+  console.error('Error loading routes:', error.message)
+  process.exit(1)
+}
 
 app.get('/health', (req, res) => {
   res.send('Server is healthy')
