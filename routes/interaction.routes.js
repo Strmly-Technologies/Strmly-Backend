@@ -12,7 +12,11 @@ const {
   statusOfLike,
   saveVideo,
   getTotalSharesByVideoId,
-  checkForSaveVideo
+  checkForSaveVideo,
+  UnsaveVideo,
+  ReplyToComment,
+  UpvoteReply,
+  DownvoteReply
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -38,9 +42,16 @@ router.get('/videos/:videoId/comments', authenticateToken, generalRateLimiter, g
 // Get comment replies - New route
 router.get('/videos/:videoId/comments/:commentId/replies', authenticateToken, generalRateLimiter, getCommentReplies);
 
+//API to reply to a comment
+router.post('/comments/reply', authenticateToken, generalRateLimiter, ReplyToComment)
+
 // Upvote/Downvote comments
 router.post('/comments/upvote', authenticateToken, generalRateLimiter, upvoteComment);
 router.post('/comments/downvote', authenticateToken, generalRateLimiter, downvoteComment);
+
+// Upvote/Downvote replies
+router.post('/replies/upvote', authenticateToken, generalRateLimiter, UpvoteReply);
+router.post('/replies/downvote', authenticateToken, generalRateLimiter, DownvoteReply);
 
 // API to gift a comment
 router.post('/gift-comment', authenticateToken, paymentRateLimiter, GiftComment)
@@ -50,6 +61,9 @@ router.post('/gift-short-video', authenticateToken, paymentRateLimiter, GiftShor
 
 // API to save a video/series
 router.post('/save', authenticateToken, generalRateLimiter, saveVideo)
+
+// API to unsave a video/series
+router.post('/unsave', authenticateToken, generalRateLimiter, UnsaveVideo)
 
 //check if video is saved
 router.post('/saved/status',authenticateToken, checkForSaveVideo);

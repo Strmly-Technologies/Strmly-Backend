@@ -1056,7 +1056,172 @@ const checkForSaveVideo=async(req,res,next)=>{
   }
 }
 
+const ReplyToComment=async(req, res, next) => {
+  const {videoId,commentId,reply,videoType}=req.body;
+  const userId = req.user.id;
+  if (!videoId || !commentId || !reply || !videoType) {
+    return res.status(400).json({ message: 'Video ID, comment ID, reply, and video type are required' });
+  }
+  if (!['long', 'short'].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long' or 'short'" });
+  }
+  try {
+    const VideoModel = videoType === 'long' ? LongVideo : ShortVideo;
+    const video = await VideoModel.findById(videoId);
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    const comment = video.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    comment.replies.push({ user: userId, reply , replyTo: comment.user });
+    await video.save();
+    res.status(200).json({ message: 'Reply added successfully', repliesCount: comment.replies.length });
+  } catch (error) {
+    handleError(error, req, res, next);
+}
+}
+
+const UpvoteReply=async (req, res, next) => {
+  const { videoId, commentId, replyId, videoType } = req.body;
+  const userId = req.user.id;
+  if (!videoId || !commentId || !replyId || !videoType) {
+    return res.status(400).json({ message: 'Video ID, comment ID, reply ID, and video type are required' });
+  }
+  if (!['long', 'short'].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long' or 'short'" });
+  }
+  try {
+    const VideoModel = videoType === 'long' ? LongVideo : ShortVideo;
+    const video = await VideoModel.findById(videoId);
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    const comment = video.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    const reply = comment.replies.id(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: 'Reply not found' });
+    }
+    if (reply.upvoted_by.includes(userId)) {
+      reply.upvoted_by.pull(userId);
+      reply.upvotes = Math.max(0, reply.upvotes - 1);
+    } else {
+      reply.upvoted_by.push(userId);
+      reply.upvotes += 1;
+    }
+    await video.save();
+    res.status(200).json({ message: 'Reply upvoted successfully', upvotes: reply.upvotes });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+}
+
+const DownvoteReply=async (req, res, next) => {
+  const { videoId, commentId, replyId, videoType } = req.body;
+  const userId = req.user.id;
+  if (!videoId || !commentId || !replyId || !videoType) {
+    return res.status(400).json({ message: 'Video ID, comment ID, reply ID, and video type are required' });
+  }
+  if (!['long', 'short'].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long' or 'short'" });
+  }
+  try { 
+    const VideoModel = videoType === 'long' ? LongVideo : ShortVideo;
+    const video = await VideoModel.findById(videoId);
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    const comment = video.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    const reply = comment.replies.id(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: 'Reply not found' });
+    }
+    if (reply.downvoted_by.includes(userId)) {
+      reply.downvoted_by.pull(userId);
+      reply.downvotes = Math.max(0, reply.downvotes - 1);
+    } else {
+      reply.downvoted_by.push(userId);
+      reply.downvotes += 1;
+    }
+    await video.save();
+    res.status(200).json({ message: 'Reply downvoted successfully', downvotes: reply.downvotes });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+}
+
+const UnsaveVideo = async (req, res, next) => {
+  const { videoId, videoType, seriesId } = req.body;
+  const userId = req.user.id;
+
+  if (!videoId || !videoType) {
+    return res.status(400).json({ message: "Video ID and video type are required" });
+  }
+
+  if (!['long', 'series', 'short'].includes(videoType)) {
+    return res.status(400).json({ message: "Video type must be 'long', 'series' or 'short'" });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (videoType === 'series') {
+      if (!seriesId) {
+        return res.status(400).json({ message: "Series ID is required for series type" });
+      }
+
+      const wasPresent = user.saved_series.some(id => id.toString() === seriesId);
+      if (!wasPresent) {
+        return res.status(400).json({ message: "Series not found in saved list" });
+      }
+
+      user.saved_series = user.saved_series.filter(id => id.toString() !== seriesId);
+      await user.save();
+      return res.status(200).json({ message: "Series unsaved successfully", seriesId });
+    }
+
+    if (videoType === 'long') {
+      const wasPresent = user.saved_videos.some(id => id.toString() === videoId);
+      if (!wasPresent) {
+        return res.status(400).json({ message: "Video not found in saved list" });
+      }
+
+      user.saved_videos = user.saved_videos.filter(id => id.toString() !== videoId);
+      await user.save();
+      return res.status(200).json({ message: 'Video unsaved successfully', videoId });
+    }
+
+    if (videoType === 'short') {
+      const wasPresent = user.saved_short_videos.some(id => id.toString() === videoId);
+      if (!wasPresent) {
+        return res.status(400).json({ message: "Short video not found in saved list" });
+      }
+
+      user.saved_short_videos = user.saved_short_videos.filter(id => id.toString() !== videoId);
+      await user.save();
+      return res.status(200).json({ message: 'Short video unsaved successfully', videoId });
+    }
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
+
+
 module.exports = {
+  ReplyToComment,
+  UpvoteReply,
+  DownvoteReply,
+  UnsaveVideo,
   checkForSaveVideo,
   LikeVideo,
   ShareVideo,
