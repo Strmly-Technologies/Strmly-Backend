@@ -98,9 +98,16 @@ const UpdateUserProfile = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
+    // Update the user's onboarding status
+    if (!updatedUser.onboarding_completed && updatedUser.interests.length > 0) {
+      updatedUser.onboarding_completed = true
+      await updatedUser.save()
+    }
+
     res.status(200).json({
       message: 'Profile updated successfully',
       user: updatedUser,
+      onboarding_completed: updatedUser.onboarding_completed,
     })
   } catch (error) {
     handleError(error, req, res, next)

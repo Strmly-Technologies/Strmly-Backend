@@ -152,6 +152,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: /^[0-9]{10}$/,
     },
+    onboarding_completed: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 )
