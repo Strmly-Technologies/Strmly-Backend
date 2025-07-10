@@ -298,6 +298,8 @@ const GetUserInteractions = async (req, res, next) => {
       interactions.comments = userComments
     }
 
+    // get total
+
     res.status(200).json({
       message: 'User interactions retrieved successfully',
       interactions,
@@ -315,6 +317,10 @@ const GetUserEarnings = async (req, res, next) => {
       'name views likes shares'
     )
 
+    const shortVideos = await ShortVideo.find({ created_by: userId }).select(
+      'name views likes shares'
+    )
+    userVideos.push(...shortVideos)
     const totalViews = userVideos.reduce((sum, video) => sum + video.views, 0)
     const totalLikes = userVideos.reduce((sum, video) => sum + video.likes, 0)
     const totalShares = userVideos.reduce((sum, video) => sum + video.shares, 0)
@@ -397,6 +403,8 @@ const GetUserNotifications = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
+
+
 
 const UpdateUserInterests = async (req, res, next) => {
   try {
@@ -485,7 +493,9 @@ const getUserProfileDetails = async (req, res, next) => {
         totalFollowers,
         totalFollowing,
         totalCommunities,
-        onboarding_completed: userDetails.onboarding_completed
+        onboarding_completed: userDetails.onboarding_completed,
+        tags: userDetails.interests || [],
+        creator_pass_price: userDetails.creator_profile?.creator_pass_price || 0
       }
     });
   } catch (error) {
