@@ -62,6 +62,7 @@ const GetUserProfile = async (req, res, next) => {
     res.status(200).json({
       message: 'User profile retrieved successfully',
       user,
+      onboarding_completed: user.onboarding_completed
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -484,6 +485,7 @@ const getUserProfileDetails = async (req, res, next) => {
         totalFollowers,
         totalFollowing,
         totalCommunities,
+        onboarding_completed: userDetails.onboarding_completed
       }
     });
   } catch (error) {
