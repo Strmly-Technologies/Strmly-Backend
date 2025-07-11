@@ -439,13 +439,24 @@ const UpdateUserInterests = async (req, res, next) => {
 const GetUserFollowers = async (req, res, next) => {
   try {
     const userId = req.params.id || req.user._id
-    const user = await User.findById(userId).populate('followers', 'username profile_photo')
+    const user = await User.findById(userId).populate(
+      'followers',
+      'username profile_photo followers'
+    )
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
+    const enrichedUserFollowers = user.followers.map((follower) => ({
+      _id: follower._id,
+      username: follower.username,
+      profile_photo: follower.profile_photo,
+      total_followers: follower.followers?.length || 0,
+      is_following: follower.followers?.includes(userId) || false, //determines whether the user also follows the follower or not (mutual following)
+    }))
+
     res.status(200).json({
       message: 'User followers retrieved successfully',
-      followers: user.followers,
+      followers: enrichedUserFollowers,
       count: user.followers.length,
     })
   } catch (error) {
