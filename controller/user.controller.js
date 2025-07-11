@@ -1,8 +1,10 @@
 const User = require('../models/User')
 const Community = require('../models/Community')
 const LongVideo = require('../models/LongVideo')
-const { handleError } = require('../utils/utils')
 const ShortVideo = require('../models/ShortVideos')
+const WalletTransfer = require('../models/WalletTransfer')
+const CreatorPass = require('../models/CreatorPass')
+const { handleError } = require('../utils/utils')
 
 const GetUserFeed = async (req, res, next) => {
   try {
@@ -351,52 +353,249 @@ const GetUserEarnings = async (req, res, next) => {
 const GetUserNotifications = async (req, res, next) => {
   try {
     const userId = req.user._id
-    const { page = 1, limit = 20 } = req.query
+    const { page = 1, limit = 20, type = 'all' } = req.query
 
     const notifications = []
 
-    const user = await User.findById(userId)
-      .populate('followers', 'username profile_photo')
-      .populate('following', 'username profile_photo')
-
-    const recentFollowers = user.followers.slice(-5).map((follower) => ({
-      type: 'follow',
-      message: `${follower.username} started following you`,
-      user: follower,
-      createdAt: new Date(),
-    }))
-
-    notifications.push(...recentFollowers)
-
-    const userVideos = await LongVideo.find({ creator: userId })
-      .populate('comments.user', 'username profile_photo')
-      .select('name comments')
-
-    userVideos.forEach((video) => {
-      const recentComments = video.comments.slice(-3).map((comment) => ({
-        type: 'comment',
-        message: `${comment.user.username} commented on your video "${video.name}"`,
-        user: comment.user,
-        video: { _id: video._id, name: video.name },
-        createdAt: comment.createdAt,
+    // 1. Follow notifications
+    if (type === 'all' || type === 'follows') {
+      const user = await User.findById(userId)
+        .populate('followers', 'username profile_photo')
+      
+      const recentFollowers = user.followers.slice(-10).map((follower) => ({
+        type: 'follow',
+        message: `${follower.username} started following you`,
+        user: follower,
+        createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000), // Random within last week
+        priority: 2,
       }))
-      notifications.push(...recentComments)
+      notifications.push(...recentFollowers)
+    }
+
+    // 2. Comment notifications (Long Videos)
+    if (type === 'all' || type === 'comments') {
+      const userLongVideos = await LongVideo.find({ created_by: userId })
+        .populate('comments.user', 'username profile_photo')
+        .select('name comments createdAt')
+        .sort({ 'comments.createdAt': -1 })
+        .limit(20)
+
+      userLongVideos.forEach((video) => {
+        const recentComments = video.comments.slice(-5).map((comment) => ({
+          type: 'comment',
+          message: `${comment.user.username} commented on your video "${video.name}"`,
+          user: comment.user,
+          video: { _id: video._id, name: video.name, type: 'long' },
+          createdAt: comment.createdAt,
+          priority: 3,
+        }))
+        notifications.push(...recentComments)
+      })
+    }
+
+    // 3. Comment notifications (Short Videos)
+    if (type === 'all' || type === 'comments') {
+      const userShortVideos = await ShortVideo.find({ created_by: userId })
+        .populate('comments.user', 'username profile_photo')
+        .select('name comments createdAt')
+        .sort({ 'comments.createdAt': -1 })
+        .limit(20)
+
+      userShortVideos.forEach((video) => {
+        const recentComments = video.comments.slice(-5).map((comment) => ({
+          type: 'comment',
+          message: `${comment.user.username} commented on your short video "${video.name}"`,
+          user: comment.user,
+          video: { _id: video._id, name: video.name, type: 'short' },
+          createdAt: comment.createdAt,
+          priority: 3,
+        }))
+        notifications.push(...recentComments)
+      })
+    }
+
+    // 4. Gift notifications (received)
+    if (type === 'all' || type === 'gifts') {
+      const WalletTransfer = require('../models/WalletTransfer')
+      const receivedGifts = await WalletTransfer.find({
+        receiver_id: userId,
+        transfer_type: { $in: ['comment_gift', 'short_video_gift'] },
+        status: 'completed'
+      })
+        .populate('sender_id', 'username profile_photo')
+        .populate('content_id', 'name title')
+        .sort({ createdAt: -1 })
+        .limit(15)
+
+      const giftNotifications = receivedGifts.map((gift) => ({
+        type: 'gift_received',
+        message: `${gift.sender_id.username} sent you ₹${gift.total_amount} as a gift`,
+        user: gift.sender_id,
+        amount: gift.total_amount,
+        giftType: gift.transfer_type,
+        content: {
+          _id: gift.content_id?._id,
+          name: gift.content_id?.name || gift.content_id?.title,
+          type: gift.transfer_type === 'comment_gift' ? 'comment' : 'video'
+        },
+        giftNote: gift.metadata?.transfer_note || '',
+        createdAt: gift.createdAt,
+        priority: 1, // High priority for money received
+      }))
+      notifications.push(...giftNotifications)
+    }
+
+    // 5. Community fee notifications (for community founders)
+    if (type === 'all' || type === 'community') {
+      const WalletTransfer = require('../models/WalletTransfer')
+      const Community = require('../models/Community')
+      
+      // Get communities founded by this user
+      const userCommunities = await Community.find({ founder: userId }).select('_id')
+      const communityIds = userCommunities.map(c => c._id)
+      
+      const communityFees = await WalletTransfer.find({
+        receiver_id: userId,
+        transfer_type: 'community_fee',
+        content_id: { $in: communityIds },
+        status: 'completed'
+      })
+        .populate('sender_id', 'username profile_photo')
+        .populate('content_id', 'name')
+        .sort({ createdAt: -1 })
+        .limit(10)
+
+      const communityNotifications = communityFees.map((fee) => ({
+        type: 'community_fee',
+        message: `${fee.sender_id.username} paid ₹${fee.total_amount} to upload in your community "${fee.content_id.name}"`,
+        user: fee.sender_id,
+        amount: fee.creator_amount,
+        community: {
+          _id: fee.content_id._id,
+          name: fee.content_id.name
+        },
+        createdAt: fee.createdAt,
+        priority: 1,
+      }))
+      notifications.push(...communityNotifications)
+    }
+
+    // 6. Creator Pass notifications (sales)
+    if (type === 'all' || type === 'creator_pass') {
+      const CreatorPass = require('../models/CreatorPass')
+      const soldPasses = await CreatorPass.find({
+        creator_id: userId,
+        status: 'active'
+      })
+        .populate('user_id', 'username profile_photo')
+        .sort({ createdAt: -1 })
+        .limit(10)
+
+      const passNotifications = soldPasses.map((pass) => ({
+        type: 'creator_pass_sold',
+        message: `${pass.user_id.username} purchased your Creator Pass for ₹${pass.amount_paid}`,
+        user: pass.user_id,
+        amount: pass.amount_paid,
+        duration: '30 days',
+        createdAt: pass.createdAt,
+        priority: 1,
+      }))
+      notifications.push(...passNotifications)
+    }
+
+    // 7. Series purchase notifications
+    if (type === 'all' || type === 'purchases') {
+      const WalletTransfer = require('../models/WalletTransfer')
+      const seriesPurchases = await WalletTransfer.find({
+        receiver_id: userId,
+        transfer_type: 'series_purchase',
+        status: 'completed'
+      })
+        .populate('sender_id', 'username profile_photo')
+        .populate('content_id', 'title')
+        .sort({ createdAt: -1 })
+        .limit(10)
+
+      const purchaseNotifications = seriesPurchases.map((purchase) => ({
+        type: 'series_purchase',
+        message: `${purchase.sender_id.username} purchased your series "${purchase.content_id.title}" for ₹${purchase.total_amount}`,
+        user: purchase.sender_id,
+        amount: purchase.creator_amount,
+        totalAmount: purchase.total_amount,
+        series: {
+          _id: purchase.content_id._id,
+          title: purchase.content_id.title
+        },
+        createdAt: purchase.createdAt,
+        priority: 1,
+      }))
+      notifications.push(...purchaseNotifications)
+    }
+
+    // 8. Creator Pass purchase confirmations (for buyers)
+    if (type === 'all' || type === 'my_purchases') {
+      const CreatorPass = require('../models/CreatorPass')
+      const myPasses = await CreatorPass.find({
+        user_id: userId,
+        status: 'active'
+      })
+        .populate('creator_id', 'username profile_photo')
+        .sort({ createdAt: -1 })
+        .limit(5)
+
+      const myPassNotifications = myPasses.map((pass) => ({
+        type: 'creator_pass_purchased',
+        message: `Your Creator Pass for ${pass.creator_id.username} is now active`,
+        user: pass.creator_id,
+        amount: pass.amount_paid,
+        expiresAt: pass.end_date,
+        createdAt: pass.createdAt,
+        priority: 2,
+      }))
+      notifications.push(...myPassNotifications)
+    }
+
+    // Sort notifications by priority and date
+    notifications.sort((a, b) => {
+      // First sort by priority (lower number = higher priority)
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority
+      }
+      // Then sort by date (newer first)
+      return new Date(b.createdAt) - new Date(a.createdAt)
     })
 
-    notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    // Pagination
     const startIndex = (page - 1) * limit
     const paginatedNotifications = notifications.slice(
       startIndex,
       startIndex + parseInt(limit)
     )
 
+    // Count by type for summary
+    const notificationSummary = {
+      total: notifications.length,
+      unread: notifications.length, // You can implement read/unread status later
+      byType: {
+        follows: notifications.filter(n => n.type === 'follow').length,
+        comments: notifications.filter(n => n.type === 'comment').length,
+        gifts: notifications.filter(n => n.type === 'gift_received').length,
+        community: notifications.filter(n => n.type === 'community_fee').length,
+        creatorPass: notifications.filter(n => n.type.includes('creator_pass')).length,
+        purchases: notifications.filter(n => n.type === 'series_purchase').length,
+      }
+    }
+
     res.status(200).json({
       message: 'User notifications retrieved successfully',
       notifications: paginatedNotifications,
+      summary: notificationSummary,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         hasMore: notifications.length > startIndex + parseInt(limit),
+        totalPages: Math.ceil(notifications.length / parseInt(limit)),
+        total: notifications.length,
       },
     })
   } catch (error) {
@@ -475,7 +674,7 @@ const getUserProfileDetails = async (req, res, next) => {
     const userId = req.user.id;
 
     const userDetails = await User.findById(userId)
-      .select('username profile_photo followers following my_communities interests onboarding_completed creator_profile');
+      .select('username profile_photo followers following my_communities');
 
     if (!userDetails) {
       return res.status(404).json({ message: 'User not found' });
@@ -493,7 +692,7 @@ const getUserProfileDetails = async (req, res, next) => {
         totalFollowers,
         totalFollowing,
         totalCommunities,
-        onboarding_completed: userDetails.onboarding_completed || false,
+        onboarding_completed: userDetails.onboarding_completed,
         tags: userDetails.interests || [],
         creator_pass_price: userDetails.creator_profile?.creator_pass_price || 0
       }
