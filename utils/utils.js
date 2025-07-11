@@ -86,7 +86,6 @@ const uploadVideoToS3 = async (file, videoType) => {
       Key: fileName,
       Body: file.buffer,
       ContentType: file.mimetype,
-      ACL: 'public-read',
       Metadata: {
         videoType: videoType,
         originalName: file.originalname,
@@ -108,6 +107,65 @@ const uploadVideoToS3 = async (file, videoType) => {
     return {
       success: false,
       message: 'Failed to upload video',
+      error: error.message,
+    }
+  }
+}
+
+const createImageMulter = (maxSize = 5 * 1024 * 1024) => {
+  const storage = multer.memoryStorage()
+
+  const fileFilter = (req, file, cb) => {
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ]
+
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true)
+    } else {
+      cb(new Error('Only image files are allowed (JPEG, PNG, WebP, GIF)'))
+    }
+  }
+
+  return multer({
+    storage: storage,
+    limits: { fileSize: maxSize },
+    fileFilter: fileFilter,
+  })
+}
+
+const uploadImageToS3 = async (file, folder = 'images') => {
+  try {
+    const fileExtension = file.originalname.split('.').pop()
+    const fileName = `${folder}/${uuidv4()}.${fileExtension}`
+
+    const uploadParams = {
+      Bucket: process.env.AWS_S3_BUCKET,
+      Key: fileName,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      Metadata: {
+        originalName: file.originalname,
+        uploadDate: new Date().toISOString(),
+      },
+    }
+
+    const result = await s3.upload(uploadParams).promise()
+    return {
+      success: true,
+      message: 'Image uploaded successfully',
+      url: result.Location,
+      key: result.Key,
+    }
+  } catch (error) {
+    console.error('Error uploading image to S3:', error)
+    return {
+      success: false,
+      message: 'Failed to upload image',
       error: error.message,
     }
   }
@@ -201,7 +259,9 @@ const handleError = (err, req, res) => {
 module.exports = {
   handleMulterError,
   createVideoMulter,
+  createImageMulter,
   dynamicVideoUpload,
   handleError,
   uploadVideoToS3,
+  uploadImageToS3,
 }

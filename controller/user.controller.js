@@ -1,7 +1,7 @@
 const User = require('../models/User')
 const Community = require('../models/Community')
 const LongVideo = require('../models/LongVideo')
-const { handleError } = require('../utils/utils')
+const { handleError, uploadImageToS3 } = require('../utils/utils')
 const ShortVideo = require('../models/ShortVideos')
 
 const GetUserFeed = async (req, res, next) => {
@@ -72,14 +72,28 @@ const GetUserProfile = async (req, res, next) => {
 const UpdateUserProfile = async (req, res, next) => {
   try {
     const userId = req.user._id
-    const { username, bio, profile_photo, date_of_birth } = req.body
+    const { username, bio, date_of_birth, interests, uniqueId } = req.body
+    const profilePhotoFile = req.file
 
     const updateData = {}
     if (username) updateData.username = username
     if (bio !== undefined) updateData.bio = bio
-    if (profile_photo !== undefined) updateData.profile_photo = profile_photo
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth
+    if (uniqueId) updateData.uniqueId = uniqueId
+    
+    // Parse interests from JSON string
+    if (interests) {
+      try {
+        const parsedInterests = JSON.parse(interests)
+        if (Array.isArray(parsedInterests)) {
+          updateData.interests = parsedInterests
+        }
+      } catch (error) {
+        return res.status(400).json({ message: 'Invalid interests format. Must be a JSON array.' })
+      }
+    }
 
+    // Check for unique username
     if (username) {
       const existingUser = await User.findOne({
         username,
@@ -87,6 +101,32 @@ const UpdateUserProfile = async (req, res, next) => {
       })
       if (existingUser) {
         return res.status(400).json({ message: 'Username already taken' })
+      }
+    }
+
+    // Check for unique uniqueId
+    if (uniqueId) {
+      const existingUserWithUniqueId = await User.findOne({
+        uniqueId,
+        _id: { $ne: userId },
+      })
+      if (existingUserWithUniqueId) {
+        return res.status(400).json({ message: 'Unique ID already taken' })
+      }
+    }
+
+    // Handle profile photo upload
+    if (profilePhotoFile) {
+      try {
+        const uploadResult = await uploadImageToS3(profilePhotoFile, 'profile-photos')
+        if (uploadResult.success) {
+          updateData.profile_photo = uploadResult.url
+        } else {
+          return res.status(500).json({ message: 'Failed to upload profile photo' })
+        }
+      } catch (error) {
+        console.error('Profile photo upload error:', error)
+        return res.status(500).json({ message: 'Error uploading profile photo' })
       }
     }
 
@@ -100,7 +140,7 @@ const UpdateUserProfile = async (req, res, next) => {
     }
 
     // Update the user's onboarding status
-    if (!updatedUser.onboarding_completed && updatedUser.interests.length > 0) {
+    if (!updatedUser.onboarding_completed && updatedUser.interests && updatedUser.interests.length > 0) {
       updatedUser.onboarding_completed = true
       await updatedUser.save()
     }
