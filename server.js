@@ -25,14 +25,12 @@ validateEnv()
 const app = express()
 
 const corsOptions = {
-  origin: ['http://localhost:3000'], // ✅ replace with your frontend URL
+  origin: ['http://localhost:3000', 'https://strmly.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }
-
 app.use(cors(corsOptions))
-
 // Raw body parser for webhooks (before express.json())
 app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }))
 
@@ -41,19 +39,31 @@ app.use(express.urlencoded({ extended: true }))
 
 const PORT = process.env.PORT
 
-app.use('/api/v1/auth', authRoutes)
-app.use('/api/v1/videos', videoRoutes)
-app.use('/api/v1/series', seriesRoutes)
-app.use('/api/v1/shorts', shortsRoutes)
-app.use('/api/v1/user', userRoutes)
-app.use('/api/v1/community', communityRoutes)
-app.use('/api/v1/interaction', interactionRoutes)
-app.use('/api/v1/caution', cautionRoutes)
-app.use('/api/v1/search', searchRoutes)
+// Add error handling for route registration
+const routes = [
+  { path: '/api/v1/auth', handler: authRoutes },
+  { path: '/api/v1/videos', handler: videoRoutes },
+  { path: '/api/v1/series', handler: seriesRoutes },
+  { path: '/api/v1/shorts', handler: shortsRoutes },
+  { path: '/api/v1/user', handler: userRoutes },
+  { path: '/api/v1/community', handler: communityRoutes },
+  { path: '/api/v1/interaction', handler: interactionRoutes },
+  { path: '/api/v1/caution', handler: cautionRoutes },
+  { path: '/api/v1/search', handler: searchRoutes },
+  { path: '/api/v1/wallet', handler: walletRoutes },
+  { path: '/api/v1/withdrawals', handler: withdrawalRoutes },
+  { path: '/api/v1/webhooks', handler: webhookRoutes },
+];
 
-app.use('/api/v1/wallet', walletRoutes)
-app.use('/api/v1/withdrawals', withdrawalRoutes)
-app.use('/api/v1/webhooks', webhookRoutes)
+try {
+  routes.forEach(({ path, handler }) => {
+    app.use(path, handler);
+    console.log(`✓ ${path} routes loaded`);
+  });
+} catch (error) {
+  console.error('Error loading routes:', error.message);
+  process.exit(1);
+}
 
 app.get('/health', (req, res) => {
   res.send('Server is healthy')
