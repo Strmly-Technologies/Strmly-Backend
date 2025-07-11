@@ -73,6 +73,6 @@ router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass);
 router.post('/follow', authenticateToken, followUser);
 
 // unfollow a user
-router.post('unfollow',authenticateToken, unfollowUser);
+router.post('/unfollow',authenticateToken, unfollowUser);
 
 module.exports = router;

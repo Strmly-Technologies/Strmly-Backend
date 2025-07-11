@@ -674,13 +674,12 @@ const HasCreatorPass = async (req, res, next) => {
 
 const followUser = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id.toString(); //convert to string to prevent type mismatch bugs
     const { followUserId } = req.body;
 
     if (!followUserId) {
       return res.status(400).json({ message: 'Follow user ID is required' });
     }
-
     if (userId === followUserId) {
       return res.status(400).json({ message: 'You cannot follow yourself' });
     }
@@ -730,7 +729,7 @@ const followUser = async (req, res, next) => {
 
 const unfollowUser=async(req,res,next)=>{
   try {
-    const userId = req.user.id;
+    const userId = req.user.id.toString(); //convert to string to prevent type mismatch bugs
     const { unfollowUserId } = req.body;
     if (!unfollowUserId) {
       return res.status(400).json({ message: 'Unfollow user ID is required' });
