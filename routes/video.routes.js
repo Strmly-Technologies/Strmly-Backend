@@ -16,14 +16,16 @@ const {
   streamVideo,
   purchaseIndividualVideo,
 } = require('../controller/videoAccess.controller')
-const { dynamicVideoUpload, handleMulterError } = require('../utils/utils')
+const { dynamicVideoUpload, handleMulterError, validateVideoFormData } = require('../utils/utils')
 const { authenticateToken } = require('../middleware/auth')
 
 // Route to upload a new video
+//accepts: FormData(name, description, genre, type, language, age_restriction, communityId, seriesId, videoType, videoFile)
 router.post(
   '/upload',
   authenticateToken,
   dynamicVideoUpload,
+  validateVideoFormData,
   uploadVideo,
   handleMulterError
 )
@@ -34,17 +36,11 @@ router.get('/search', searchVideos)
 // Route to get trending videos
 router.get('/trending', getTrendingVideos)
 
+//add video to community
+router.post('/upload/community', authenticateToken, uploadVideoToCommunity)
+
 // Route to get videos by genre
 router.get('/by-genre/:genre', getVideosByGenre)
-
-// Route to get a video by ID
-router.get('/:id', getVideoById)
-
-// Route to update a video by ID
-router.put('/:id', authenticateToken, updateVideo)
-
-// Route to delete a video by ID
-router.delete('/:id', authenticateToken, deleteVideo)
 
 // Route to increment video view count
 router.post('/:id/view', authenticateToken, incrementVideoView)
@@ -59,8 +55,15 @@ router.get('/:id/stream', authenticateToken, streamVideo)
 
 router.post('/:id/purchase', authenticateToken, purchaseIndividualVideo)
 
-//add video to community
-router.post('/upload/community',authenticateToken, uploadVideoToCommunity)
+// Route to get a video by ID
+router.get('/:id', getVideoById)
+
+// Route to update a video by ID
+router.put('/:id', authenticateToken, updateVideo)
+
+// Route to delete a video by ID
+router.delete('/:id', authenticateToken, deleteVideo)
+
 
 
 module.exports = router

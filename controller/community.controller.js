@@ -1,6 +1,6 @@
 const Community = require('../models/Community')
 const CommunityAccess = require('../models/CommunityAccess')
-const { handleError } = require('../utils/utils')
+const { handleError, uploadImageToS3 } = require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
   const { name, bio, type, amount, fee_description } = req.body
@@ -69,31 +69,42 @@ const RenameCommunity = async (req, res, next) => {
 }
 
 const ChangeCommunityProfilePhoto = async (req, res, next) => {
-  const { communityId, profilePhotoUrl } = req.body
-  const userId = req.user.id
+  const profilePhotoFile = req.files?.imageFile?.[0];
+  const { communityId } = req.body
+  const userId = req.user.id.toString();
 
-  if (!communityId || !profilePhotoUrl) {
+  if (!communityId || !profilePhotoFile) {
     return res
       .status(400)
-      .json({ message: 'Community ID and profile photo URL are required' })
+      .json({ message: 'Community ID and profile photo are required' })
   }
 
   try {
-    const updatedCommunity = await Community.findOneAndUpdate(
-      { _id: communityId, founder: userId },
-      { profile_photo: profilePhotoUrl },
-      { new: true }
-    )
 
-    if (!updatedCommunity) {
+    const community = await Community.findOne({ _id: communityId, founder: userId });
+    if (!community) {
       return res
         .status(404)
         .json({ message: 'Community not found or you are not the founder' })
     }
 
+    const uploadResult = await uploadImageToS3(profilePhotoFile,"community-profile-photos")
+    if (!uploadResult.success) {
+      console.error(' S3 upload failed:', uploadResult)
+      return res.status(500).json({
+        error: uploadResult.message,
+        details: uploadResult.error || 'Failed to upload image to S3',
+      })
+    }
+
+    const profilePhotoUrl = uploadResult.url;
+
+    community.profile_photo = profilePhotoUrl;
+    await community.save();
+
     res.status(200).json({
       message: 'Community profile photo updated successfully',
-      community: updatedCommunity,
+      community: community,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -193,31 +204,36 @@ const getAllCommunities = async (req, res, next) => {
     const communities = await Community.find()
       .populate('founder', 'username profile_photo')
       .populate('followers', 'username profile_photo')
-      .populate('creators', 'username profile_photo');
-
+      .populate('creators', 'username profile_photo')
+      .populate('long_videos', 'name description videoUrl')
+      .populate('short_videos', 'name description videoUrl')
+      .populate('series', 'title description total_episodes');
     if (communities.length === 0) {
       return res.status(404).json({ message: 'No communities found' });
     }
-    
+
     return res.status(200).json({
-    communities,
-    count: communities.length,
-    message: 'Communities fetched successfully'
-});
+      communities,
+      count: communities.length,
+      message: 'Communities fetched successfully'
+    });
   } catch (error) {
     handleError(error, req, res, next);
   }
 };
 
 
-const getCommunityById = async (req, res,next) => {
+const getCommunityById = async (req, res, next) => {
   const communityId = req.params.id;
   try {
     const community = await Community.findById(communityId)
       .populate('founder', 'username profile_photo')
       .populate('followers', 'username profile_photo')
-      .populate('creators', 'username profile_photo');
-    
+      .populate('creators', 'username profile_photo')
+      .populate('long_videos', 'name description videoUrl')
+      .populate('short_videos', 'name description videoUrl')
+      .populate('series', 'title description total_episodes');
+
     if (!community) {
       return res.status(404).json({ message: 'Community not found' });
     }
@@ -244,14 +260,20 @@ const getUserCommunities = async (req, res, next) => {
       created = await Community.find({ founder: userId })
         .populate('founder', 'username profile_photo')
         .populate('followers', 'username profile_photo')
-        .populate('creators', 'username profile_photo');
+        .populate('creators', 'username profile_photo')
+        .populate('long_videos', 'name description videoUrl')
+        .populate('short_videos', 'name description videoUrl')
+        .populate('series', 'title description total_episodes');
     }
 
     if (type === 'joined' || type === 'all') {
       joined = await Community.find({ followers: userId })
         .populate('founder', 'username profile_photo')
         .populate('followers', 'username profile_photo')
-        .populate('creators', 'username profile_photo');
+        .populate('creators', 'username profile_photo')
+        .populate('long_videos', 'name description videoUrl')
+        .populate('short_videos', 'name description videoUrl')
+        .populate('series', 'title description total_episodes');
     }
 
     let combined = [];

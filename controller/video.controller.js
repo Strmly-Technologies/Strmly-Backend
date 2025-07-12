@@ -51,9 +51,8 @@ const uploadVideoToCommunity=async(req,res,next)=>{
 
 const uploadVideo = async (req, res, next) => {
   try {
-    const videoType = req.videoType
-    const videoFile = req.file
-    const userId = req.user.id
+    const videoFile = req.files?.videoFile?.[0];
+    const userId = req.user.id.toString() 
     const {
       name,
       description,
@@ -62,6 +61,8 @@ const uploadVideo = async (req, res, next) => {
       language,
       age_restriction,
       communityId,
+      seriesId,
+      videoType
     } = req.body
 
     if (!userId) {
@@ -144,9 +145,10 @@ const uploadVideo = async (req, res, next) => {
         thumbnailUrl: '',
         genre: genre || 'Action',
         type: type || 'Free',
+        series:seriesId || null,
         age_restriction:
-          age_restriction === 'true' || age_restriction === true || false,
-        language: language || 'English',
+        age_restriction === 'true' || age_restriction === true || false,
+        Videolanguage: language || 'English',
         subtitles: [],
       }
       savedVideo = new LongVideo(longVideo)
