@@ -267,16 +267,15 @@ const GetUserVideos = async (req, res, next) => {
         },
       })
       videos = user.playlist
-    } else if(type==='long'){
+    } else if (type === 'long') {
       videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
-    }
-    else {
-      videos= await ShortVideo.find({ created_by: userId })
+    } else {
+      videos = await ShortVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
         .sort({ createdAt: -1 })
@@ -815,6 +814,46 @@ const unfollowUser=async(req,res,next)=>{
   }
 }
 
+const checkFollowStatus = async (req, res, next) => {
+  try {
+    const currentUserId = req.user.id;
+    const { targetUserId } = req.params;
+
+    if (!targetUserId) {
+      return res.status(400).json({ message: 'Target user ID is required' });
+    }
+
+    if (currentUserId.toString() === targetUserId.toString()) {
+      return res.status(400).json({ 
+        message: 'Cannot check follow status for yourself',
+        isFollowing: false 
+      });
+    }
+
+    // Check if target user exists
+    const targetUser = await User.findById(targetUserId).select('_id username');
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found' });
+    }
+
+    // Check if current user follows target user
+    const currentUser = await User.findById(currentUserId).select('following');
+    const isFollowing = currentUser.following.some(
+      (id) => id.toString() === targetUserId
+    );
+
+    res.status(200).json({
+      message: 'Follow status retrieved successfully',
+      isFollowing,
+      targetUser: {
+        id: targetUser._id,
+        username: targetUser.username
+      }
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+};
 
 module.exports = {
   getUserProfileDetails,
@@ -835,4 +874,5 @@ module.exports = {
   HasCreatorPass,
   followUser,
   unfollowUser,
+  checkFollowStatus,
 }
