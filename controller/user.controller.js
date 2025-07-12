@@ -267,7 +267,7 @@ const GetUserVideos = async (req, res, next) => {
         },
       })
       videos = user.playlist
-    } else if(type==='long'){
+    } else if (type === 'long') {
       videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
@@ -276,7 +276,7 @@ const GetUserVideos = async (req, res, next) => {
         .limit(parseInt(limit))
     }
     else {
-      videos= await ShortVideo.find({ created_by: userId })
+      videos = await ShortVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
         .sort({ createdAt: -1 })
@@ -390,37 +390,146 @@ const GetUserEarnings = async (req, res, next) => {
 
 const GetUserNotifications = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user._id.toString()
     const { page = 1, limit = 20 } = req.query
 
     const notifications = []
 
     const user = await User.findById(userId)
       .populate('followers', 'username profile_photo')
-      .populate('following', 'username profile_photo')
+      .populate({
+        path: 'my_communities',
+        select: '_id name community_fee_type community_fee_amount followers',
+        populate: {
+          path: 'followers',
+          select: '_id username profile_photo',
+        },
+      })
+      .populate({
+        path: 'commented_videos',
+        select: '_id comments name',
+        populate: {
+          path: 'comments',
+          select: '_id upvoted_by replies user',
+          populate: [
+            {
+              path: 'upvoted_by',
+              select: '_id username profile_photo',
+            },
+            {
+              path: 'replies.user',
+              select: '_id username profile_photo',
+            }
+          ],
+        },
+      });
 
+    user.commented_videos.forEach((video) => {
+      video.comments.forEach((comment) => {
+        if (comment.user.toString() === userId) {
+          const recentCommentUpvote = comment.upvoted_by.slice(-5).map((upvotedUser) => ({
+
+            _id: comment._id,
+            group: "non-revenue",
+            type: 'comment upvote',
+            content: `${upvotedUser.username} upvoted your comment on the video ${video.name}`,
+            timeStamp: new Date(),
+            avatar: upvotedUser.profile_photo,
+            read: false,
+            URL: `/api/v1/user/profile/${userId}`
+
+          }))
+          const recentCommentReplies = comment.replies.slice(-5).map((reply) => ({
+
+            _id: comment._id,
+            group: "non-revenue",
+            type: 'comment reply',
+            content: `${reply.user.username} replied to your comment on the video ${video.name}`,
+            timeStamp: new Date(),
+            avatar: reply.user.profile_photo,
+            read: false,
+            URL: `/api/v1/user/profile/${userId}`
+
+          }))
+          notifications.push(...recentCommentUpvote, ...recentCommentReplies) //user comment upvote -notification
+        }
+      })
+    })
     const recentFollowers = user.followers.slice(-5).map((follower) => ({
+      _id: follower._id,
+      group: "non-revenue",
       type: 'follow',
-      message: `${follower.username} started following you`,
-      user: follower,
-      createdAt: new Date(),
+      content: `${follower.username} started following you`,
+      timeStamp: new Date(),
+      avatar: follower.profile_photo,
+      read: false,
+      URL: `/api/v1/user/profile/${follower._id}`
     }))
 
-    notifications.push(...recentFollowers)
+    notifications.push(...recentFollowers) //user follow -notification
 
-    const userVideos = await LongVideo.find({ creator: userId })
+    user.my_communities.forEach((community) => {
+      if (community.community_fee_type === "paid") {
+        const recentCommunityFeePayers = community.followers.slice(-5).map((follower) => ({
+
+          _id: follower._id,
+          group: 'revenue',
+          content: `${follower.username} paid ₹${community.community_fee_amount} for community "${community.name}"`,
+          type: 'community fee',
+          timeStamp: new Date(),
+          avatar: follower.profile_photo,
+          read: false,
+          URL: `/api/v1/community/${community._id}`
+
+        }))
+        notifications.push(...recentCommunityFeePayers) //user community fee payment -notification
+      }
+
+    })
+
+
+    const userLongVideos = await LongVideo.find({ creator: userId })
       .populate('comments.user', 'username profile_photo')
-      .select('name comments')
+      .populate('liked_by', 'username profile_photo')
+      .select('_id name comments liked_by')
+
+
+    const userShortVideos = await ShortVideo.find({ creator: userId })
+      .populate('comments.user', 'username profile_photo')
+      .populate('liked_by', 'username profile_photo')
+      .select('_id name comments liked_by')
+
+
+    const userVideos = [...userLongVideos, ...userShortVideos]
 
     userVideos.forEach((video) => {
       const recentComments = video.comments.slice(-3).map((comment) => ({
+        _id: comment._id,
+        group: "non-revenue",
         type: 'comment',
-        message: `${comment.user.username} commented on your video "${video.name}"`,
-        user: comment.user,
-        video: { _id: video._id, name: video.name },
-        createdAt: comment.createdAt,
+        content: `${comment.user.username} commented on your video "${video.name}"`,
+        videoId: video._id,
+        avatar: comment.user.profile_photo,
+        timeStamp: comment.createdAt,
+        read: false,
+        URL: `/api/v1/videos/${video._id}`
       }))
-      notifications.push(...recentComments)
+
+      notifications.push(...recentComments) //comment on user video -notification
+
+      const recentLikes = video.liked_by.slice(-3).map((likedUser) => ({
+        _id: likedUser._id,
+        group: "non-revenue",
+        type: 'video like',
+        content: `${likedUser.username} liked your video "${video.name}"`,
+        videoId: video._id,
+        avatar: likedUser.profile_photo,
+        timeStamp: new Date(),
+        read: false,
+        URL: `/api/v1/videos/${video._id}`
+      }))
+
+      notifications.push(...recentLikes)  //like on user video -notification
     })
 
     notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -443,6 +552,7 @@ const GetUserNotifications = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
+
 
 
 
@@ -554,7 +664,7 @@ const getUserProfileDetails = async (req, res, next) => {
   }
 };
 
-const GetUserProfileById=async(req,res,next)=>{
+const GetUserProfileById = async (req, res, next) => {
   try {
     const userId = req.params.id;
     const userDetails = await User.findById(userId)
@@ -582,8 +692,8 @@ const GetUserProfileById=async(req,res,next)=>{
     handleError(error, req, res, next);
   }
 };
-const GetUserVideosById=async(req,res,next)=>{
-   try {
+const GetUserVideosById = async (req, res, next) => {
+  try {
     const userId = req.params.id;
     const { type = 'uploaded', page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
@@ -673,20 +783,20 @@ const SetCreatorPassPrice = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { price } = req.body;
-    
+
     if (typeof price !== 'number' || price < 99 || price > 10000) {
-      return res.status(400).json({ 
-        message: 'Invalid price. Must be between ₹99 and ₹10000' 
+      return res.status(400).json({
+        message: 'Invalid price. Must be between ₹99 and ₹10000'
       });
     }
-    
+
     await User.findByIdAndUpdate(userId, {
       'creator_profile.creator_pass_price': price,
     });
-    
-    res.status(200).json({ 
-      message: 'Creator pass price updated', 
-      price 
+
+    res.status(200).json({
+      message: 'Creator pass price updated',
+      price
     });
   } catch (error) {
     handleError(error, req, res, next);
@@ -697,14 +807,14 @@ const HasCreatorPass = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const { creatorId } = req.params;
-    
+
     const access = await UserAccess.findOne({
       user_id: userId,
       content_id: creatorId,
       content_type: 'creator',
       access_type: 'creator_pass',
     });
-    
+
     res.status(200).json({ hasCreatorPass: !!access });
   } catch (error) {
     handleError(error, req, res, next);
@@ -767,7 +877,7 @@ const followUser = async (req, res, next) => {
 };
 
 
-const unfollowUser=async(req,res,next)=>{
+const unfollowUser = async (req, res, next) => {
   try {
     const userId = req.user.id.toString(); //convert to string to prevent type mismatch bugs
     const { unfollowUserId } = req.body;

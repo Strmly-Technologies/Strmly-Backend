@@ -14,6 +14,9 @@ const {
   getCommunityVideos,
   getUserCommunities
 } = require('../controller/community.controller')
+
+const { communityProfilePhotoUpload, validateCommunityProfilePhotoFormData } = require('../utils/utils')
+
 const { authenticateToken } = require('../middleware/auth')
 
 // API to create a community
@@ -23,9 +26,12 @@ router.post('/create', authenticateToken, CreateCommunity)
 router.put('/rename', authenticateToken, RenameCommunity)
 
 // API to change community profile photo
+//accepts: FormData(communityId, imageFile)
 router.put(
   '/change-profile-photo',
   authenticateToken,
+  communityProfilePhotoUpload,
+  validateCommunityProfilePhotoFormData,
   ChangeCommunityProfilePhoto
 )
 

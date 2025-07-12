@@ -2,9 +2,7 @@ const multer = require('multer')
 const { s3 } = require('../config/AWS')
 const { v4: uuidv4 } = require('uuid')
 
-const createVideoMulter = (maxSize) => {
-  const storage = multer.memoryStorage()
-
+const dynamicVideoUpload = (req, res, next) => {
   const fileFilter = (req, file, cb) => {
     const allowedMimeTypes = [
       'video/mp4',
@@ -13,54 +11,149 @@ const createVideoMulter = (maxSize) => {
       'video/x-msvideo',
       'video/x-ms-wmv',
       'application/octet-stream',
-    ]
+    ];
 
-    const allowedExtensions = ['.mp4', '.avi', '.mov', '.wmv']
-    const fileExtension = file.originalname.toLowerCase().slice(-4)
+    const allowedExtensions = ['.mp4', '.avi', '.mov', '.wmv'];
+    const fileExtension = file.originalname.toLowerCase().slice(-4);
 
     if (
       allowedMimeTypes.includes(file.mimetype) ||
       allowedExtensions.includes(fileExtension)
     ) {
-      console.log('✅ File accepted')
-      cb(null, true)
+      console.log('✅ File accepted');
+      cb(null, true);
     } else {
-      console.log('❌ File rejected')
-      cb(new Error('Only video files are allowed (MP4, AVI, MOV, WMV)'))
+      console.log('File rejected');
+      cb(new Error('Only video files are allowed (MP4, AVI, MOV, WMV)'));
     }
-  }
+  };
 
-  return multer({
-    storage: storage,
-    limits: { fileSize: maxSize },
+  const upload = multer({
+    storage: multer.memoryStorage(),
     fileFilter: fileFilter,
-  })
-}
+  }).fields([
+    { name: 'videoFile', maxCount: 1 },
+    { name: 'videoType', maxCount: 1 },
+    { name: 'name', maxCount: 1 },
+    { name: 'description', maxCount: 1 },
+    { name: 'genre', maxCount: 1 },
+    { name: 'type', maxCount: 1 },
+    { name: 'language', maxCount: 1 },
+    { name: 'age_restriction', maxCount: 1 },
+    { name: 'communityId', maxCount: 1 },
+    { name: 'seriesId', maxCount: 1 },
+  ]);
 
-const dynamicVideoUpload = (req, res, next) => {
-  const videoType = req.query.type || req.body.type
+  upload(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err.message);
+      return res.status(400).json({ error: err.message });
+    }
 
+    next();
+  });
+};
+
+
+
+const validateVideoFormData = (req, res, next) => {
+  const videoFile = req.files?.videoFile?.[0];
+  if (!videoFile) {
+    console.error('Invalid or missing video file')
+    return res.status(400).json({
+      error: 'Video file is required'
+    })
+  }
+  const videoType = req.body.videoType
   if (!videoType || !['short', 'long'].includes(videoType)) {
     console.error('Invalid or missing video type')
     return res.status(400).json({
-      error: 'Video type is required. Use ?type=short or ?type=long',
+      error: 'Video type is required'
     })
   }
-
   const maxSize = videoType === 'short' ? 50 * 1024 * 1024 : 200 * 1024 * 1024
+  if (videoFile.size > maxSize) {
+    console.error('Video too large')
+    return res.status(400).json({
+      error: 'Video too large'
+    })
+  }
+  next()
+}
 
-  req.videoType = videoType
+const communityProfilePhotoUpload = (req, res, next) => {
+  const fileFilter = (req, file, cb) => {
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/jpg',
+    ];
 
-  const upload = createVideoMulter(maxSize)
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const fileExtension = file.originalname
+      .toLowerCase()
+      .slice(file.originalname.lastIndexOf('.'));
 
-  upload.single('video')(req, res, (err) => {
+    if (
+      allowedMimeTypes.includes(file.mimetype) ||
+      allowedExtensions.includes(fileExtension)
+    ) {
+      console.log('Image file accepted');
+      cb(null, true);
+    } else {
+      console.log('Image file rejected');
+      cb(new Error('Only image files are allowed (JPG, PNG, GIF, WEBP)'));
+    }
+  };
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 }, //limit 5mb
+  }).fields([
+    { name: 'imageFile', maxCount: 1 },
+    { name: 'communityId', maxCount: 1 },
+  ]);
+
+  upload(req, res, (err) => {
     if (err) {
-      console.error(' Multer error:', err.message)
+      console.error('Multer image upload error:', err.message);
+      return res.status(400).json({ error: err.message });
     }
 
-    next(err)
-  })
-}
+    next();
+  });
+};
+
+const validateCommunityProfilePhotoFormData = (req, res, next) => {
+  const imageFile = req.files?.imageFile?.[0];
+  if (!imageFile) {
+    console.error('Invalid or missing image file');
+    return res.status(400).json({
+      error: 'Image file is required',
+    });
+  }
+
+  const communityId = req.body.communityId;
+  if (!communityId) {
+    console.error('Missing community ID');
+    return res.status(400).json({
+      error: 'Community ID is required',
+    });
+  }
+
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  if (imageFile.size > maxSize) {
+    console.error('Image too large');
+    return res.status(400).json({
+      error: 'Image too large. Max size is 5MB',
+    });
+  }
+
+  next();
+};
 
 const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -258,10 +351,12 @@ const handleError = (err, req, res) => {
 
 module.exports = {
   handleMulterError,
-  createVideoMulter,
+  validateVideoFormData,
   createImageMulter,
   dynamicVideoUpload,
   handleError,
   uploadVideoToS3,
   uploadImageToS3,
+  validateCommunityProfilePhotoFormData,
+  communityProfilePhotoUpload
 }

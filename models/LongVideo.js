@@ -113,7 +113,7 @@ const longVideoSchema = new mongoose.Schema(
       required: true,
       enum: ['Free', 'Paid'],
     },
-    language: {
+    Videolanguage: {
       type: String,
       required: true,
       trim: true,
