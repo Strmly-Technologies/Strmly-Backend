@@ -20,6 +20,7 @@ const {
   followUser,
   unfollowUser,
 } = require('../controller/user.controller');
+const { createImageMulter, handleMulterError } = require('../utils/utils');
 
 // Get user feed
 router.get('/feed', authenticateToken, GetUserFeed);
@@ -28,7 +29,13 @@ router.get('/feed', authenticateToken, GetUserFeed);
 router.get('/profile', authenticateToken, GetUserProfile);
 
 // Update user profile
-router.put('/profile', authenticateToken, UpdateUserProfile);
+router.put(
+  '/profile',
+  authenticateToken,
+  createImageMulter().single('profile_photo'),
+  UpdateUserProfile,
+  handleMulterError
+);
 
 // Get user communities
 router.get('/communities', authenticateToken, GetUserCommunities);
@@ -73,6 +80,6 @@ router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass);
 router.post('/follow', authenticateToken, followUser);
 
 // unfollow a user
-router.post('/unfollow',authenticateToken, unfollowUser);
+router.post('/unfollow', authenticateToken, unfollowUser);
 
 module.exports = router;
