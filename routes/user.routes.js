@@ -19,6 +19,7 @@ const {
   HasCreatorPass,
   followUser,
   unfollowUser,
+  checkFollowStatus,
 } = require('../controller/user.controller');
 const { createImageMulter, handleMulterError } = require('../utils/utils');
 
@@ -81,5 +82,8 @@ router.post('/follow', authenticateToken, followUser);
 
 // unfollow a user
 router.post('/unfollow', authenticateToken, unfollowUser);
+
+// check if current user follows a specific user
+router.get('/follow-status/:targetUserId', authenticateToken, checkFollowStatus);
 
 module.exports = router;
