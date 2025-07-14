@@ -26,41 +26,7 @@ const longVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    comments: {
-      type: [
-        {
-          user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-          comment: { type: String, required: true, trim: true, maxlength: 500 },
-          likes: { type: Number, default: 0 },
-          upvotes: { type: Number, default: 0 },
-          downvotes: { type: Number, default: 0 },
-          donations: { type: Number, default: 0 },
-          upvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-          downvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-          replies: [
-            {
-              user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-              reply: {
-                type: String,
-                required: true,
-                trim: true,
-                maxlength: 500,
-              },
-              likes: { type: Number, default: 0 },
-              upvotes: { type: Number, default: 0 },
-              downvotes: { type: Number, default: 0 },
-              donations: { type: Number, default: 0 },
-              upvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-              downvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-              replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-              createdAt: { type: Date, default: Date.now },
-            },
-          ],
-          default: [],
-          createdAt: { type: Date, default: Date.now },
-        },
-      ],
-    },
+    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],  
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {
       type: String,
