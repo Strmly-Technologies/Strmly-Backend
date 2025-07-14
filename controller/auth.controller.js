@@ -1,5 +1,5 @@
 const User = require('../models/User')
-const { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail } = require('../utils/email')
+const { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail, generatePasswordResetToken, sendPasswordResetEmail, sendPasswordResetConfirmationEmail } = require('../utils/email')
 const { generateToken } = require('../utils/jwt')
 const { handleError } = require('../utils/utils')
 
@@ -358,6 +358,160 @@ const RefreshToken = async (req, res, next) => {
   }
 }
 
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' })
+    }
+
+    const user = await User.findOne({ email })
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.status(200).json({ 
+        message: 'If an account with that email exists, we have sent a password reset link.',
+        email_sent: true
+      })
+    }
+
+    // Check if we can send reset email (rate limiting)
+    const lastReset = user.password_reset.reset_requested_at
+    if (lastReset && new Date() - lastReset < 300000) { // 5 minutes cooldown
+      return res.status(429).json({ 
+        message: 'Please wait before requesting another password reset email',
+        code: 'RATE_LIMITED'
+      })
+    }
+
+    // Generate reset token
+    const resetToken = generatePasswordResetToken()
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+    user.password_reset.reset_token = resetToken
+    user.password_reset.reset_token_expires = resetExpires
+    user.password_reset.reset_requested_at = new Date()
+    await user.save()
+
+    // Send reset email
+    const emailResult = await sendPasswordResetEmail(user.email, user.username, resetToken)
+
+    if (!emailResult.success) {
+      // Reset the token if email fails
+      user.password_reset.reset_token = null
+      user.password_reset.reset_token_expires = null
+      await user.save()
+      
+      return res.status(500).json({ 
+        message: 'Failed to send password reset email',
+        code: 'EMAIL_SEND_FAILED'
+      })
+    }
+
+    res.status(200).json({
+      message: 'Password reset email sent successfully',
+      email_sent: true,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const verifyResetToken = async (req, res, next) => {
+  try {
+    const { token } = req.body
+
+    if (!token) {
+      return res.status(400).json({ 
+        message: 'Reset token is required',
+        code: 'TOKEN_REQUIRED'
+      })
+    }
+
+    const user = await User.findOne({
+      'password_reset.reset_token': token,
+      'password_reset.reset_token_expires': { $gt: new Date() },
+    })
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired reset token',
+        code: 'INVALID_TOKEN'
+      })
+    }
+
+    res.status(200).json({
+      message: 'Reset token is valid',
+      valid: true,
+      email: user.email 
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword, confirmPassword } = req.body
+
+    if (!token || !newPassword || !confirmPassword) {
+      return res.status(400).json({ 
+        message: 'Token, new password, and password confirmation are required' 
+      })
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ 
+        message: 'Passwords do not match' 
+      })
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 6 characters long' 
+      })
+    }
+
+    const user = await User.findOne({
+      'password_reset.reset_token': token,
+      'password_reset.reset_token_expires': { $gt: new Date() },
+    }).select('+password')
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired reset token',
+        code: 'INVALID_TOKEN'
+      })
+    }
+
+    // Check if new password is different from current password
+    const isSamePassword = await user.comparePassword(newPassword)
+    if (isSamePassword) {
+      return res.status(400).json({ 
+        message: 'New password must be different from your current password' 
+      })
+    }
+
+    // Update password and clear reset token
+    user.password = newPassword
+    user.password_reset.reset_token = null
+    user.password_reset.reset_token_expires = null
+    user.password_reset.reset_requested_at = null
+    await user.save()
+
+    // Send confirmation email
+    await sendPasswordResetConfirmationEmail(user.email, user.username)
+
+    res.status(200).json({
+      message: 'Password reset successfully. You can now sign in with your new password.',
+      success: true,
+      redirect: '/login'
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   RegisterNewUser,
   LoginUserWithEmail,
@@ -368,4 +522,8 @@ module.exports = {
   LoginUserWithGoogle,
   verifyEmail,
   resendVerificationEmail,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
+
 }

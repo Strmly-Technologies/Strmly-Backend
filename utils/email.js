@@ -110,8 +110,111 @@ const sendWelcomeEmail = async (email, username) => {
   }
 };
 
+const sendPasswordResetEmail = async (email, username, resetToken) => {
+  const transporter = createTransporter();
+  
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+  
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Reset your Strmly password',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333;">Password Reset Request</h1>
+        <p>Hi ${username},</p>
+        <p>We received a request to reset your password for your Strmly account. If you didn't make this request, please ignore this email.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetUrl}" 
+             style="background-color: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Reset Password
+          </a>
+        </div>
+        
+        <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #dc3545;">${resetUrl}</p>
+        
+        <p><strong>This link will expire in 1 hour.</strong></p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">Security Tips:</h3>
+          <ul style="margin: 0;">
+            <li>Never share your password with anyone</li>
+            <li>Use a strong, unique password</li>
+            <li>Enable two-factor authentication when available</li>
+          </ul>
+        </div>
+        
+        <hr style="margin: 30px 0;">
+        <p style="color: #666; font-size: 12px;">
+          This is an automated message from Strmly. Please do not reply to this email.
+        </p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Password reset email sending error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+const sendPasswordResetConfirmationEmail = async (email, username) => {
+  const transporter = createTransporter();
+  
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Password successfully changed - Strmly',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #28a745;">Password Changed Successfully</h1>
+        <p>Hi ${username},</p>
+        <p>Your Strmly account password has been successfully changed on ${new Date().toLocaleString()}.</p>
+        
+        <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <strong>✓ Your account is now secured with your new password.</strong>
+        </div>
+        
+        <p>If you didn't make this change, please contact our support team immediately.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/login" 
+             style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Sign In to Your Account
+          </a>
+        </div>
+        
+        <hr style="margin: 30px 0;">
+        <p style="color: #666; font-size: 12px;">
+          This is an automated message from Strmly. Please do not reply to this email.
+        </p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Password reset confirmation email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+const generatePasswordResetToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
 module.exports = {
     sendVerificationEmail,
     sendWelcomeEmail,
     generateVerificationToken,
+    sendPasswordResetEmail,
+    sendPasswordResetConfirmationEmail,
+    generatePasswordResetToken,
 }
