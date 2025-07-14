@@ -6,12 +6,21 @@ const {
   LogoutUser,
   RefreshToken,
   LoginUserWithGoogle,
-  RegisterUserWithGoogle
+  RegisterUserWithGoogle,
+  verifyEmail,
+  resendVerificationEmail
 } = require('../controller/auth.controller')
 const { authenticateToken,parseGoogleOAuthToken} = require('../middleware/auth')
 
 // Register a new user
 router.post('/register', RegisterNewUser)
+
+// Verify email
+router.post('/verify-email', verifyEmail)
+
+// Resend verification email
+router.post('/resend-verification', resendVerificationEmail)
+
 
 // Login an existing user using email
 router.post('/login/email', LoginUserWithEmail)

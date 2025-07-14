@@ -20,6 +20,14 @@ const authenticateToken = async (req, res, next) => {
     if (!user) {
       return res.status(403).json({ message: 'User not found' })
     }
+    // TODO: Uncomment this later
+    // if (!user.email_verification.is_verified) {
+    //   return res.status(403).json({ 
+    //     message: 'Email verification required',
+    //     code: 'EMAIL_NOT_VERIFIED',
+    //     email: user.email,
+    //   })
+    // }
 
     req.user = { ...user.toObject(), id: user._id }
     next()
