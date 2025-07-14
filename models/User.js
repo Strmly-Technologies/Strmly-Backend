@@ -3,6 +3,11 @@ const bcrypt = require('bcrypt')
 
 const userSchema = new mongoose.Schema(
   {
+      is_google_user: {
+      type: Boolean,
+      default:false,
+      select: false,
+    },
     username: {
       type: String,
       required: true,
@@ -19,7 +24,6 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
       minlength: 6,
       select: false,
     },

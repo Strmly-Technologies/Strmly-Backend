@@ -116,6 +116,92 @@ const LoginUserWithUsername = async (req, res, next) => {
   }
 }
 
+const RegisterUserWithGoogle = async (req, res, next) => {
+const { email,picture } = req.googleUser; 
+if(!email){
+  return res.status(401).json({ message: 'Malformed google Id-token' })
+}
+
+  try {
+    const existingUser = await User.findOne({ email })
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' })
+    }
+
+    let username = await User.findOne({ username: email.split('@')[0] })
+    if (!username) {
+      username = email.split('@')[0]
+    } else {
+      username = username.username + Math.floor(Math.random() * 100000)
+    }
+
+    const newUser = new User({
+      username,
+      email,
+      is_google_user:true,
+    })
+
+    if(picture){
+      newUser.profile_photo=picture;
+    }
+
+    await newUser.save()
+
+    const token = generateToken(newUser._id)
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+      },
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+
+const LoginUserWithGoogle = async (req, res, next) => {
+  const { email} = req.googleUser; 
+
+  if (!email) {
+    return res
+      .status(400)
+      .json({ message: 'Malformed google Id-token' })
+  }
+
+  try {
+    const user = await User.findOne({ email }).select('+is_google_user')
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid email' })
+    }
+
+    if (!user.is_google_user) {
+      return res.status(400).json({ message: 'Email is not linked with a google account' })
+    }
+
+    const token = generateToken(user._id)
+
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+      },
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+
+
+
 const LogoutUser = (req, res) => {
   // Remove the token on the client side
   res.status(200).json({ message: 'User logged out successfully' })
@@ -145,4 +231,6 @@ module.exports = {
   LoginUserWithUsername,
   LogoutUser,
   RefreshToken,
+  RegisterUserWithGoogle,
+  LoginUserWithGoogle
 }
