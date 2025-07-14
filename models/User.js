@@ -87,9 +87,19 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
-    commented_videos: {
+    commented_long_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'LongVideo',
+      default: [],
+    },
+     commented_short_videos: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'ShortVideo',
+      default: [],
+    },
+    replied_comments: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'Comment',
       default: [],
     },
     shared_videos: {

@@ -1,5 +1,6 @@
 const LongVideo = require('../models/LongVideo')
 const ShortVideo = require('../models/ShortVideos')
+const Comment = require('../models/Comment')
 const Wallet = require('../models/Wallet')
 const WalletTransaction = require('../models/WalletTransaction')
 const WalletTransfer = require('../models/WalletTransfer')
@@ -273,18 +274,28 @@ const CommentOnVideo = async (req, res, next) => {
       return res.status(404).json({ message: 'Video not found' })
     }
 
-    video.comments.push({ user: userId, comment })
+    const newComment = await Comment.create({
+    user: userId,
+    content: comment,
+    [videoType === 'long' ? 'long_video' : 'short_video']: videoId,
+   });
+
+    await newComment.save()
+    video.comments.push(newComment._id) 
+
     await video.save()
-
+   
     const user = await User.findById(userId)
-    if (!Array.isArray(user.commented_videos)) {
-      user.commented_videos = []
+    const userCommentType= videoType==='long'? 'commented_long_videos':'commented_short_videos'
+    
+    if (!Array.isArray(user[userCommentType])) {
+      user[userCommentType] = []
     }
-    if (!user.commented_videos.map(id => id.toString()).includes(videoId.toString())) {
-      user.commented_videos.push(videoId)
-      await user.save()
+    if (!user[userCommentType].map(id => id.toString()).includes(videoId.toString())) {
+      user[userCommentType].push(videoId)
     }
-
+ 
+    await user.save()
     res.status(200).json({
       message: 'Comment added successfully',
       comments: video.comments.length,
@@ -324,13 +335,14 @@ const getVideoComments = async (req, res, next) => {
 
     const comments = video.comments.map((comment) => ({
       _id: comment._id,
-      content: comment.comment,
+      content: comment.content,
       videoId: videoId,
-      repliesCount: comment.replies ? comment.replies.length : 0,
+      replies: comment.replies ? comment.replies.length : 0,
       timestamp: comment.createdAt,
       donations: comment.donations || 0,
       upvotes: comment.upvotes || 0,
       downvotes: comment.downvotes || 0,
+      likes:comment.likes || 0,
       user: {
         id: comment.user._id,
         name: comment.user.username,
@@ -338,7 +350,7 @@ const getVideoComments = async (req, res, next) => {
       },
       upvoted: comment.upvoted_by ? comment.upvoted_by.includes(userId) : false,
       downvoted: comment.downvoted_by ? comment.downvoted_by.includes(userId) : false,
-      replies: comment.replies ? comment.replies.length : 0,
+      liked: comment.liked_by ? comment.liked_by.includes(userId) : false,
     }));
 
     res.status(200).json(comments);
