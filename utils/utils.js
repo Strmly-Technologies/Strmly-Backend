@@ -1,6 +1,7 @@
 const multer = require('multer')
 const { s3 } = require('../config/AWS')
-const { v4: uuidv4 } = require('uuid')
+const { v4: uuidv4 } = require('uuid');
+const videoCompressor = require('./video_compressor');
 
 const dynamicVideoUpload = (req, res, next) => {
   const fileFilter = (req, file, cb) => {
@@ -171,13 +172,14 @@ const handleMulterError = (err, req, res, next) => {
 
 const uploadVideoToS3 = async (file, videoType) => {
   try {
+    const compressedVideoBuffer=await videoCompressor(file.buffer);
     const fileExtension = file.originalname.split('.').pop()
     const fileName = `${videoType}/${uuidv4()}.${fileExtension}`
 
     const uploadParams = {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: fileName,
-      Body: file.buffer,
+      Body: compressedVideoBuffer,
       ContentType: file.mimetype,
       Metadata: {
         videoType: videoType,
