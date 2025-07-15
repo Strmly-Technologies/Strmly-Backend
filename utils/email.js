@@ -15,35 +15,31 @@ const createTransporter=()=>{
     });
 };
 
-const generateVerificationToken=()=>{
-    return crypto.randomBytes(32).toString('hex');
+const generateVerificationOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
 }
 
-const sendVerificationEmail = async (email, username, verificationToken) => {
+const sendVerificationEmail = async (email, username, verificationOTP) => {
   const transporter = createTransporter();
-  
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
   
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
-    subject: 'Verify your Strmly account',
+    subject: 'Verify your Strmly account - OTP',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #333;">Welcome to Strmly, ${username}!</h1>
-        <p>Thank you for registering with Strmly. To complete your registration, please verify your email address by clicking the button below:</p>
+        <p>Thank you for registering with Strmly. To complete your registration, please verify your email address using the OTP below:</p>
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationUrl}" 
-             style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            Verify Email Address
-          </a>
+          <div style="background-color: #f8f9fa; border: 2px dashed #007bff; padding: 20px; border-radius: 10px; display: inline-block;">
+            <h2 style="color: #007bff; margin: 0; letter-spacing: 3px; font-size: 32px;">${verificationOTP}</h2>
+          </div>
         </div>
         
-        <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-        <p style="word-break: break-all; color: #007bff;">${verificationUrl}</p>
+        <p style="text-align: center; font-size: 16px; color: #666;">Enter this 6-digit code in the verification form</p>
         
-        <p><strong>This link will expire in 24 hours.</strong></p>
+        <p><strong>This OTP will expire in 10 minutes.</strong></p>
         
         <p>If you didn't create an account with Strmly, please ignore this email.</p>
         
@@ -213,8 +209,9 @@ const generatePasswordResetToken = () => {
 module.exports = {
     sendVerificationEmail,
     sendWelcomeEmail,
-    generateVerificationToken,
+    generateVerificationOTP,
     sendPasswordResetEmail,
     sendPasswordResetConfirmationEmail,
     generatePasswordResetToken,
 }
+  

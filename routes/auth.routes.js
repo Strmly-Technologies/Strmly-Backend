@@ -18,10 +18,10 @@ const { authenticateToken,parseGoogleOAuthToken} = require('../middleware/auth')
 // Register a new user
 router.post('/register', RegisterNewUser)
 
-// Verify email
+// Verify email with OTP
 router.post('/verify-email', verifyEmail)
 
-// Resend verification email
+// Resend verification OTP
 router.post('/resend-verification', resendVerificationEmail)
 
 
