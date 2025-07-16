@@ -1,6 +1,5 @@
 const User = require('../models/User')
 const LongVideo = require('../models/LongVideo')
-const ShortVideo = require('../models/ShortVideos')
 const Community = require('../models/Community')
 const Series = require('../models/Series')
 const { handleError } = require('../utils/utils')
@@ -55,35 +54,6 @@ const DeleteLongVideo = async (req, res, next) => {
   }
 }
 
-const DeleteShortVideo = async (req, res, next) => {
-  const { videoId } = req.params
-  const userId = req.user.id
-
-  try {
-    const video = await ShortVideo.findById(videoId)
-    if (!video) {
-      return res.status(404).json({ message: 'Short video not found' })
-    }
-
-    if (!video.created_by.equals(userId)) {
-      return res
-        .status(403)
-        .json({ message: 'You can only delete videos you created' })
-    }
-
-    await Community.updateMany(
-      { short_videos: videoId },
-      { $pull: { short_videos: videoId } }
-    )
-
-    await ShortVideo.findByIdAndDelete(videoId)
-
-    res.status(200).json({ message: 'Short video deleted successfully' })
-  } catch (error) {
-    handleError(error, req, res, next)
-  }
-}
-
 const DeleteUserProfile = async (req, res, next) => {
   const userId = req.user.id
 
@@ -94,8 +64,6 @@ const DeleteUserProfile = async (req, res, next) => {
     }
 
     await LongVideo.deleteMany({ created_by: userId })
-    await ShortVideo.deleteMany({ created_by: userId })
-
     await Community.deleteMany({ founder: userId })
     await Community.updateMany(
       { followers: userId },
@@ -203,19 +171,12 @@ const DeleteSeries = async (req, res, next) => {
 
 const RemoveVideoFromCommunity = async (req, res, next) => {
   const { communityId, videoId } = req.body
-  const { videoType } = req.query
   const userId = req.user.id
 
-  if (!communityId || !videoId || !videoType) {
+  if (!communityId || !videoId) {
     return res
       .status(400)
-      .json({ message: 'Community ID, video ID, and video type are required' })
-  }
-
-  if (!['long', 'short'].includes(videoType)) {
-    return res
-      .status(400)
-      .json({ message: "Video type must be 'long' or 'short'" })
+      .json({ message: 'Community ID and video ID are required' })
   }
 
   try {
@@ -233,20 +194,18 @@ const RemoveVideoFromCommunity = async (req, res, next) => {
       })
     }
 
-    const videoField = videoType === 'long' ? 'long_videos' : 'short_videos'
-
-    if (!community[videoField].includes(videoId)) {
+    if (!community.long_videos.includes(videoId)) {
       return res
         .status(404)
         .json({ message: 'Video not found in this community' })
     }
 
     await Community.findByIdAndUpdate(communityId, {
-      $pull: { [videoField]: videoId },
+      $pull: { ['long_videos']: videoId },
     })
 
     res.status(200).json({
-      message: `${videoType} video removed from community successfully`,
+      message: `video removed from community successfully`,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -336,22 +295,15 @@ const RemoveUserFromCommunity = async (req, res, next) => {
 }
 
 const BulkDeleteVideos = async (req, res, next) => {
-  const { videoIds, videoType } = req.body
+  const { videoIds } = req.body
   const userId = req.user.id
 
   if (!videoIds || !Array.isArray(videoIds) || videoIds.length === 0) {
     return res.status(400).json({ message: 'Array of video IDs is required' })
   }
 
-  if (!videoType || !['long', 'short'].includes(videoType)) {
-    return res
-      .status(400)
-      .json({ message: "Video type must be 'long' or 'short'" })
-  }
-
   try {
-    const VideoModel = videoType === 'long' ? LongVideo : ShortVideo
-    const videos = await VideoModel.find({
+    const videos = await LongVideo.find({
       _id: { $in: videoIds },
       created_by: userId,
     })
@@ -364,43 +316,36 @@ const BulkDeleteVideos = async (req, res, next) => {
 
     const validVideoIds = videos.map((video) => video._id)
 
-    if (videoType === 'long') {
-      await Community.updateMany(
-        { long_videos: { $in: validVideoIds } },
-        { $pull: { long_videos: { $in: validVideoIds } } }
-      )
+    await Community.updateMany(
+      { long_videos: { $in: validVideoIds } },
+      { $pull: { long_videos: { $in: validVideoIds } } }
+    )
 
-      await User.updateMany(
-        {
-          $or: [
-            { saved_videos: { $in: validVideoIds } },
-            { playlist: { $in: validVideoIds } },
-            { history: { $in: validVideoIds } },
-            { liked_videos: { $in: validVideoIds } },
-            { video_frame: { $in: validVideoIds } },
-          ],
+    await User.updateMany(
+      {
+        $or: [
+          { saved_videos: { $in: validVideoIds } },
+          { playlist: { $in: validVideoIds } },
+          { history: { $in: validVideoIds } },
+          { liked_videos: { $in: validVideoIds } },
+          { video_frame: { $in: validVideoIds } },
+        ],
+      },
+      {
+        $pull: {
+          saved_videos: { $in: validVideoIds },
+          playlist: { $in: validVideoIds },
+          history: { $in: validVideoIds },
+          liked_videos: { $in: validVideoIds },
+          video_frame: { $in: validVideoIds },
         },
-        {
-          $pull: {
-            saved_videos: { $in: validVideoIds },
-            playlist: { $in: validVideoIds },
-            history: { $in: validVideoIds },
-            liked_videos: { $in: validVideoIds },
-            video_frame: { $in: validVideoIds },
-          },
-        }
-      )
-    } else {
-      await Community.updateMany(
-        { short_videos: { $in: validVideoIds } },
-        { $pull: { short_videos: { $in: validVideoIds } } }
-      )
-    }
+      }
+    )
 
-    await VideoModel.deleteMany({ _id: { $in: validVideoIds } })
+    await LongVideo.deleteMany({ _id: { $in: validVideoIds } })
 
     res.status(200).json({
-      message: `${validVideoIds.length} ${videoType} video(s) deleted successfully`,
+      message: `${validVideoIds.length} video(s) deleted successfully`,
       deletedCount: validVideoIds.length,
     })
   } catch (error) {
@@ -410,7 +355,6 @@ const BulkDeleteVideos = async (req, res, next) => {
 
 module.exports = {
   DeleteLongVideo,
-  DeleteShortVideo,
   DeleteUserProfile,
   DeleteCommunity,
   DeleteSeries,

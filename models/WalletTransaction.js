@@ -33,7 +33,6 @@ const walletTransactionSchema = new mongoose.Schema(
         'gift_received',
         'community_fee',
         'community_fee_received',
-        'short_video_gift',
       ],
     },
     amount: {

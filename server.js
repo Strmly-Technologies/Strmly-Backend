@@ -4,7 +4,7 @@ const connectDB = require('./config/database')
 const authRoutes = require('./routes/auth.routes')
 const videoRoutes = require('./routes/video.routes')
 const seriesRoutes = require('./routes/series.routes')
-const shortsRoutes = require('./routes/shorts.routes')
+
 const userRoutes = require('./routes/user.routes')
 const communityRoutes = require('./routes/community.routes')
 const interactionRoutes = require('./routes/interaction.routes')
@@ -44,7 +44,6 @@ const routes = [
   { path: '/api/v1/auth', handler: authRoutes },
   { path: '/api/v1/videos', handler: videoRoutes },
   { path: '/api/v1/series', handler: seriesRoutes },
-  { path: '/api/v1/shorts', handler: shortsRoutes },
   { path: '/api/v1/user', handler: userRoutes },
   { path: '/api/v1/community', handler: communityRoutes },
   { path: '/api/v1/interaction', handler: interactionRoutes },
@@ -53,16 +52,16 @@ const routes = [
   { path: '/api/v1/wallet', handler: walletRoutes },
   { path: '/api/v1/withdrawals', handler: withdrawalRoutes },
   { path: '/api/v1/webhooks', handler: webhookRoutes },
-];
+]
 
 try {
   routes.forEach(({ path, handler }) => {
-    app.use(path, handler);
-    console.log(`✓ ${path} routes loaded`);
-  });
+    app.use(path, handler)
+    console.log(`✓ ${path} routes loaded`)
+  })
 } catch (error) {
-  console.error('Error loading routes:', error.message);
-  process.exit(1);
+  console.error('Error loading routes:', error.message)
+  process.exit(1)
 }
 
 app.get('/health', (req, res) => {

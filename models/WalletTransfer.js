@@ -50,7 +50,6 @@ const walletTransferSchema = new mongoose.Schema(
         'gift',
         'comment_gift',
         'community_fee',
-        'short_video_gift', // ADD THIS
       ],
     },
     content_id: {
@@ -58,14 +57,7 @@ const walletTransferSchema = new mongoose.Schema(
     },
     content_type: {
       type: String,
-      enum: [
-        'Series',
-        'LongVideo',
-        'ShortVideo',
-        'series',
-        'comment',
-        'Community',
-      ],
+      enum: ['Series', 'LongVideo', 'series', 'comment', 'Community'],
     },
     description: {
       type: String,

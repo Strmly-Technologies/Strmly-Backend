@@ -2,7 +2,6 @@ const { handleError } = require('../utils/utils')
 const User = require('../models/User')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
-const ShortVideos = require('../models/ShortVideos')
 const Community = require('../models/Community')
 
 const GlobalSearch = async (req, res, next) => {
@@ -17,7 +16,7 @@ const GlobalSearch = async (req, res, next) => {
     const skip = (page - 1) * limit
     const limitNum = parseInt(limit)
 
-    const [users, videos, series, shorts] = await Promise.all([
+    const [users, videos, series] = await Promise.all([
       User.find({
         $or: [{ username: searchRegex }, { email: searchRegex }],
       })
@@ -44,17 +43,9 @@ const GlobalSearch = async (req, res, next) => {
         .populate('created_by', 'username profile_photo')
         .limit(limitNum)
         .skip(skip),
-
-      ShortVideos.find({
-        $or: [{ name: searchRegex }, { description: searchRegex }],
-      })
-        .populate('created_by', 'username profile_photo')
-        .limit(limitNum)
-        .skip(skip),
     ])
 
-    const totalResults =
-      users.length + videos.length + series.length + shorts.length
+    const totalResults = users.length + videos.length + series.length
 
     res.status(200).json({
       message: 'Search completed successfully',
@@ -64,7 +55,6 @@ const GlobalSearch = async (req, res, next) => {
         users,
         videos,
         series,
-        shorts,
       },
       pagination: {
         currentPage: parseInt(page),
@@ -88,7 +78,8 @@ const searchFollowersOrFollowing = async (req, res, next) => {
 
     if (!type || !['followers', 'following'].includes(type)) {
       return res.status(400).json({
-        message: 'Type is required and must be either "followers" or "following"',
+        message:
+          'Type is required and must be either "followers" or "following"',
       })
     }
 
@@ -108,16 +99,18 @@ const searchFollowersOrFollowing = async (req, res, next) => {
     let totalCount = 0
 
     if (type === 'followers') {
-      allUsers = user.followers.filter((follower) =>
-        follower.username.match(searchRegex) ||
-        (follower.email && follower.email.match(searchRegex))
+      allUsers = user.followers.filter(
+        (follower) =>
+          follower.username.match(searchRegex) ||
+          (follower.email && follower.email.match(searchRegex))
       )
       totalCount = allUsers.length
       allUsers = allUsers.slice(skip, skip + limitNum)
     } else if (type === 'following') {
-      allUsers = user.following.filter((following) =>
-        following.username.match(searchRegex) ||
-        (following.email && following.email.match(searchRegex))
+      allUsers = user.following.filter(
+        (following) =>
+          following.username.match(searchRegex) ||
+          (following.email && following.email.match(searchRegex))
       )
       totalCount = allUsers.length
       allUsers = allUsers.slice(skip, skip + limitNum)
@@ -193,7 +186,7 @@ const PersonalizedSearch = async (req, res, next) => {
       seriesQuery.$or.push({ genre: { $in: userGenres } })
     }
 
-    const [videos, series, shorts] = await Promise.all([
+    const [videos, series] = await Promise.all([
       LongVideo.find(videoQuery)
         .populate('created_by', 'username profile_photo')
         .populate('series', 'title')
@@ -207,22 +200,10 @@ const PersonalizedSearch = async (req, res, next) => {
         .limit(limitNum)
         .skip(skip),
 
-      ShortVideos.find({
-        $or: [
-          { name: searchRegex },
-          { description: searchRegex },
-          ...(followingIds.length > 0
-            ? [{ created_by: { $in: followingIds } }]
-            : []),
-        ],
-      })
-        .populate('created_by', 'username profile_photo')
-        .sort({ views: -1, likes: -1 })
-        .limit(limitNum)
-        .skip(skip),
+ 
     ])
 
-    const totalResults = videos.length + series.length + shorts.length
+    const totalResults = videos.length + series.length  
 
     res.status(200).json({
       message: 'Personalized search completed successfully',
@@ -231,7 +212,7 @@ const PersonalizedSearch = async (req, res, next) => {
       results: {
         videos,
         series,
-        shorts,
+     
       },
       userPreferences: {
         favoriteGenres: userGenres,
@@ -261,15 +242,15 @@ const GetContentByType = async (req, res, next) => {
 
     if (!type) {
       return res.status(400).json({
-        message: 'Content type is required (videos, series, shorts, users)',
+        message: 'Content type is required (videos, series, users)',
       })
     }
 
-    const validTypes = ['videos', 'series', 'shorts', 'users']
+    const validTypes = ['videos', 'series', 'users']
     if (!validTypes.includes(type)) {
       return res.status(400).json({
         message:
-          'Invalid content type. Valid types are: videos, series, shorts, users',
+          'Invalid content type. Valid types are: videos, series,users',
       })
     }
 
@@ -330,16 +311,6 @@ const GetContentByType = async (req, res, next) => {
         totalCount = await Series.countDocuments(seriesQuery)
         break
       }
-
-      case 'shorts':
-        results = await ShortVideos.find({})
-          .populate('created_by', 'username profile_photo')
-          .sort(sortObject)
-          .limit(limitNum)
-          .skip(skip)
-
-        totalCount = await ShortVideos.countDocuments({})
-        break
 
       case 'users': {
         let userSortObject = {}

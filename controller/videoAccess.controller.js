@@ -1,50 +1,33 @@
-const mongoose = require('mongoose');
-const LongVideo = require('../models/LongVideo');
-const ShortVideo = require('../models/ShortVideos');
-const UserAccess = require('../models/UserAccess');
-const Wallet = require('../models/Wallet');
-const WalletTransaction = require('../models/WalletTransaction');
-const WalletTransfer = require('../models/WalletTransfer');
-const { handleError } = require('../utils/utils');
+const mongoose = require('mongoose')
+const LongVideo = require('../models/LongVideo')
+const UserAccess = require('../models/UserAccess')
+const Wallet = require('../models/Wallet')
+const WalletTransaction = require('../models/WalletTransaction')
+const WalletTransfer = require('../models/WalletTransfer')
+const { handleError } = require('../utils/utils')
+const User = require('../models/User')
+const PLATFORM_FEE_PERCENTAGE = 30
+const CREATOR_SHARE_PERCENTAGE = 70
 
-const PLATFORM_FEE_PERCENTAGE = 30;
-const CREATOR_SHARE_PERCENTAGE = 70;
-
-const { checkCreatorPassAccess } = require('./creatorpass.controller');
+const { checkCreatorPassAccess } = require('./creatorpass.controller')
 
 const checkVideoAccess = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { type } = req.query;
-    const userId = req.user.id;
-
-    if (!type || !['short', 'long'].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        error: "Video type must be 'short' or 'long'",
-        code: 'INVALID_VIDEO_TYPE',
-      });
-    }
+    const { id } = req.params
+    const userId = req.user.id
 
     // Get video details
-    let video;
-    if (type === 'short') {
-      video = await ShortVideo.findById(id)
-        .populate('created_by', 'username email')
-        .populate('community', 'name');
-    } else {
-      video = await LongVideo.findById(id)
-        .populate('created_by', 'username email')
-        .populate('community', 'name')
-        .populate('series', 'title price type');
-    }
+    let video = await LongVideo.findById(id)
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
+      .populate('series', 'title price type')
 
     if (!video) {
       return res.status(404).json({
         success: false,
         error: 'Video not found',
         code: 'VIDEO_NOT_FOUND',
-      });
+      })
     }
 
     // Check if user owns the video
@@ -59,14 +42,13 @@ const checkVideoAccess = async (req, res, next) => {
           description: video.description,
           creator: video.created_by.username,
           type: video.type || 'Free',
-          canGift: type === 'short', // Can gift short videos
         },
         message: 'You have access as the video owner',
-      });
+      })
     }
 
     // Check if video is free (all short videos are free, long videos check type)
-    if (type === 'short' || video.type === 'Free') {
+    if (video.type === 'Free') {
       return res.status(200).json({
         success: true,
         hasAccess: true,
@@ -77,14 +59,16 @@ const checkVideoAccess = async (req, res, next) => {
           description: video.description,
           creator: video.created_by.username,
           type: video.type || 'Free',
-          canGift: type === 'short', // Can gift short videos
         },
         message: 'This video is free to watch',
-      });
+      })
     }
 
     // Check creator pass
-    const creatorPassCheck = await checkCreatorPassAccess(userId, video.created_by._id);
+    const creatorPassCheck = await checkCreatorPassAccess(
+      userId,
+      video.created_by._id
+    )
     if (creatorPassCheck.hasAccess) {
       return res.status(200).json({
         success: true,
@@ -100,7 +84,7 @@ const checkVideoAccess = async (req, res, next) => {
         creatorPass: {
           message: 'Free access with Creator Pass for this creator',
         },
-      });
+      })
     }
 
     // Check if user has direct access to this video
@@ -108,7 +92,7 @@ const checkVideoAccess = async (req, res, next) => {
       user_id: userId,
       content_id: id,
       content_type: 'video',
-    });
+    })
 
     if (directAccess) {
       return res.status(200).json({
@@ -121,13 +105,12 @@ const checkVideoAccess = async (req, res, next) => {
           description: video.description,
           creator: video.created_by.username,
           type: video.type,
-          canGift: type === 'short',
         },
         purchaseInfo: {
           purchasedAt: directAccess.granted_at,
           paymentMethod: directAccess.payment_method,
         },
-      });
+      })
     }
 
     // Check if user has series access (if video is part of a series)
@@ -136,7 +119,7 @@ const checkVideoAccess = async (req, res, next) => {
         user_id: userId,
         content_id: video.series._id,
         content_type: 'series',
-      });
+      })
 
       if (seriesAccess) {
         return res.status(200).json({
@@ -149,18 +132,17 @@ const checkVideoAccess = async (req, res, next) => {
             description: video.description,
             creator: video.created_by.username,
             type: video.type,
-            canGift: type === 'short',
           },
           seriesInfo: {
             seriesTitle: video.series.title,
             purchasedAt: seriesAccess.granted_at,
           },
-        });
+        })
       }
     }
 
     // No access - return payment options
-    const paymentOptions = [];
+    const paymentOptions = []
 
     // Individual video purchase option
     paymentOptions.push({
@@ -168,7 +150,7 @@ const checkVideoAccess = async (req, res, next) => {
       price: video.price || 99,
       description: `Buy this video for ₹${video.price || 99}`,
       endpoint: `/api/v1/videos/${id}/purchase`,
-    });
+    })
 
     // Series purchase option (if video is part of a series)
     if (video.series && video.series.type === 'Paid') {
@@ -178,20 +160,22 @@ const checkVideoAccess = async (req, res, next) => {
         description: `Buy entire series "${video.series.title}" for ₹${video.series.price}`,
         endpoint: `/api/v1/wallet/transfer-series`,
         seriesId: video.series._id,
-      });
+      })
     }
 
     // Creator Pass option
-    const creator = await User.findById(video.created_by._id).select('creator_profile');
-    const creatorPassPrice = creator?.creator_profile?.creator_pass_price || 199;
-    
+    const creator = await User.findById(video.created_by._id).select(
+      'creator_profile'
+    )
+    const creatorPassPrice = creator?.creator_profile?.creator_pass_price || 199
+
     paymentOptions.push({
       type: 'creator_pass',
       price: creatorPassPrice,
       description: `Get unlimited access to all content by ${video.created_by.username} for ₹${creatorPassPrice}`,
       endpoint: '/api/v1/creator-pass/create-order',
       creatorId: video.created_by._id,
-    });
+    })
 
     return res.status(200).json({
       success: true,
@@ -207,56 +191,41 @@ const checkVideoAccess = async (req, res, next) => {
       },
       paymentOptions,
       message: 'Payment required to watch this video',
-    });
-
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const streamVideo = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { type } = req.query;
-    const userId = req.user.id;
+    const { id } = req.params
 
-    if (!type || !['short', 'long'].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        error: "Video type must be 'short' or 'long'",
-        code: 'INVALID_VIDEO_TYPE',
-      });
-    }
+    //const userId = req.user.id
 
     // First check access
-    const accessCheck = await checkVideoAccess(req, res, next);
-    
+    //const accessCheck = await checkVideoAccess(req, res, next)
+
     // If access check didn't return (meaning no access), don't proceed
     if (!res.headersSent) {
-      return;
+      return
     }
 
     // Get video with URL
-    let video;
-    if (type === 'short') {
-      video = await ShortVideo.findById(id);
-    } else {
-      video = await LongVideo.findById(id);
-    }
+    let video = await LongVideo.findById(id)
 
     if (!video) {
       return res.status(404).json({
         success: false,
         error: 'Video not found',
         code: 'VIDEO_NOT_FOUND',
-      });
+      })
     }
 
     // Increment view count
-    await (type === 'short' ? ShortVideo : LongVideo).findByIdAndUpdate(
-      id,
-      { $inc: { views: 1 } }
-    );
+    await LongVideo.findByIdAndUpdate(id, {
+      $inc: { views: 1 },
+    })
 
     res.status(200).json({
       success: true,
@@ -269,61 +238,50 @@ const streamVideo = async (req, res, next) => {
         views: video.views + 1,
         thumbnailUrl: video.thumbnailUrl,
       },
-    });
-
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const purchaseIndividualVideo = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { type } = req.query;
-    const { amount, transferNote } = req.body;
-    const buyerId = req.user.id;
+    const { id } = req.params
 
-    if (!type || !['short', 'long'].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        error: "Video type must be 'short' or 'long'",
-        code: 'INVALID_VIDEO_TYPE',
-      });
-    }
+    const { amount, transferNote } = req.body
+    const buyerId = req.user.id
 
     if (!amount) {
       return res.status(400).json({
         success: false,
         error: 'Amount is required',
         code: 'MISSING_AMOUNT',
-      });
+      })
     }
 
     // Get video details
-    let video;
-    if (type === 'short') {
-      video = await ShortVideo.findById(id).populate('created_by', 'username email');
-    } else {
-      video = await LongVideo.findById(id).populate('created_by', 'username email');
-    }
+    let video = await LongVideo.findById(id).populate(
+      'created_by',
+      'username email'
+    )
 
     if (!video) {
       return res.status(404).json({
         success: false,
         error: 'Video not found',
         code: 'VIDEO_NOT_FOUND',
-      });
+      })
     }
 
-    const creatorId = video.created_by._id;
+    const creatorId = video.created_by._id
 
     // Check if video is free
-    if (type === 'short' || video.type === 'Free') {
+    if (video.type === 'Free') {
       return res.status(400).json({
         success: false,
         error: 'This video is free to watch',
         code: 'VIDEO_NOT_PAID',
-      });
+      })
     }
 
     // Check if user already has access
@@ -331,14 +289,14 @@ const purchaseIndividualVideo = async (req, res, next) => {
       user_id: buyerId,
       content_id: id,
       content_type: 'video',
-    });
+    })
 
     if (existingAccess) {
       return res.status(400).json({
         success: false,
         error: 'You already have access to this video',
         code: 'ALREADY_PURCHASED',
-      });
+      })
     }
 
     // Check if user owns the video
@@ -347,11 +305,11 @@ const purchaseIndividualVideo = async (req, res, next) => {
         success: false,
         error: 'You cannot buy your own video',
         code: 'CANNOT_BUY_OWN_VIDEO',
-      });
+      })
     }
 
     // Check Creator Pass access
-    const creatorPassCheck = await checkCreatorPassAccess(buyerId, creatorId);
+    const creatorPassCheck = await checkCreatorPassAccess(buyerId, creatorId)
     if (creatorPassCheck.hasAccess) {
       // Grant access directly
       const userAccess = new UserAccess({
@@ -366,9 +324,9 @@ const purchaseIndividualVideo = async (req, res, next) => {
         metadata: {
           creator_pass_id: creatorPassCheck.pass._id,
         },
-      });
+      })
 
-      await userAccess.save();
+      await userAccess.save()
 
       return res.status(200).json({
         success: true,
@@ -378,12 +336,12 @@ const purchaseIndividualVideo = async (req, res, next) => {
           id: id,
           title: video.name,
         },
-      });
+      })
     }
 
     // Process payment
-    const buyerWallet = await Wallet.findOne({ user_id: buyerId });
-    const creatorWallet = await Wallet.findOne({ user_id: creatorId });
+    const buyerWallet = await Wallet.findOne({ user_id: buyerId })
+    const creatorWallet = await Wallet.findOne({ user_id: creatorId })
 
     if (!buyerWallet || buyerWallet.balance < amount) {
       return res.status(400).json({
@@ -392,13 +350,13 @@ const purchaseIndividualVideo = async (req, res, next) => {
         code: 'INSUFFICIENT_BALANCE',
         currentBalance: buyerWallet?.balance || 0,
         requiredAmount: amount,
-      });
+      })
     }
 
-    const platformAmount = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100));
-    const creatorAmount = amount - platformAmount;
+    const platformAmount = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))
+    const creatorAmount = amount - platformAmount
 
-    const session = await mongoose.startSession();
+    const session = await mongoose.startSession()
 
     try {
       await session.withTransaction(async () => {
@@ -427,20 +385,19 @@ const purchaseIndividualVideo = async (req, res, next) => {
             video_title: video.name,
             creator_name: video.created_by.username,
             transfer_note: transferNote || '',
-            video_type: type,
           },
-        });
+        })
 
-        await walletTransfer.save({ session });
+        await walletTransfer.save({ session })
 
         // Update wallets
-        buyerWallet.balance -= amount;
-        buyerWallet.total_spent += amount;
-        creatorWallet.balance += creatorAmount;
-        creatorWallet.total_received += creatorAmount;
+        buyerWallet.balance -= amount
+        buyerWallet.total_spent += amount
+        creatorWallet.balance += creatorAmount
+        creatorWallet.total_received += creatorAmount
 
-        await buyerWallet.save({ session });
-        await creatorWallet.save({ session });
+        await buyerWallet.save({ session })
+        await creatorWallet.save({ session })
 
         // Create user access
         const userAccess = new UserAccess({
@@ -452,9 +409,9 @@ const purchaseIndividualVideo = async (req, res, next) => {
           payment_method: 'wallet_transfer',
           payment_amount: amount,
           granted_at: new Date(),
-        });
+        })
 
-        await userAccess.save({ session });
+        await userAccess.save({ session })
 
         // Create transactions
         const buyerTransaction = new WalletTransaction({
@@ -470,7 +427,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
           content_id: id,
           content_type: 'video',
           status: 'completed',
-        });
+        })
 
         const creatorTransaction = new WalletTransaction({
           wallet_id: creatorWallet._id,
@@ -485,13 +442,13 @@ const purchaseIndividualVideo = async (req, res, next) => {
           content_id: id,
           content_type: 'video',
           status: 'completed',
-        });
+        })
 
-        await buyerTransaction.save({ session });
-        await creatorTransaction.save({ session });
-      });
+        await buyerTransaction.save({ session })
+        await creatorTransaction.save({ session })
+      })
 
-      await session.endSession();
+      await session.endSession()
 
       res.status(200).json({
         success: true,
@@ -507,22 +464,18 @@ const purchaseIndividualVideo = async (req, res, next) => {
           accessType: 'paid',
           grantedAt: new Date(),
         },
-      });
-
+      })
     } catch (transactionError) {
-      await session.abortTransaction();
-      throw transactionError;
+      await session.abortTransaction()
+      throw transactionError
     }
-
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
-
-
+}
 
 module.exports = {
   checkVideoAccess,
   streamVideo,
   purchaseIndividualVideo,
-};
+}

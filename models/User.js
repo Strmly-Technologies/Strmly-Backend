@@ -3,9 +3,9 @@ const bcrypt = require('bcrypt')
 
 const userSchema = new mongoose.Schema(
   {
-      is_google_user: {
+    is_google_user: {
       type: Boolean,
-      default:false,
+      default: false,
       select: false,
     },
     username: {
@@ -35,11 +35,6 @@ const userSchema = new mongoose.Schema(
     saved_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'LongVideo',
-      default: [],
-    },
-    saved_short_videos: {
-      type: [mongoose.Schema.Types.ObjectId],
-      ref: 'ShortVideo',
       default: [],
     },
     saved_series: {
@@ -87,14 +82,9 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
-    commented_long_videos: {
+    commented_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'LongVideo',
-      default: [],
-    },
-     commented_short_videos: {
-      type: [mongoose.Schema.Types.ObjectId],
-      ref: 'ShortVideo',
       default: [],
     },
     replied_comments: {
@@ -122,6 +112,11 @@ const userSchema = new mongoose.Schema(
     liked_communities: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Community',
+      default: [],
+    },
+    already_watched_long_videos: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'LongVideo',
       default: [],
     },
     creator_profile: {
@@ -187,7 +182,7 @@ const userSchema = new mongoose.Schema(
         default: null,
       },
     },
-     password_reset: {
+    password_reset: {
       reset_token: {
         type: String,
         default: null,

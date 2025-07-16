@@ -1,4 +1,3 @@
-const ShortVideo = require('../models/ShortVideos')
 const User = require('../models/User')
 const Community = require('../models/Community')
 const { uploadVideoToS3, handleError } = require('../utils/utils')
@@ -6,12 +5,15 @@ const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
 
-const uploadVideoToCommunity=async(req,res,next)=>{
+const uploadVideoToCommunity = async (req, res, next) => {
   try {
-    const {communityId, videoId}=req.body
-    const userId = req.user.id  
+    const { communityId, videoId } = req.body
+    const userId = req.user.id
 
-    const hasPermission = await checkCommunityUploadPermission(userId, communityId)
+    const hasPermission = await checkCommunityUploadPermission(
+      userId,
+      communityId
+    )
     if (!hasPermission.hasPermission) {
       return res.status(403).json({
         error: hasPermission.error,
@@ -24,7 +26,6 @@ const uploadVideoToCommunity=async(req,res,next)=>{
       {
         $addToSet: {
           [`long_videos`]: videoId,
-          [`short_videos`]: videoId,
         },
       },
       { new: true }
@@ -32,18 +33,15 @@ const uploadVideoToCommunity=async(req,res,next)=>{
     if (!updatedCommunity) {
       return res.status(404).json({ error: 'Community not found' })
     }
-     
+
     res.status(200).json({
       message: 'Video added to community successfully',
       community: {
         id: updatedCommunity._id,
         name: updatedCommunity.name,
-        short_videos: updatedCommunity.short_videos,
         long_videos: updatedCommunity.long_videos,
       },
     })
-
-    
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -51,8 +49,8 @@ const uploadVideoToCommunity=async(req,res,next)=>{
 
 const uploadVideo = async (req, res, next) => {
   try {
-    const videoFile = req.files?.videoFile?.[0];
-    const userId = req.user.id.toString() 
+    const videoFile = req.files?.videoFile?.[0]
+    const userId = req.user.id.toString()
     const {
       name,
       description,
@@ -62,7 +60,6 @@ const uploadVideo = async (req, res, next) => {
       age_restriction,
       communityId,
       seriesId,
-      videoType
     } = req.body
 
     if (!userId) {
@@ -73,13 +70,6 @@ const uploadVideo = async (req, res, next) => {
     if (!videoFile) {
       console.error(' No video file found in request')
       return res.status(400).json({ error: 'No video file uploaded' })
-    }
-
-    if (!videoType) {
-      console.error(' No video type found in request')
-      return res.status(400).json({
-        error: 'Video type is required. Use ?type=short or ?type=long',
-      })
     }
 
     // Check upload permission using the proper function
@@ -114,7 +104,7 @@ const uploadVideo = async (req, res, next) => {
       return res.status(404).json({ error: 'User not found' })
     }
 
-    const uploadResult = await uploadVideoToS3(videoFile, videoType)
+    const uploadResult = await uploadVideoToS3(videoFile)
     if (!uploadResult.success) {
       console.error(' S3 upload failed:', uploadResult)
       return res.status(500).json({
@@ -123,52 +113,32 @@ const uploadVideo = async (req, res, next) => {
       })
     }
 
-    let savedVideo
-    if (videoType === 'short') {
-      const shortVideo = {
-        name: name || videoFile.originalname,
-        description: description || 'No description provided',
-        videoUrl: uploadResult.url,
-        created_by: userId,
-        updated_by: userId,
-        community: communityId,
-      }
-      savedVideo = new ShortVideo(shortVideo)
-    } else if (videoType === 'long') {
-      const longVideo = {
-        name: name || videoFile.originalname,
-        description: description || 'No description provided',
-        videoUrl: uploadResult.url,
-        created_by: userId,
-        updated_by: userId,
-        community: communityId,
-        thumbnailUrl: '',
-        genre: genre || 'Action',
-        type: type || 'Free',
-        series:seriesId || null,
-        age_restriction:
+    const longVideo = {
+      name: name || videoFile.originalname,
+      description: description || 'No description provided',
+      videoUrl: uploadResult.url,
+      created_by: userId,
+      updated_by: userId,
+      community: communityId,
+      thumbnailUrl: '',
+      genre: genre || 'Action',
+      type: type || 'Free',
+      series: seriesId || null,
+      age_restriction:
         age_restriction === 'true' || age_restriction === true || false,
-        Videolanguage: language || 'English',
-        subtitles: [],
-      }
-      savedVideo = new LongVideo(longVideo)
+      Videolanguage: language || 'English',
+      subtitles: [],
     }
+    let savedVideo = new LongVideo(longVideo)
 
     await savedVideo.save()
 
-    if (videoType === 'short') {
-      await Community.findByIdAndUpdate(communityId, {
-        $push: { short_videos: savedVideo._id },
-      })
-    } else if (videoType === 'long') {
-      await Community.findByIdAndUpdate(communityId, {
-        $push: { long_videos: savedVideo._id },
-      })
-    }
+    await Community.findByIdAndUpdate(communityId, {
+      $push: { long_videos: savedVideo._id },
+    })
 
     res.status(200).json({
       message: 'Video uploaded successfully',
-      videoType: videoType,
 
       videoUrl: uploadResult.url,
       s3Key: uploadResult.key,
@@ -181,16 +151,14 @@ const uploadVideo = async (req, res, next) => {
       videoData: {
         name: savedVideo.name,
         description: savedVideo.description,
-        ...(videoType === 'long' && {
-          genre: savedVideo.genre,
-          type: savedVideo.type,
-          language: savedVideo.language,
-          age_restriction: savedVideo.age_restriction,
-        }),
+        genre: savedVideo.genre,
+        type: savedVideo.type,
+        language: savedVideo.language,
+        age_restriction: savedVideo.age_restriction,
       },
       nextSteps: {
         message: 'Use videoId to add this video to a community',
-        endpoint: `/api/v1/community/add-${videoType}-video`,
+        endpoint: '/api/v1/videos/upload/community',
         requiredFields: ['communityId', 'videoId'],
       },
     })
@@ -210,29 +178,18 @@ const searchVideos = async (req, res, next) => {
 
     const searchRegex = new RegExp(query, 'i')
 
-    const [longVideos, shortVideos] = await Promise.all([
-      LongVideo.find({
-        $or: [
-          { name: searchRegex },
-          { description: searchRegex },
-          { genre: searchRegex },
-        ],
-      })
-        .populate('created_by', 'username email')
-        .populate('community', 'name')
-        .skip(skip)
-        .limit(parseInt(limit))
-        .sort({ createdAt: -1 }),
-
-      ShortVideo.find({
-        $or: [{ name: searchRegex }, { description: searchRegex }],
-      })
-        .populate('created_by', 'username email')
-        .populate('community', 'name')
-        .skip(skip)
-        .limit(parseInt(limit))
-        .sort({ createdAt: -1 }),
-    ])
+    const longVideos = await LongVideo.find({
+      $or: [
+        { name: searchRegex },
+        { description: searchRegex },
+        { genre: searchRegex },
+      ],
+    })
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 })
 
     const totalLong = await LongVideo.countDocuments({
       $or: [
@@ -242,21 +199,16 @@ const searchVideos = async (req, res, next) => {
       ],
     })
 
-    const totalShort = await ShortVideo.countDocuments({
-      $or: [{ name: searchRegex }, { description: searchRegex }],
-    })
-
     res.status(200).json({
       message: 'Search results retrieved successfully',
       data: {
         longVideos,
-        shortVideos,
+
         pagination: {
           currentPage: parseInt(page),
-          totalPages: Math.ceil((totalLong + totalShort) / limit),
-          totalResults: totalLong + totalShort,
+          totalPages: Math.ceil(totalLong / limit),
+          totalResults: totalLong,
           longVideoCount: totalLong,
-          shortVideoCount: totalShort,
         },
       },
     })
@@ -268,19 +220,10 @@ const searchVideos = async (req, res, next) => {
 const getVideoById = async (req, res, next) => {
   try {
     const { id } = req.params
-    const { type } = req.query
-
-    let video
-    if (type === 'short') {
-      video = await ShortVideo.findById(id)
-        .populate('created_by', 'username email')
-        .populate('community', 'name')
-    } else {
-      video = await LongVideo.findById(id)
-        .populate('created_by', 'username email')
-        .populate('community', 'name')
-        .populate('series', 'title')
-    }
+    let video = await LongVideo.findById(id)
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
+      .populate('series', 'title')
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' })
@@ -298,53 +241,34 @@ const getVideoById = async (req, res, next) => {
 const updateVideo = async (req, res, next) => {
   try {
     const { id } = req.params
-    const { type } = req.query
     const userId = req.user.id
     const { name, description, genre, language, age_restriction } = req.body
 
-    let video
     const updateData = {
       ...(name && { name }),
       ...(description && { description }),
       updated_by: userId,
     }
 
-    if (type === 'short') {
-      video = await ShortVideo.findById(id)
-      if (!video) {
-        return res.status(404).json({ error: 'Short video not found' })
-      }
+    if (genre) updateData.genre = genre
+    if (language) updateData.language = language
+    if (age_restriction !== undefined)
+      updateData.age_restriction = age_restriction
 
-      if (video.created_by.toString() !== userId) {
-        return res
-          .status(403)
-          .json({ error: 'Not authorized to update this video' })
-      }
-
-      video = await ShortVideo.findByIdAndUpdate(id, updateData, {
-        new: true,
-      })
-    } else {
-      if (genre) updateData.genre = genre
-      if (language) updateData.language = language
-      if (age_restriction !== undefined)
-        updateData.age_restriction = age_restriction
-
-      video = await LongVideo.findById(id)
-      if (!video) {
-        return res.status(404).json({ error: 'Long video not found' })
-      }
-
-      if (video.created_by.toString() !== userId) {
-        return res
-          .status(403)
-          .json({ error: 'Not authorized to update this video' })
-      }
-
-      video = await LongVideo.findByIdAndUpdate(id, updateData, {
-        new: true,
-      })
+    let video = await LongVideo.findById(id)
+    if (!video) {
+      return res.status(404).json({ error: 'Long video not found' })
     }
+
+    if (video.created_by.toString() !== userId) {
+      return res
+        .status(403)
+        .json({ error: 'Not authorized to update this video' })
+    }
+
+    video = await LongVideo.findByIdAndUpdate(id, updateData, {
+      new: true,
+    })
 
     res.status(200).json({
       message: 'Video updated successfully',
@@ -358,44 +282,27 @@ const updateVideo = async (req, res, next) => {
 const deleteVideo = async (req, res, next) => {
   try {
     const { id } = req.params
-    const { type } = req.query
     const userId = req.user.id
 
-    let video
-    if (type === 'short') {
-      video = await ShortVideo.findById(id)
-      if (!video) {
-        return res.status(404).json({ error: 'Short video not found' })
-      }
-
-      if (video.created_by.toString() !== userId) {
-        return res
-          .status(403)
-          .json({ error: 'Not authorized to delete this video' })
-      }
-
-      await ShortVideo.findByIdAndDelete(id)
-    } else {
-      video = await LongVideo.findById(id)
-      if (!video) {
-        return res.status(404).json({ error: 'Long video not found' })
-      }
-
-      if (video.created_by.toString() !== userId) {
-        return res
-          .status(403)
-          .json({ error: 'Not authorized to delete this video' })
-      }
-
-      if (video.series) {
-        await Series.findByIdAndUpdate(video.series, {
-          $pull: { episodes: id },
-          $inc: { total_episodes: -1 },
-        })
-      }
-
-      await LongVideo.findByIdAndDelete(id)
+    let video = await LongVideo.findById(id)
+    if (!video) {
+      return res.status(404).json({ error: 'Long video not found' })
     }
+
+    if (video.created_by.toString() !== userId) {
+      return res
+        .status(403)
+        .json({ error: 'Not authorized to delete this video' })
+    }
+
+    if (video.series) {
+      await Series.findByIdAndUpdate(video.series, {
+        $pull: { episodes: id },
+        $inc: { total_episodes: -1 },
+      })
+    }
+
+    await LongVideo.findByIdAndDelete(id)
 
     res.status(200).json({
       message: 'Video deleted successfully',
@@ -407,63 +314,27 @@ const deleteVideo = async (req, res, next) => {
 
 const getTrendingVideos = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, type } = req.query
+    const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
-    let videos
-    let total
+    let videos = await LongVideo.find()
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
+      .populate('series', 'title')
+      .sort({ views: -1, likes: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
 
-    if (type === 'short') {
-      videos = await ShortVideo.find()
-        .populate('created_by', 'username email')
-        .populate('community', 'name')
-        .sort({ views: -1, likes: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-
-      total = await ShortVideo.countDocuments()
-    } else if (type === 'long') {
-      videos = await LongVideo.find()
-        .populate('created_by', 'username email')
-        .populate('community', 'name')
-        .populate('series', 'title')
-        .sort({ views: -1, likes: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-
-      total = await LongVideo.countDocuments()
-    } else {
-      const [longVideos, shortVideos] = await Promise.all([
-        LongVideo.find()
-          .populate('created_by', 'username email')
-          .populate('community', 'name')
-          .populate('series', 'title')
-          .sort({ views: -1, likes: -1, createdAt: -1 })
-          .limit(Math.ceil(limit / 2)),
-
-        ShortVideo.find()
-          .populate('created_by', 'username email')
-          .populate('community', 'name')
-          .sort({ views: -1, likes: -1, createdAt: -1 })
-          .limit(Math.floor(limit / 2)),
-      ])
-
-      videos = { longVideos, shortVideos }
-      total = await Promise.all([
-        LongVideo.countDocuments(),
-        ShortVideo.countDocuments(),
-      ])
-    }
+    let total = await LongVideo.countDocuments()
 
     res.status(200).json({
       message: 'Trending videos retrieved successfully',
       data: videos,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: type
-          ? Math.ceil(total / limit)
-          : Math.ceil((total[0] + total[1]) / limit),
-        totalResults: type ? total : total[0] + total[1],
+        totalPages: Math.ceil(total / limit),
+
+        totalResults: total,
       },
     })
   } catch (error) {
@@ -504,22 +375,12 @@ const getVideosByGenre = async (req, res, next) => {
 const incrementVideoView = async (req, res, next) => {
   try {
     const { id } = req.params
-    const { type } = req.query
 
-    let video
-    if (type === 'short') {
-      video = await ShortVideo.findByIdAndUpdate(
-        id,
-        { $inc: { views: 1 } },
-        { new: true }
-      )
-    } else {
-      video = await LongVideo.findByIdAndUpdate(
-        id,
-        { $inc: { views: 1 } },
-        { new: true }
-      )
-    }
+    let video = await LongVideo.findByIdAndUpdate(
+      id,
+      { $inc: { views: 1 } },
+      { new: true }
+    )
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' })
@@ -537,24 +398,17 @@ const incrementVideoView = async (req, res, next) => {
 const getRelatedVideos = async (req, res, next) => {
   try {
     const { id } = req.params
-    const { type } = req.query
 
-    let video
-    if (type === 'short') {
-      video = await ShortVideo.findById(id)
-    } else {
-      video = await LongVideo.findById(id)
-    }
+    let video = await LongVideo.findById(id)
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' })
     }
 
-    const relatedVideos = await (type === 'short' ? ShortVideo : LongVideo)
-      .find({
-        _id: { $ne: id },
-        genre: video.genre,
-      })
+    const relatedVideos = await LongVideo.find({
+      _id: { $ne: id },
+      genre: video.genre,
+    })
       .populate('created_by', 'username email')
       .populate('community', 'name')
       .limit(10)
@@ -578,5 +432,5 @@ module.exports = {
   getVideosByGenre,
   incrementVideoView,
   getRelatedVideos,
-  uploadVideoToCommunity
+  uploadVideoToCommunity,
 }

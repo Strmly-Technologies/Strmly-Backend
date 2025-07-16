@@ -4,19 +4,18 @@ const {
   ShareVideo,
   CommentOnVideo,
   GiftComment,
-  GiftShortVideo,
   getVideoComments,
   getCommentReplies,
   upvoteComment,
   downvoteComment,
   statusOfLike,
-  saveVideo,
+  reshareVideo,
   getTotalSharesByVideoId,
   checkForSaveVideo,
   UnsaveVideo,
   ReplyToComment,
   UpvoteReply,
-  DownvoteReply
+  DownvoteReply,
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -37,41 +36,78 @@ router.post('/share', authenticateToken, generalRateLimiter, ShareVideo)
 router.post('/comment', authenticateToken, generalRateLimiter, CommentOnVideo)
 
 // Get video comments - Updated route
-router.get('/videos/:videoId/comments', authenticateToken, generalRateLimiter, getVideoComments);
+router.get(
+  '/videos/:videoId/comments',
+  authenticateToken,
+  generalRateLimiter,
+  getVideoComments
+)
 
 // Get comment replies - New route
-router.get('/videos/:videoId/comments/:commentId/replies', authenticateToken, generalRateLimiter, getCommentReplies);
+router.get(
+  '/videos/:videoId/comments/:commentId/replies',
+  authenticateToken,
+  generalRateLimiter,
+  getCommentReplies
+)
 
 //API to reply to a comment
-router.post('/comments/reply', authenticateToken, generalRateLimiter, ReplyToComment)
+router.post(
+  '/comments/reply',
+  authenticateToken,
+  generalRateLimiter,
+  ReplyToComment
+)
 
 // Upvote/Downvote comments
-router.post('/comments/upvote', authenticateToken, generalRateLimiter, upvoteComment);
-router.post('/comments/downvote', authenticateToken, generalRateLimiter, downvoteComment);
+router.post(
+  '/comments/upvote',
+  authenticateToken,
+  generalRateLimiter,
+  upvoteComment
+)
+router.post(
+  '/comments/downvote',
+  authenticateToken,
+  generalRateLimiter,
+  downvoteComment
+)
 
 // Upvote/Downvote replies
-router.post('/replies/upvote', authenticateToken, generalRateLimiter, UpvoteReply);
-router.post('/replies/downvote', authenticateToken, generalRateLimiter, DownvoteReply);
+router.post(
+  '/replies/upvote',
+  authenticateToken,
+  generalRateLimiter,
+  UpvoteReply
+)
+router.post(
+  '/replies/downvote',
+  authenticateToken,
+  generalRateLimiter,
+  DownvoteReply
+)
 
 // API to gift a comment
 router.post('/gift-comment', authenticateToken, paymentRateLimiter, GiftComment)
 
-// Gift short video to creator
-router.post('/gift-short-video', authenticateToken, paymentRateLimiter, GiftShortVideo)
-
-// API to save a video/series
-router.post('/save', authenticateToken, generalRateLimiter, saveVideo)
+// API to reshare a video
+router.post('/reshare', authenticateToken, generalRateLimiter, reshareVideo)
 
 // API to unsave a video/series
 router.post('/unsave', authenticateToken, generalRateLimiter, UnsaveVideo)
 
 //check if video is saved
-router.post('/saved/status',authenticateToken, checkForSaveVideo);
+router.post('/saved/status', authenticateToken, checkForSaveVideo)
 
 // get status of like video
 router.post('/like/status', authenticateToken, generalRateLimiter, statusOfLike)
 
 // Get total shares by video ID
-router.get('/shares/:videoId', authenticateToken, generalRateLimiter, getTotalSharesByVideoId)
+router.get(
+  '/shares/:videoId',
+  authenticateToken,
+  generalRateLimiter,
+  getTotalSharesByVideoId
+)
 
 module.exports = router

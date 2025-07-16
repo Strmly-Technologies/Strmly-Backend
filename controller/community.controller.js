@@ -1,5 +1,6 @@
 const Community = require('../models/Community')
 const CommunityAccess = require('../models/CommunityAccess')
+const LongVideo = require('../models/LongVideo')
 const { handleError, uploadImageToS3 } = require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
@@ -22,8 +23,8 @@ const CreateCommunity = async (req, res, next) => {
       founder: userId,
       followers: [userId],
       community_fee_type: type,
-      community_fee_amount: type === 'paid' ? (amount || 0) : 0,
-      community_fee_description: type === 'paid' ? (fee_description || '') : '',
+      community_fee_amount: type === 'paid' ? amount || 0 : 0,
+      community_fee_description: type === 'paid' ? fee_description || '' : '',
     })
 
     await newCommunity.save()
@@ -69,9 +70,9 @@ const RenameCommunity = async (req, res, next) => {
 }
 
 const ChangeCommunityProfilePhoto = async (req, res, next) => {
-  const profilePhotoFile = req.files?.imageFile?.[0];
+  const profilePhotoFile = req.files?.imageFile?.[0]
   const { communityId } = req.body
-  const userId = req.user.id.toString();
+  const userId = req.user.id.toString()
 
   if (!communityId || !profilePhotoFile) {
     return res
@@ -80,15 +81,20 @@ const ChangeCommunityProfilePhoto = async (req, res, next) => {
   }
 
   try {
-
-    const community = await Community.findOne({ _id: communityId, founder: userId });
+    const community = await Community.findOne({
+      _id: communityId,
+      founder: userId,
+    })
     if (!community) {
       return res
         .status(404)
         .json({ message: 'Community not found or you are not the founder' })
     }
 
-    const uploadResult = await uploadImageToS3(profilePhotoFile,"community-profile-photos")
+    const uploadResult = await uploadImageToS3(
+      profilePhotoFile,
+      'community-profile-photos'
+    )
     if (!uploadResult.success) {
       console.error(' S3 upload failed:', uploadResult)
       return res.status(500).json({
@@ -97,10 +103,10 @@ const ChangeCommunityProfilePhoto = async (req, res, next) => {
       })
     }
 
-    const profilePhotoUrl = uploadResult.url;
+    const profilePhotoUrl = uploadResult.url
 
-    community.profile_photo = profilePhotoUrl;
-    await community.save();
+    community.profile_photo = profilePhotoUrl
+    await community.save()
 
     res.status(200).json({
       message: 'Community profile photo updated successfully',
@@ -174,7 +180,7 @@ const checkCommunityUploadPermission = async (userId, communityId) => {
   if (community.founder.toString() === userId) {
     return { hasPermission: true, accessType: 'founder' }
   }
- 
+
   // Check if community is free
   if (community.community_fee_type === 'free') {
     return { hasPermission: true, accessType: 'free' }
@@ -206,55 +212,52 @@ const getAllCommunities = async (req, res, next) => {
       .populate('followers', 'username profile_photo')
       .populate('creators', 'username profile_photo')
       .populate('long_videos', 'name description videoUrl')
-      .populate('short_videos', 'name description videoUrl')
-      .populate('series', 'title description total_episodes');
+      .populate('series', 'title description total_episodes')
     if (communities.length === 0) {
-      return res.status(404).json({ message: 'No communities found' });
+      return res.status(404).json({ message: 'No communities found' })
     }
 
     return res.status(200).json({
       communities,
       count: communities.length,
-      message: 'Communities fetched successfully'
-    });
+      message: 'Communities fetched successfully',
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
-
+}
 
 const getCommunityById = async (req, res, next) => {
-  const communityId = req.params.id;
+  const communityId = req.params.id
   try {
     const community = await Community.findById(communityId)
       .populate('founder', 'username profile_photo')
       .populate('followers', 'username profile_photo')
       .populate('creators', 'username profile_photo')
       .populate('long_videos', 'name description videoUrl')
-      .populate('short_videos', 'name description videoUrl')
-      .populate('series', 'title description total_episodes');
+      .populate('series', 'title description total_episodes')
 
     if (!community) {
-      return res.status(404).json({ message: 'Community not found' });
+      return res.status(404).json({ message: 'Community not found' })
     }
 
-    return res.status(200).json(community);
+    return res.status(200).json(community)
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const getUserCommunities = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-    const { type = 'all' } = req.query;
+    const userId = req.user.id
+    const { type = 'all' } = req.query
 
     if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
+      return res.status(400).json({ message: 'User ID is required' })
     }
 
-    let created = [];
-    let joined = [];
+    let created = []
+    let joined = []
 
     if (type === 'created' || type === 'all') {
       created = await Community.find({ founder: userId })
@@ -262,8 +265,8 @@ const getUserCommunities = async (req, res, next) => {
         .populate('followers', 'username profile_photo')
         .populate('creators', 'username profile_photo')
         .populate('long_videos', 'name description videoUrl')
-        .populate('short_videos', 'name description videoUrl')
-        .populate('series', 'title description total_episodes');
+
+        .populate('series', 'title description total_episodes')
     }
 
     if (type === 'joined' || type === 'all') {
@@ -272,79 +275,83 @@ const getUserCommunities = async (req, res, next) => {
         .populate('followers', 'username profile_photo')
         .populate('creators', 'username profile_photo')
         .populate('long_videos', 'name description videoUrl')
-        .populate('short_videos', 'name description videoUrl')
-        .populate('series', 'title description total_episodes');
+
+        .populate('series', 'title description total_episodes')
     }
 
-    let combined = [];
+    let combined = []
 
     if (type === 'all') {
-      const combinedMap = new Map();
+      const combinedMap = new Map()
 
-      [...created, ...joined].forEach((comm) => {
-        combinedMap.set(comm._id.toString(), comm);
-      });
+      ;[...created, ...joined].forEach((comm) => {
+        combinedMap.set(comm._id.toString(), comm)
+      })
 
-      combined = Array.from(combinedMap.values());
+      combined = Array.from(combinedMap.values())
     }
 
     res.status(200).json({
       communities:
-        type === 'created' ? created :
-        type === 'joined' ? joined :
-        combined,
+        type === 'created' ? created : type === 'joined' ? joined : combined,
       createdCount: created.length,
       joinedCount: joined.length,
-      totalCount: type === 'all' ? combined.length : (type === 'created' ? created.length : joined.length),
+      totalCount:
+        type === 'all'
+          ? combined.length
+          : type === 'created'
+            ? created.length
+            : joined.length,
       message: 'Communities fetched successfully',
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
-
-
-const getUploadPermissionForCommunity = async (req, res, next) => {
- try {
-   const { communityId } = req.body
-   const userId = req.user.id
-   if (!communityId) {
-     return res.status(400).json({ message: 'Community ID is required' })
-   }
-   const permission = await checkCommunityUploadPermission(userId, communityId)
-   if (!permission.hasPermission) {
-     return res.status(403).json({
-       message: permission.error || 'You do not have permission to upload content',
-       requiredFee: permission.requiredFee,
-       communityName: permission.communityName,
-     })
-   }
-   return res.status(200).json({
-     message: 'You have permission to upload content',
-     accessType: permission.accessType,
-     access: permission.access || null,
-   })
- } catch (error) {
-   handleError(error, req, res, next)
- }
 }
 
-const getCommunityProfileDetails=async(req,res,next)=>{
+const getUploadPermissionForCommunity = async (req, res, next) => {
   try {
-    const communityId=req.params.id
+    const { communityId } = req.body
+    const userId = req.user.id
     if (!communityId) {
-      return res.status(400).json({ message: 'Community ID is required to proceed' })
+      return res.status(400).json({ message: 'Community ID is required' })
+    }
+    const permission = await checkCommunityUploadPermission(userId, communityId)
+    if (!permission.hasPermission) {
+      return res.status(403).json({
+        message:
+          permission.error || 'You do not have permission to upload content',
+        requiredFee: permission.requiredFee,
+        communityName: permission.communityName,
+      })
+    }
+    return res.status(200).json({
+      message: 'You have permission to upload content',
+      accessType: permission.accessType,
+      access: permission.access || null,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getCommunityProfileDetails = async (req, res, next) => {
+  try {
+    const communityId = req.params.id
+    if (!communityId) {
+      return res
+        .status(400)
+        .json({ message: 'Community ID is required to proceed' })
     }
     const community = await Community.findById(communityId)
-     if (!community) {
+    if (!community) {
       return res.status(404).json({ message: 'Community not found' })
     }
     const totalFollowers = community.followers.length
     const totalCreators = community.creators.length
-    const totalVideos = community.long_videos.length + community.short_videos.length + community.series.length
+    const totalVideos = community.long_videos.length + community.series.length
     const totalContent = {
       longVideos: community.long_videos.length,
-      shortVideos: community.short_videos.length,
       series: community.series.length,
     }
     return res.status(200).json({
@@ -362,27 +369,25 @@ const getCommunityProfileDetails=async(req,res,next)=>{
         profilePhoto: community.founder.profile_photo,
       },
     })
-    
   } catch (error) {
     handleError(error, req, res, next)
-    
   }
 }
 const getCommunityVideos = async (req, res, next) => {
   try {
-    const communityId = req.params.id;
-    const { videoType } = req.query;
+    const communityId = req.params.id
+    const { videoType } = req.query
 
     if (!communityId) {
-      return res.status(400).json({ message: 'Community ID is required' });
+      return res.status(400).json({ message: 'Community ID is required' })
     }
 
-    const community = await Community.findById(communityId);
+    const community = await Community.findById(communityId)
     if (!community) {
-      return res.status(404).json({ message: 'Community not found' });
+      return res.status(404).json({ message: 'Community not found' })
     }
 
-    let videos;
+    let videos
 
     if (videoType === 'long') {
       const populated = await Community.findById(communityId).populate({
@@ -391,19 +396,8 @@ const getCommunityVideos = async (req, res, next) => {
           path: 'created_by',
           select: 'username profile_photo',
         },
-      });
-      videos = populated.long_videos;
-
-    } else if (videoType === 'short') {
-      const populated = await Community.findById(communityId).populate({
-        path: 'short_videos',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
-      });
-      videos = populated.short_videos;
-
+      })
+      videos = populated.long_videos
     } else if (videoType === 'series') {
       const populated = await Community.findById(communityId).populate({
         path: 'series',
@@ -411,209 +405,144 @@ const getCommunityVideos = async (req, res, next) => {
           path: 'created_by',
           select: 'username profile_photo',
         },
-      });
-      videos = populated.series;
-
+      })
+      videos = populated.series
     } else {
-      return res.status(400).json({ message: 'Invalid video type' });
+      return res.status(400).json({ message: 'Invalid video type' })
     }
 
     return res.status(200).json({
       videos,
       count: videos.length,
-      message: videos.length === 0 ? 'No videos found in this community' : 'Videos fetched successfully',
-    });
-
+      message:
+        videos.length === 0
+          ? 'No videos found in this community'
+          : 'Videos fetched successfully',
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const getTrendingCommunityVideos = async (req, res, next) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      videoType = 'all', 
-      communityId 
-    } = req.query;
-    
-    const skip = (page - 1) * limit;
-    const limitNum = parseInt(limit);
+    const { page = 1, limit = 10, communityId } = req.query
 
-    let query = {};
+    const skip = (page - 1) * limit
+    const limitNum = parseInt(limit)
+
+    let query = {}
     if (communityId) {
-      query.community = communityId;
+      query.community = communityId
     }
 
-    let trendingVideos = [];
+    let trendingVideos = []
 
-    if (videoType === 'long' || videoType === 'all') {
-      const longVideos = await LongVideo.find(query)
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .sort({ likes: -1, views: -1, createdAt: -1 })
-        .skip(videoType === 'all' ? 0 : skip)
-        .limit(videoType === 'all' ? Math.ceil(limitNum / 2) : limitNum);
+    const longVideos = await LongVideo.find(query)
+      .populate('created_by', 'username profile_photo')
+      .populate('community', 'name profile_photo')
+      .sort({ likes: -1, views: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
 
-      trendingVideos = trendingVideos.concat(
-        longVideos.map(video => ({
-          ...video.toObject(),
-          videoType: 'long'
-        }))
-      );
-    }
-
-    if (videoType === 'short' || videoType === 'all') {
-      const shortVideos = await ShortVideo.find(query)
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .sort({ likes: -1, views: -1, createdAt: -1 })
-        .skip(videoType === 'all' ? 0 : skip)
-        .limit(videoType === 'all' ? Math.floor(limitNum / 2) : limitNum);
-
-      trendingVideos = trendingVideos.concat(
-        shortVideos.map(video => ({
-          ...video.toObject(),
-          videoType: 'short'
-        }))
-      );
-    }
-
-    // If getting all types, sort combined results and apply pagination
-    if (videoType === 'all') {
-      trendingVideos.sort((a, b) => {
-        if (b.likes !== a.likes) return b.likes - a.likes;
-        if (b.views !== a.views) return b.views - a.views;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-      
-      trendingVideos = trendingVideos.slice(skip, skip + limitNum);
-    }
+    trendingVideos = trendingVideos.concat(
+      longVideos.map((video) => ({
+        ...video.toObject(),
+      }))
+    )
 
     // Get total counts for pagination
-    const totalLongVideos = await LongVideo.countDocuments(query);
-    const totalShortVideos = await ShortVideo.countDocuments(query);
-    const totalVideos = totalLongVideos + totalShortVideos;
+    const totalLongVideos = await LongVideo.countDocuments(query)
 
     res.status(200).json({
       message: 'Trending community videos retrieved successfully',
       videos: trendingVideos,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(totalVideos / limitNum),
-        totalVideos,
+        totalPages: Math.ceil(totalLongVideos / limitNum),
+        totalLongVideos,
         limit: limitNum,
-        hasMore: parseInt(page) < Math.ceil(totalVideos / limitNum),
+        hasMore: parseInt(page) < Math.ceil(totalLongVideos / limitNum),
       },
       filters: {
-        videoType,
         communityId: communityId || 'all',
         sortBy: 'likes_desc',
       },
       stats: {
         totalLongVideos,
-        totalShortVideos,
         totalCommunities: communityId ? 1 : await Community.countDocuments(),
       },
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 const getTrendingVideosByCommunity = async (req, res, next) => {
   try {
-    const { id: communityId } = req.params;
-    const { 
-      page = 1, 
-      limit = 10, 
-      videoType = 'all',
-      sortBy = 'likes' 
-    } = req.query;
-    
-    const skip = (page - 1) * limit;
-    const limitNum = parseInt(limit);
+    const { id: communityId } = req.params
+    const { page = 1, limit = 10, sortBy = 'likes' } = req.query
+
+    const skip = (page - 1) * limit
+    const limitNum = parseInt(limit)
 
     // Check if community exists
-    const community = await Community.findById(communityId);
+    const community = await Community.findById(communityId)
     if (!community) {
-      return res.status(404).json({ message: 'Community not found' });
+      return res.status(404).json({ message: 'Community not found' })
     }
 
-    let sortObject = {};
+    let sortObject = {}
     switch (sortBy) {
       case 'likes':
-        sortObject = { likes: -1, views: -1, createdAt: -1 };
-        break;
+        sortObject = { likes: -1, views: -1, createdAt: -1 }
+        break
       case 'views':
-        sortObject = { views: -1, likes: -1, createdAt: -1 };
-        break;
+        sortObject = { views: -1, likes: -1, createdAt: -1 }
+        break
       case 'recent':
-        sortObject = { createdAt: -1, likes: -1, views: -1 };
-        break;
+        sortObject = { createdAt: -1, likes: -1, views: -1 }
+        break
       default:
-        sortObject = { likes: -1, views: -1, createdAt: -1 };
+        sortObject = { likes: -1, views: -1, createdAt: -1 }
     }
 
-    let trendingVideos = [];
+    let trendingVideos = []
 
-    if (videoType === 'long' || videoType === 'all') {
-      const longVideos = await LongVideo.find({ community: communityId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .sort(sortObject)
-        .skip(videoType === 'all' ? 0 : skip)
-        .limit(videoType === 'all' ? Math.ceil(limitNum / 2) : limitNum);
+    const longVideos = await LongVideo.find({ community: communityId })
+      .populate('created_by', 'username profile_photo')
+      .populate('community', 'name profile_photo')
+      .sort(sortObject)
+      .skip(skip)
+      .limit(limitNum)
 
-      trendingVideos = trendingVideos.concat(
-        longVideos.map(video => ({
-          ...video.toObject(),
-          videoType: 'long'
-        }))
-      );
-    }
+    trendingVideos = trendingVideos.concat(
+      longVideos.map((video) => ({
+        ...video.toObject(),
+      }))
+    )
 
-    if (videoType === 'short' || videoType === 'all') {
-      const shortVideos = await ShortVideo.find({ community: communityId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .sort(sortObject)
-        .skip(videoType === 'all' ? 0 : skip)
-        .limit(videoType === 'all' ? Math.floor(limitNum / 2) : limitNum);
+    trendingVideos.sort((a, b) => {
+      switch (sortBy) {
+        case 'views':
+          if (b.views !== a.views) return b.views - a.views
+          if (b.likes !== a.likes) return b.likes - a.likes
+          return new Date(b.createdAt) - new Date(a.createdAt)
+        case 'recent':
+          return new Date(b.createdAt) - new Date(a.createdAt)
+        default: // likes
+          if (b.likes !== a.likes) return b.likes - a.likes
+          if (b.views !== a.views) return b.views - a.views
+          return new Date(b.createdAt) - new Date(a.createdAt)
+      }
+    })
 
-      trendingVideos = trendingVideos.concat(
-        shortVideos.map(video => ({
-          ...video.toObject(),
-          videoType: 'short'
-        }))
-      );
-    }
-
-    // Sort combined results if getting all types
-    if (videoType === 'all') {
-      trendingVideos.sort((a, b) => {
-        switch (sortBy) {
-          case 'views':
-            if (b.views !== a.views) return b.views - a.views;
-            if (b.likes !== a.likes) return b.likes - a.likes;
-            return new Date(b.createdAt) - new Date(a.createdAt);
-          case 'recent':
-            return new Date(b.createdAt) - new Date(a.createdAt);
-          default: // likes
-            if (b.likes !== a.likes) return b.likes - a.likes;
-            if (b.views !== a.views) return b.views - a.views;
-            return new Date(b.createdAt) - new Date(a.createdAt);
-        }
-      });
-      
-      trendingVideos = trendingVideos.slice(skip, skip + limitNum);
-    }
+    trendingVideos = trendingVideos.slice(skip, skip + limitNum)
 
     // Get totals for this community
-    const totalLongVideos = await LongVideo.countDocuments({ community: communityId });
-    const totalShortVideos = await ShortVideo.countDocuments({ community: communityId });
-    const totalVideos = totalLongVideos + totalShortVideos;
+    const totalLongVideos = await LongVideo.countDocuments({
+      community: communityId,
+    })
 
     res.status(200).json({
       message: `Trending videos from ${community.name} retrieved successfully`,
@@ -626,26 +555,24 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
       videos: trendingVideos,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(totalVideos / limitNum),
-        totalVideos,
+        totalPages: Math.ceil(totalLongVideos / limitNum),
+        totalLongVideos,
         limit: limitNum,
-        hasMore: parseInt(page) < Math.ceil(totalVideos / limitNum),
+        hasMore: parseInt(page) < Math.ceil(totalLongVideos / limitNum),
       },
       filters: {
-        videoType,
         sortBy,
         communityId,
       },
       stats: {
         totalLongVideos,
-        totalShortVideos,
         communityFollowers: community.followers.length,
       },
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
+}
 
 module.exports = {
   getCommunityProfileDetails,

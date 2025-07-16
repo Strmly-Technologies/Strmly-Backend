@@ -16,11 +16,15 @@ const {
   streamVideo,
   purchaseIndividualVideo,
 } = require('../controller/videoAccess.controller')
-const { dynamicVideoUpload, handleMulterError, validateVideoFormData } = require('../utils/utils')
+const {
+  dynamicVideoUpload,
+  handleMulterError,
+  validateVideoFormData,
+} = require('../utils/utils')
 const { authenticateToken } = require('../middleware/auth')
 
 // Route to upload a new video
-//accepts: FormData(name, description, genre, type, language, age_restriction, communityId, seriesId, videoType, videoFile)
+//accepts: FormData(name, description, genre, type, language, age_restriction, communityId, seriesId, videoFile)
 router.post(
   '/upload',
   authenticateToken,
@@ -63,7 +67,5 @@ router.put('/:id', authenticateToken, updateVideo)
 
 // Route to delete a video by ID
 router.delete('/:id', authenticateToken, deleteVideo)
-
-
 
 module.exports = router

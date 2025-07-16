@@ -39,11 +39,6 @@ const communitySchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
-    short_videos: {
-      type: [mongoose.Schema.Types.ObjectId],
-      ref: 'ShortVideo',
-      default: [],
-    },
     series: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Series',

@@ -1,7 +1,7 @@
 const router = require('express').Router()
 const {
   DeleteLongVideo,
-  DeleteShortVideo,
+
   DeleteUserProfile,
   DeleteCommunity,
   DeleteSeries,
@@ -14,9 +14,6 @@ const { authenticateToken } = require('../middleware/auth')
 
 // API to delete a long video
 router.delete('/video/long/:videoId', authenticateToken, DeleteLongVideo)
-
-// API to delete a short video
-router.delete('/video/short/:videoId', authenticateToken, DeleteShortVideo)
 
 // API to bulk delete videos
 router.delete('/videos/bulk', authenticateToken, BulkDeleteVideos)
