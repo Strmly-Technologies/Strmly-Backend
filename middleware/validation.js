@@ -105,6 +105,17 @@ const validateAndSanitize = {
     }
     return { isValid: true, page: pageNum, limit: limitNum }
   },
+
+  otp: (otp) => {
+    if (!otp || typeof otp !== 'string') {
+      return { isValid: false, error: 'OTP must be a valid string' }
+    }
+    const cleaned = otp.replace(/\s/g, '')
+    if (!/^\d{6}$/.test(cleaned)) {
+      return { isValid: false, error: 'OTP must be exactly 6 digits' }
+    }
+    return { isValid: true, value: cleaned }
+  },
 }
 
 const validateWalletLoad = (req, res, next) => {

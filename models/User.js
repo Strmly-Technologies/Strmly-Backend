@@ -156,8 +156,7 @@ const userSchema = new mongoose.Schema(
       },
       creator_pass_price: {
         type: Number,
-        default: 199,
-        min: 99,
+        default: 0,
         max: 10000,
       },
     },
@@ -175,11 +174,11 @@ const userSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
-      verification_token: {
+      verification_otp: {
         type: String,
         default: null,
       },
-      verification_token_expires: {
+      verification_otp_expires: {
         type: Date,
         default: null,
       },

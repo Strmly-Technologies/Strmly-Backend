@@ -1,7 +1,8 @@
 const User = require('../models/User')
-const { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail, generatePasswordResetToken, sendPasswordResetEmail, sendPasswordResetConfirmationEmail } = require('../utils/email')
+const { generateVerificationOTP, sendVerificationEmail, sendWelcomeEmail, generatePasswordResetToken, sendPasswordResetEmail, sendPasswordResetConfirmationEmail } = require('../utils/email')
 const { generateToken } = require('../utils/jwt')
 const { handleError } = require('../utils/utils')
+const { validateAndSanitize } = require('../middleware/validation')
 
 const RegisterNewUser = async (req, res, next) => {
   const { email, password } = req.body
@@ -23,9 +24,9 @@ const RegisterNewUser = async (req, res, next) => {
       username = username.username + Math.floor(Math.random() * 100000)
     }
 
-    //generate a verification token
-    const verificationToken = generateVerificationToken();
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    //generate a verification OTP
+    const verificationOTP = generateVerificationOTP();
+    const verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
     const newUser = new User({
       username,
@@ -33,22 +34,22 @@ const RegisterNewUser = async (req, res, next) => {
       password,
       email_verification:{
         is_verified:false,
-        verification_token: verificationToken,
-        verification_token_expires: verificationTokenExpires,
+        verification_otp: verificationOTP,
+        verification_otp_expires: verificationOTPExpires,
         verification_sent_at: new Date(),
       }
     });
 
     await newUser.save()
 
-    const emailResult=await sendVerificationEmail(email,username,verificationToken);
+    const emailResult=await sendVerificationEmail(email,username,verificationOTP);
     if(!emailResult.success){
       return res.status(500).json({ message: 'Failed to send verification email' })
     }
     const token = generateToken(newUser._id)
 
     res.status(201).json({
-      message: 'User registered successfully.Please check your email to verify your account',
+      message: 'User registered successfully. Please check your email for the 6-digit verification code',
       token,
       user: {
         id: newUser._id,
@@ -59,8 +60,9 @@ const RegisterNewUser = async (req, res, next) => {
      verification: {
         email_sent: emailResult.success,
         message: emailResult.success 
-          ? 'Verification email sent successfully' 
+          ? 'Verification OTP sent successfully' 
           : 'Registration completed but verification email failed to send',
+        otp_expires_in: '10 minutes',
       },
     })
   } catch (error) {
@@ -69,28 +71,48 @@ const RegisterNewUser = async (req, res, next) => {
 }
 
 const verifyEmail=async(req,res,next)=>{
-  const { token } = req.body;
-  if (!token) {
-    return res.status(400).json({ message: 'Verification token is required' })
+  const { otp } = req.body;
+  
+  if (!otp) {
+    return res.status(400).json({ message: 'Verification OTP is required' })
   }
+
+  // Validate OTP format
+  const otpValidation = validateAndSanitize.otp(otp)
+  if (!otpValidation.isValid) {
+    return res.status(400).json({ 
+      message: otpValidation.error,
+      code: 'INVALID_OTP_FORMAT'
+    })
+  }
+
   try {
     const user=await User.findOne({
-      'email_verification.verification_token': token,
-      'email_verification.verification_token_expires': { $gt: new Date() },
+      'email_verification.verification_otp': otpValidation.value,
+      'email_verification.verification_otp_expires': { $gt: new Date() },
     })
+    
     if(!user) {
-      return res.status(400).json({ message: 'Invalid or expired verification token' })
+      return res.status(400).json({ 
+        message: 'Invalid or expired verification OTP',
+        code: 'INVALID_OTP'
+      })
     }
 
     if(user.email_verification.is_verified){
-      return res.status(400).json({ message: 'Email is already verified' })
+      return res.status(400).json({ 
+        message: 'Email is already verified',
+        code: 'ALREADY_VERIFIED'
+      })
     } 
+    
     user.email_verification.is_verified = true;
-    user.email_verification.verification_token = null;
-    user.email_verification.verification_token_expires = null;
+    user.email_verification.verification_otp = null;
+    user.email_verification.verification_otp_expires = null;
     await user.save();
 
     await sendWelcomeEmail(user.email, user.username);
+    
    res.status(200).json({
       message: 'Email verified successfully! You can now sign in.',
       user: {
@@ -130,22 +152,22 @@ const resendVerificationEmail = async (req, res, next) => {
     const lastSent = user.email_verification.verification_sent_at
     if (lastSent && new Date() - lastSent < 60000) { // 1 minute cooldown
       return res.status(429).json({ 
-        message: 'Please wait before requesting another verification email',
+        message: 'Please wait before requesting another verification OTP',
         code: 'RATE_LIMITED'
       })
     }
 
-    // Generate new token
-    const verificationToken = generateVerificationToken()
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    // Generate new OTP
+    const verificationOTP = generateVerificationOTP()
+    const verificationExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
-    user.email_verification.verification_token = verificationToken
-    user.email_verification.verification_token_expires = verificationExpires
+    user.email_verification.verification_otp = verificationOTP
+    user.email_verification.verification_otp_expires = verificationExpires
     user.email_verification.verification_sent_at = new Date()
     await user.save()
 
     // Send verification email
-    const emailResult = await sendVerificationEmail(user.email, user.username, verificationToken)
+    const emailResult = await sendVerificationEmail(user.email, user.username, verificationOTP)
 
     if (!emailResult.success) {
       return res.status(500).json({ 
@@ -155,8 +177,9 @@ const resendVerificationEmail = async (req, res, next) => {
     }
 
     res.status(200).json({
-      message: 'Verification email sent successfully',
+      message: 'Verification OTP sent successfully',
       email_sent: true,
+      otp_expires_in: '10 minutes',
     })
   } catch (error) {
     handleError(error, req, res, next)
