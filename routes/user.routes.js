@@ -52,8 +52,8 @@ router.get('/earnings', authenticateToken, GetUserEarnings)
 // Get user notifications
 router.get('/notifications', authenticateToken, GetUserNotifications)
 
-// Update user interests
-router.put('/interests', UpdateUserInterests)
+// Update user interests 
+router.put('/interests', authenticateToken, UpdateUserInterests)
 
 // Get all user followers
 router.get('/followers', authenticateToken, GetUserFollowers)

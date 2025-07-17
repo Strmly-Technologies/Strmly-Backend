@@ -10,27 +10,51 @@ const GetUserFeed = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * (limit - 2)
     const resharedVideoSkip = (page - 1) * 2
-    //per page we have 2 reshared videos for a set limit
-    //for e.g if limit=10 reshared videos=2 and the rest is normal feed (8)
+
     const user = await User.findById(userId)
       .populate('following', '_id')
       .populate('community', '_id')
+      .select('following community interests viewed_videos')
 
     const followingIds = user.following.map((f) => f._id)
     const communityIds = user.community.map((c) => c._id)
+    const viewedVideoIds = user.viewed_videos || []
 
+    // Get feed videos from following and communities (excluding already viewed)
     const feedVideos = await LongVideo.find({
-      $or: [
-        { created_by: { $in: followingIds } },
-        { community: { $in: communityIds } },
-      ],
+      $and: [
+        {
+          $or: [
+            { created_by: { $in: followingIds } },
+            { community: { $in: communityIds } },
+          ]
+        },
+        { _id: { $nin: viewedVideoIds } }
+      ]
     })
       .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
+      .limit(parseInt(limit - 2))
 
+    // Get personalized recommendations based on interests
+    let recommendedVideos = []
+    if (user.interests && user.interests.length > 0) {
+      const userInterests = user.interests.slice(0, 3)
+      
+      recommendedVideos = await LongVideo.find({
+        genre: { $in: userInterests },
+        _id: { $nin: [...viewedVideoIds, ...feedVideos.map(v => v._id)] },
+        created_by: { $nin: followingIds }, // Exclude videos from followed users
+      })
+        .populate('created_by', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort({ views: -1, likes: -1 })
+        .limit(3)
+    }
+
+    // Get reshared videos
     const resharedVideos = await Reshare.find({})
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
@@ -44,14 +68,24 @@ const GetUserFeed = async (req, res, next) => {
         ],
       })
 
+    // Mark feed videos as viewed
+    if (feedVideos.length > 0) {
+      const feedVideoIds = feedVideos.map(video => video._id)
+      await User.findByIdAndUpdate(userId, {
+        $addToSet: { viewed_videos: { $each: feedVideoIds } }
+      })
+    }
+
     res.status(200).json({
       message: 'User feed retrieved successfully',
       feed: feedVideos,
+      recommendedVideos,
       reshared: resharedVideos,
+      userInterests: user.interests,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        hasMore: feedVideos.length === parseInt(limit),
+        hasMore: feedVideos.length === parseInt(limit - 2),
       },
     })
   } catch (error) {

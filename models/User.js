@@ -107,7 +107,34 @@ const userSchema = new mongoose.Schema(
     },
     interests: {
       type: [String],
+      enum: [
+        'Action',
+        'Comedy', 
+        'Drama',
+        'Horror',
+        'Sci-Fi',
+        'Romance',
+        'Documentary',
+        'Thriller',
+        'Fantasy',
+        'Animation',
+      ],
       default: [],
+    },
+    viewed_videos: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'LongVideo',
+      default: [],
+    },
+    recommendation_settings: {
+      last_recommendation_reset: {
+        type: Date,
+        default: Date.now,
+      },
+      recommendation_batch_size: {
+        type: Number,
+        default: 5,
+      },
     },
     liked_communities: {
       type: [mongoose.Schema.Types.ObjectId],
