@@ -1108,7 +1108,7 @@ const getWalletDetails = async (req, res, next) => {
 const getWalletTransactionHistory = async (req, res, next) => {
   try {
     const userId = req.user.id
-    const { page = 1, limit = 20, type, category } = req.query
+    const { page = 1, limit = 20, type, category,timePeriod='7d' } = req.query
 
     const userValidation = validateObjectId(userId, 'User ID')
     if (!userValidation.isValid) {
@@ -1165,6 +1165,37 @@ const getWalletTransactionHistory = async (req, res, next) => {
       filter.transaction_category = category
     }
 
+    const now = new Date();
+    let startDate;
+
+switch (timePeriod) {
+  case '7d':
+    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    break;
+  case '15d':
+    startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+    break;
+  case '30d':
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    break;
+  case '3m':
+    startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
+    break;
+  case '6m':
+    startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
+    break;
+  case '1y':
+    startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
+    break;
+  default:
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid time period',
+      code: 'INVALID_TIME_PERIOD',
+    });
+ }
+  filter.createdAt = { $gte: startDate };
+
     const transactions = await WalletTransaction.find(filter)
       .sort({ createdAt: -1 })
       .limit(limitNum)
@@ -1208,7 +1239,7 @@ const getWalletTransactionHistory = async (req, res, next) => {
 const getGiftHistory = async (req, res, next) => {
   try {
     const userId = req.user.id
-    const { page = 1, limit = 20, type = 'all' } = req.query
+    const { page = 1, limit = 20, type = 'all',timePeriod='7d' } = req.query
 
     const userValidation = validateObjectId(userId, 'User ID')
     if (!userValidation.isValid) {
@@ -1258,6 +1289,37 @@ const getGiftHistory = async (req, res, next) => {
         code: 'INVALID_TYPE',
       })
     }
+
+    const now = new Date();
+    let startDate;
+
+switch (timePeriod) {
+  case '7d':
+    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    break;
+  case '15d':
+    startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+    break;
+  case '30d':
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    break;
+  case '3m':
+    startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
+    break;
+  case '6m':
+    startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
+    break;
+  case '1y':
+    startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
+    break;
+  default:
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid time period',
+      code: 'INVALID_TIME_PERIOD',
+    });
+ }
+  filter.createdAt = { $gte: startDate };
 
     const gifts = await WalletTransfer.find(filter)
       .populate('sender_id', 'username profilePicture')

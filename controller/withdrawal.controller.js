@@ -267,7 +267,7 @@ const createWithdrawalRequest = async (req, res, next) => {
 const getWithdrawalHistory = async (req, res, next) => {
   try {
     const creatorId = req.user.id
-    const { page = 1, limit = 20, status } = req.query
+    const { page = 1, limit = 20, status,timePeriod='7d' } = req.query
 
     const pageNum = parseInt(page)
     const limitNum = parseInt(limit)
@@ -309,6 +309,37 @@ const getWithdrawalHistory = async (req, res, next) => {
       }
       filter.status = status
     }
+
+    const now = new Date();
+    let startDate;
+
+switch (timePeriod) {
+  case '7d':
+    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    break;
+  case '15d':
+    startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+    break;
+  case '30d':
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    break;
+  case '3m':
+    startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
+    break;
+  case '6m':
+    startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
+    break;
+  case '1y':
+    startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
+    break;
+  default:
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid time period',
+      code: 'INVALID_TIME_PERIOD',
+    });
+ }
+  filter.createdAt = { $gte: startDate };
 
     const withdrawals = await Withdrawal.find(filter)
       .sort({ createdAt: -1 })
