@@ -4,6 +4,7 @@ const LongVideo = require('../models/LongVideo')
 const { handleError, uploadImageToS3 } = require('../utils/utils')
 const UserAccess = require('../models/UserAccess')
 const Reshare = require('../models/Reshare')
+const { getRedisClient } = require('../config/redis')
 const GetUserFeed = async (req, res, next) => {
   try {
     const userId = req.user._id
@@ -75,6 +76,8 @@ const GetUserFeed = async (req, res, next) => {
         $addToSet: { viewed_videos: { $each: feedVideoIds } }
       })
     }
+
+    console.log("Recommended videos from interests:", recommendedVideos);
 
     res.status(200).json({
       message: 'User feed retrieved successfully',
@@ -207,6 +210,12 @@ const UpdateUserProfile = async (req, res, next) => {
     ) {
       updatedUser.onboarding_completed = true
       await updatedUser.save()
+    }
+     const redis = getRedisClient();
+    if (redis) {
+      await redis.del(`user_profile:${userId}`);
+      await redis.del(`user_profile_public:${userId}`);
+      console.log(`🗑️ Profile cache cleared for user: ${userId}`);
     }
 
     res.status(200).json({
@@ -675,6 +684,21 @@ const GetUserFollowing = async (req, res, next) => {
 const getUserProfileDetails = async (req, res, next) => {
   try {
     const userId = req.user.id
+    const redis = getRedisClient();
+    const cacheKey = `user_profile:${userId}`;
+    
+    if (redis) {
+      const cachedProfile = await redis.get(cacheKey);
+      if (cachedProfile) {
+        console.log(`📦 Profile cache HIT for user: ${userId}`);
+        return res.status(200).json({
+          ...JSON.parse(cachedProfile),
+          cached: true
+        });
+      }
+    }
+    console.log(`🔄 Profile cache MISS for user: ${userId} - fetching fresh`);
+
 
     const userDetails = await User.findById(userId).select(
       'username profile_photo followers following my_communities interests onboarding_completed creator_profile'
@@ -688,7 +712,7 @@ const getUserProfileDetails = async (req, res, next) => {
     const totalFollowing = userDetails.following?.length || 0
     const totalCommunities = userDetails.my_communities?.length || 0
 
-    res.status(200).json({
+     const result = {
       message: 'User profile details retrieved successfully',
       user: {
         username: userDetails.username,
@@ -701,7 +725,16 @@ const getUserProfileDetails = async (req, res, next) => {
         creator_pass_price:
           userDetails.creator_profile?.creator_pass_price || 0,
       },
-    })
+      cached: false
+    };
+
+    // Cache for 5 minutes
+    if (redis) {
+      await redis.setex(cacheKey, 300, JSON.stringify(result));
+      console.log(`💾 Profile cached for user: ${userId}`);
+    }
+
+    res.status(200).json(result);
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -710,6 +743,19 @@ const getUserProfileDetails = async (req, res, next) => {
 const GetUserProfileById = async (req, res, next) => {
   try {
     const userId = req.params.id
+    const redis = getRedisClient();
+    const cacheKey = `user_profile_public:${userId}`;
+    
+    if (redis) {
+      const cachedProfile = await redis.get(cacheKey);
+      if (cachedProfile) {
+        console.log(`📦 Public profile cache HIT for user: ${userId}`);
+        return res.status(200).json({
+          ...JSON.parse(cachedProfile),
+          cached: true
+        });
+      }
+    }
     const userDetails = await User.findById(userId).select(
       'username profile_photo followers following my_communities'
     )
@@ -722,7 +768,7 @@ const GetUserProfileById = async (req, res, next) => {
     const totalFollowing = userDetails.following?.length || 0
     const totalCommunities = userDetails.my_communities?.length || 0
 
-    res.status(200).json({
+    const result = {
       message: 'User profile details retrieved successfully',
       user: {
         username: userDetails.username,
@@ -731,7 +777,15 @@ const GetUserProfileById = async (req, res, next) => {
         totalFollowing,
         totalCommunities,
       },
-    })
+      cached: false
+    };
+
+    // Cache for 3 minutes
+    if (redis) {
+      await redis.setex(cacheKey, 180, JSON.stringify(result));
+    }
+
+    res.status(200).json(result);
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -828,11 +882,7 @@ const SetCreatorPassPrice = async (req, res, next) => {
     const userId = req.user.id
     const { price } = req.body
 
-    if (typeof price !== 'number' || price < 99 || price > 10000) {
-      return res.status(400).json({
-        message: 'Invalid price. Must be between ₹99 and ₹10000',
-      })
-    }
+  
 
     await User.findByIdAndUpdate(userId, {
       'creator_profile.creator_pass_price': price,

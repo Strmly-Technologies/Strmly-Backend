@@ -11,6 +11,19 @@ const GlobalSearch = async (req, res, next) => {
     if (!query || query.trim() === '') {
       return res.status(400).json({ message: 'Search query is required' })
     }
+     const redis = getRedisClient();
+    const cacheKey = `global_search:${query}:${page}:${limit}`;
+    
+    if (redis) {
+      const cachedResult = await redis.get(cacheKey);
+      if (cachedResult) {
+        console.log(`📦 Search cache HIT for query: ${query}`);
+        return res.status(200).json({
+          ...JSON.parse(cachedResult),
+          cached: true
+        });
+      }
+    }
 
     const searchRegex = new RegExp(query, 'i')
     const skip = (page - 1) * limit
@@ -47,7 +60,7 @@ const GlobalSearch = async (req, res, next) => {
 
     const totalResults = users.length + videos.length + series.length
 
-    res.status(200).json({
+     const result = {
       message: 'Search completed successfully',
       query,
       totalResults,
@@ -59,9 +72,18 @@ const GlobalSearch = async (req, res, next) => {
       pagination: {
         currentPage: parseInt(page),
         limit: limitNum,
-        hasMore: totalResults === limitNum * 4,
+        hasMore: totalResults === limitNum * 3,
       },
-    })
+      cached: false
+    };
+
+    // Cache the result for 5 minutes
+    if (redis && totalResults > 0) {
+      await redis.setex(cacheKey, 300, JSON.stringify(result));
+      console.log(`💾 Search results cached for query: ${query}`);
+    }
+
+    res.status(200).json(result);
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -81,6 +103,19 @@ const searchFollowersOrFollowing = async (req, res, next) => {
         message:
           'Type is required and must be either "followers" or "following"',
       })
+    }
+
+    const redis = getRedisClient();
+    const cacheKey = `search_connections:${userId}:${type}:${query}:${page}:${limit}`;
+    
+    if (redis) {
+      const cachedResult = await redis.get(cacheKey);
+      if (cachedResult) {
+        return res.status(200).json({
+          ...JSON.parse(cachedResult),
+          cached: true
+        });
+      }
     }
 
     const searchRegex = new RegExp(query, 'i')
@@ -116,7 +151,7 @@ const searchFollowersOrFollowing = async (req, res, next) => {
       allUsers = allUsers.slice(skip, skip + limitNum)
     }
 
-    res.status(200).json({
+    const result = {
       message: 'Search completed successfully',
       query,
       type,
@@ -130,7 +165,14 @@ const searchFollowersOrFollowing = async (req, res, next) => {
         totalPages: Math.ceil(totalCount / limitNum),
         hasMore: skip + limitNum < totalCount,
       },
-    })
+      cached: false
+    };
+
+    if (redis) {
+      await redis.setex(cacheKey, 300, JSON.stringify(result));
+    }
+
+    res.status(200).json(result);
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -254,6 +296,19 @@ const GetContentByType = async (req, res, next) => {
       })
     }
 
+    const redis = getRedisClient();
+    const cacheKey = `content_by_type:${type}:${genre || 'all'}:${language || 'all'}:${sortBy}:${page}:${limit}`;
+    
+    if (redis) {
+      const cachedResult = await redis.get(cacheKey);
+      if (cachedResult) {
+        return res.status(200).json({
+          ...JSON.parse(cachedResult),
+          cached: true
+        });
+      }
+    }
+
     const skip = (page - 1) * limit
     const limitNum = parseInt(limit)
 
@@ -333,8 +388,8 @@ const GetContentByType = async (req, res, next) => {
 
     const totalPages = Math.ceil(totalCount / limitNum)
 
-    res.status(200).json({
-      message: `${type} retrieved successfully`,
+    const result = {
+      message: `${type} content retrieved successfully`,
       type,
       filters: {
         genre: genre || null,
@@ -349,7 +404,15 @@ const GetContentByType = async (req, res, next) => {
         limit: limitNum,
         hasMore: parseInt(page) < totalPages,
       },
-    })
+      cached: false
+    };
+
+    // Cache for 10 minutes
+    if (redis) {
+      await redis.setex(cacheKey, 600, JSON.stringify(result));
+    }
+
+    res.status(200).json(result);
   } catch (error) {
     handleError(error, req, res, next)
   }
