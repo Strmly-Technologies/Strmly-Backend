@@ -92,7 +92,9 @@ const ChangeCommunityProfilePhoto = async (req, res, next) => {
     }
 
     const uploadResult = await uploadImageToS3(
-      profilePhotoFile,
+      profilePhotoFile.originalname,
+      profilePhotoFile.mimetype,
+      profilePhotoFile.buffer,
       'community-profile-photos'
     )
     if (!uploadResult.success) {
@@ -211,7 +213,7 @@ const getAllCommunities = async (req, res, next) => {
       .populate('founder', 'username profile_photo')
       .populate('followers', 'username profile_photo')
       .populate('creators', 'username profile_photo')
-      .populate('long_videos', 'name description videoUrl')
+      .populate('long_videos', 'name description videoUrl thumbnailUrl')
       .populate('series', 'title description total_episodes')
     if (communities.length === 0) {
       return res.status(404).json({ message: 'No communities found' })
@@ -234,7 +236,7 @@ const getCommunityById = async (req, res, next) => {
       .populate('founder', 'username profile_photo')
       .populate('followers', 'username profile_photo')
       .populate('creators', 'username profile_photo')
-      .populate('long_videos', 'name description videoUrl')
+      .populate('long_videos', 'name description videoUrl thumbnailUrl')
       .populate('series', 'title description total_episodes')
 
     if (!community) {
@@ -264,7 +266,7 @@ const getUserCommunities = async (req, res, next) => {
         .populate('founder', 'username profile_photo')
         .populate('followers', 'username profile_photo')
         .populate('creators', 'username profile_photo')
-        .populate('long_videos', 'name description videoUrl')
+        .populate('long_videos', 'name description videoUrl thumbnailUrl')
 
         .populate('series', 'title description total_episodes')
     }
@@ -274,7 +276,7 @@ const getUserCommunities = async (req, res, next) => {
         .populate('founder', 'username profile_photo')
         .populate('followers', 'username profile_photo')
         .populate('creators', 'username profile_photo')
-        .populate('long_videos', 'name description videoUrl')
+        .populate('long_videos', 'name description videoUrl thumbnailUrl')
 
         .populate('series', 'title description total_episodes')
     }

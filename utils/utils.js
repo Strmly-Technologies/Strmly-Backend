@@ -1,7 +1,9 @@
 const multer = require('multer')
 const { s3 } = require('../config/AWS')
 const { v4: uuidv4 } = require('uuid')
-const videoCompressor = require('./video_compressor')
+const { spawn } = require('child_process')
+const fs = require('fs')
+const path = require('path')
 
 const dynamicVideoUpload = (req, res, next) => {
   const fileFilter = (req, file, cb) => {
@@ -161,19 +163,21 @@ const handleMulterError = (err, req, res, next) => {
   next(err)
 }
 
-const uploadVideoToS3 = async (file) => {
+const uploadVideoToS3 = async (
+  compressedVideoBuffer,
+  fileOriginalName,
+  fileMimeType
+) => {
+  const fileExtension = fileOriginalName.split('.').pop()
+  const fileName = `long_video/${uuidv4()}.${fileExtension}`
   try {
-    const compressedVideoBuffer = await videoCompressor(file.buffer)
-    const fileExtension = file.originalname.split('.').pop()
-    const fileName = `long_video/${uuidv4()}.${fileExtension}`
-
     const uploadParams = {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: fileName,
       Body: compressedVideoBuffer,
-      ContentType: file.mimetype,
+      ContentType: fileMimeType,
       Metadata: {
-        originalName: file.originalname,
+        originalName: fileOriginalName,
         uploadDate: new Date().toISOString(),
       },
     }
@@ -222,18 +226,23 @@ const createImageMulter = (maxSize = 5 * 1024 * 1024) => {
   })
 }
 
-const uploadImageToS3 = async (file, folder = 'images') => {
+const uploadImageToS3 = async (
+  fileOriginalName,
+  fileMimetype,
+  fileBuffer,
+  folder = 'images'
+) => {
   try {
-    const fileExtension = file.originalname.split('.').pop()
+    const fileExtension = fileOriginalName.split('.').pop()
     const fileName = `${folder}/${uuidv4()}.${fileExtension}`
 
     const uploadParams = {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: fileName,
-      Body: file.buffer,
-      ContentType: file.mimetype,
+      Body: fileBuffer,
+      ContentType: fileMimetype,
       Metadata: {
-        originalName: file.originalname,
+        originalName: fileOriginalName,
         uploadDate: new Date().toISOString(),
       },
     }
@@ -270,7 +279,7 @@ const handleError = (err, req, res) => {
   console.error('API Error:', sanitizedError)
 
   // Handle specific error types
-  if (err.name === 'ValidationError') {
+  if (err?.name === 'ValidationError') {
     return res.status(400).json({
       success: false,
       error: 'Validation failed',
@@ -279,7 +288,15 @@ const handleError = (err, req, res) => {
     })
   }
 
-  if (err.name === 'CastError') {
+  if (err?.name === 'FFmpegError') {
+    return res.status(500).json({
+      success: false,
+      error: 'FFmpeg process failed',
+      code: 'FFmpeg_Error',
+    })
+  }
+
+  if (err?.name === 'CastError') {
     return res.status(400).json({
       success: false,
       error: 'Invalid ID format',
@@ -287,7 +304,7 @@ const handleError = (err, req, res) => {
     })
   }
 
-  if (err.code === 11000) {
+  if (err?.code === 11000) {
     return res.status(409).json({
       success: false,
       error: 'Duplicate entry found',
@@ -295,7 +312,7 @@ const handleError = (err, req, res) => {
     })
   }
 
-  if (err.name === 'JsonWebTokenError') {
+  if (err?.name === 'JsonWebTokenError') {
     return res.status(401).json({
       success: false,
       error: 'Invalid token',
@@ -303,7 +320,7 @@ const handleError = (err, req, res) => {
     })
   }
 
-  if (err.name === 'TokenExpiredError') {
+  if (err?.name === 'TokenExpiredError') {
     return res.status(401).json({
       success: false,
       error: 'Token expired',
@@ -312,7 +329,7 @@ const handleError = (err, req, res) => {
   }
 
   // Mongoose connection errors
-  if (err.name === 'MongoNetworkError' || err.name === 'MongoTimeoutError') {
+  if (err?.name === 'MongoNetworkError' || err.name === 'MongoTimeoutError') {
     return res.status(503).json({
       success: false,
       error: 'Database connection error',
@@ -340,6 +357,64 @@ const handleError = (err, req, res) => {
   })
 }
 
+const generateVideoThumbnail = (videoPath) => {
+  const thumbnailFilename = `thumb-${uuidv4()}.jpg`
+  const thumbnailPath = path.join(__dirname, thumbnailFilename)
+
+  return new Promise((resolve, reject) => {
+    const ffmpegProcess = spawn('ffmpeg', [
+      '-i',
+      videoPath,
+      '-ss',
+      '00:00:01',
+      '-vframes',
+      '1',
+      '-q:v',
+      '2',
+      thumbnailPath,
+    ])
+
+    ffmpegProcess.stderr.on('data', (data) => {
+      console.error(data.toString())
+    })
+
+    ffmpegProcess.on('error', (error) => {
+      console.error('FFmpeg-Error:', error)
+      fs.unlinkSync(videoPath)
+      const errorMsg = `FFmpeg-Error:${error.message}`
+      const err = new Error(errorMsg)
+      err.name = 'FFmpegError'
+      reject(err)
+    })
+
+    ffmpegProcess.on('exit', (code) => {
+      if (code !== 0) {
+        fs.unlinkSync(videoPath)
+        const msg = `FFmpeg exited with code ${code}`
+        console.error(msg)
+        const errorMsg = `FFmpeg-Error:${msg}`
+        const err = new Error(errorMsg)
+        err.name = 'FFmpegError'
+        return reject(err)
+      }
+
+      try {
+        const imageBuffer = fs.readFileSync(thumbnailPath)
+        fs.unlinkSync(thumbnailPath) // clean up
+        fs.unlinkSync(videoPath)
+        resolve(imageBuffer)
+      } catch (error) {
+        fs.unlinkSync(videoPath)
+        if (fs.existsSync(thumbnailPath)) fs.unlinkSync(thumbnailPath)
+        const errorMsg = `FFmpeg-Error:${error.message}`
+        const err = new Error(errorMsg)
+        err.name = 'FFmpegError'
+        reject(err)
+      }
+    })
+  })
+}
+
 module.exports = {
   handleMulterError,
   validateVideoFormData,
@@ -350,4 +425,5 @@ module.exports = {
   uploadImageToS3,
   validateCommunityProfilePhotoFormData,
   communityProfilePhotoUpload,
+  generateVideoThumbnail,
 }

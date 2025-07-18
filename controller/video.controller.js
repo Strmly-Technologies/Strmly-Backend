@@ -1,9 +1,15 @@
 const User = require('../models/User')
 const Community = require('../models/Community')
-const { uploadVideoToS3, handleError } = require('../utils/utils')
+const {
+  uploadVideoToS3,
+  handleError,
+  generateVideoThumbnail,
+  uploadImageToS3,
+} = require('../utils/utils')
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
+const videoCompressor = require('../utils/video_compressor')
 
 const uploadVideoToCommunity = async (req, res, next) => {
   try {
@@ -103,24 +109,47 @@ const uploadVideo = async (req, res, next) => {
       console.error(' User not found:', userId)
       return res.status(404).json({ error: 'User not found' })
     }
+    const {
+      compressedVideoBuffer,
+      outputPath,
+      fileOriginalName,
+      fileMimeType,
+    } = await videoCompressor(videoFile)
 
-    const uploadResult = await uploadVideoToS3(videoFile)
-    if (!uploadResult.success) {
-      console.error(' S3 upload failed:', uploadResult)
+    const videoUploadResult = await uploadVideoToS3(
+      compressedVideoBuffer,
+      fileOriginalName,
+      fileMimeType
+    )
+    if (!videoUploadResult.success) {
+      console.error(' S3 upload failed:', videoUploadResult)
       return res.status(500).json({
-        error: uploadResult.message,
-        details: uploadResult.error || 'Failed to upload video to S3',
+        error: videoUploadResult.message,
+        details: videoUploadResult.error || 'Failed to upload video to S3',
       })
+    }
+
+    const thumbnailBuffer = await generateVideoThumbnail(outputPath)
+
+    const thumbnailUploadResult = await uploadImageToS3(
+      `${fileOriginalName}_thumbnail`,
+      'image/png',
+      thumbnailBuffer,
+      'video_thumbnails'
+    )
+    if (!thumbnailUploadResult.success) {
+      console.log(thumbnailUploadResult.error)
+      return res.status(500).json({ message: 'Failed to upload thumbnail' })
     }
 
     const longVideo = {
       name: name || videoFile.originalname,
       description: description || 'No description provided',
-      videoUrl: uploadResult.url,
+      videoUrl: videoUploadResult.url,
       created_by: userId,
       updated_by: userId,
       community: communityId,
-      thumbnailUrl: '',
+      thumbnailUrl: thumbnailUploadResult.url,
       genre: genre || 'Action',
       type: type || 'Free',
       series: seriesId || null,
@@ -140,9 +169,10 @@ const uploadVideo = async (req, res, next) => {
     res.status(200).json({
       message: 'Video uploaded successfully',
 
-      videoUrl: uploadResult.url,
-      s3Key: uploadResult.key,
-
+      videoUrl: videoUploadResult.url,
+      videoS3Key: videoUploadResult.key,
+      thumbnailUrl: thumbnailUploadResult.url,
+      thumbnailS3Key: thumbnailUploadResult.key,
       videoName: videoFile.originalname,
       fileSize: videoFile.size,
 

@@ -3,7 +3,10 @@ const fs = require('fs')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 
-const videoCompressor = (fileBuffer) => {
+const videoCompressor = (file) => {
+  const fileOriginalName = file.originalname
+  const fileMimeType = file.mimetype
+  const fileBuffer = file.buffer
   const inputPath = path.join(__dirname, `temp-${uuidv4()}.mp4`)
   const outputPath = path.join(__dirname, `compressed-${uuidv4()}.mp4`)
   fs.writeFileSync(inputPath, fileBuffer)
@@ -30,11 +33,13 @@ const videoCompressor = (fileBuffer) => {
       console.error(data.toString())
     })
 
-    ffmpegProcess.on('error', (err) => {
-      const errorMsg = `FFmpeg error:${err.message}`
-      console.error('FFmpeg error:', err)
+    ffmpegProcess.on('error', (error) => {
+      const errorMsg = `FFmpeg-Error:${error.message}`
+      console.error('FFmpeg error:', error)
       fs.unlinkSync(inputPath)
-      reject(new Error(errorMsg))
+      const err = new Error(errorMsg)
+      err.name = 'FFmpegError'
+      reject(err)
     })
 
     ffmpegProcess.on('exit', (code) => {
@@ -42,18 +47,27 @@ const videoCompressor = (fileBuffer) => {
         const errorMsg = `FFmpeg-Error:exited with code ${code}`
         console.error(errorMsg)
         fs.unlinkSync(inputPath)
-        return reject(new Error(errorMsg))
+        const err = new Error(errorMsg)
+        err.name = 'FFmpegError'
+        return reject(err)
       }
       try {
-        const compressedBuffer = fs.readFileSync(outputPath)
+        const compressedVideoBuffer = fs.readFileSync(outputPath)
         fs.unlinkSync(inputPath)
-        fs.unlinkSync(outputPath)
-        resolve(compressedBuffer)
-      } catch (err) {
+        //fs.unlinkSync(outputPath)
+        resolve({
+          compressedVideoBuffer,
+          outputPath,
+          fileOriginalName,
+          fileMimeType,
+        })
+      } catch (error) {
         fs.unlinkSync(inputPath)
         if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
-        const errorMsg = `FFmpeg-Error:${err.message}`
-        reject(new Error(errorMsg))
+        const errorMsg = `FFmpeg-Error:${error.message}`
+        const err = new Error(errorMsg)
+        err.name = 'FFmpegError'
+        reject(err)
       }
     })
   })

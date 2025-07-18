@@ -172,7 +172,9 @@ const UpdateUserProfile = async (req, res, next) => {
     if (profilePhotoFile) {
       try {
         const uploadResult = await uploadImageToS3(
-          profilePhotoFile,
+          profilePhotoFile.originalname,
+          profilePhotoFile.mimetype,
+          profilePhotoFile.buffer,
           'profile-photos'
         )
         if (uploadResult.success) {

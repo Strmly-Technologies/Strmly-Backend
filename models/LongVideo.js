@@ -35,6 +35,7 @@ const longVideoSchema = new mongoose.Schema(
     },
     thumbnailUrl: {
       type: String,
+      required:true,
       trim: true,
     },
     series: {
