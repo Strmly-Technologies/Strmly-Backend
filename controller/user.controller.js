@@ -28,10 +28,10 @@ const GetUserFeed = async (req, res, next) => {
           $or: [
             { created_by: { $in: followingIds } },
             { community: { $in: communityIds } },
-          ]
+          ],
         },
-        { _id: { $nin: viewedVideoIds } }
-      ]
+        { _id: { $nin: viewedVideoIds } },
+      ],
     })
       .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo')
@@ -43,10 +43,10 @@ const GetUserFeed = async (req, res, next) => {
     let recommendedVideos = []
     if (user.interests && user.interests.length > 0) {
       const userInterests = user.interests.slice(0, 3)
-      
+
       recommendedVideos = await LongVideo.find({
         genre: { $in: userInterests },
-        _id: { $nin: [...viewedVideoIds, ...feedVideos.map(v => v._id)] },
+        _id: { $nin: [...viewedVideoIds, ...feedVideos.map((v) => v._id)] },
         created_by: { $nin: followingIds }, // Exclude videos from followed users
       })
         .populate('created_by', 'username profile_photo')
@@ -71,13 +71,13 @@ const GetUserFeed = async (req, res, next) => {
 
     // Mark feed videos as viewed
     if (feedVideos.length > 0) {
-      const feedVideoIds = feedVideos.map(video => video._id)
+      const feedVideoIds = feedVideos.map((video) => video._id)
       await User.findByIdAndUpdate(userId, {
-        $addToSet: { viewed_videos: { $each: feedVideoIds } }
+        $addToSet: { viewed_videos: { $each: feedVideoIds } },
       })
     }
 
-    console.log("Recommended videos from interests:", recommendedVideos);
+    console.log('Recommended videos from interests:', recommendedVideos)
 
     res.status(200).json({
       message: 'User feed retrieved successfully',
@@ -213,11 +213,11 @@ const UpdateUserProfile = async (req, res, next) => {
       updatedUser.onboarding_completed = true
       await updatedUser.save()
     }
-     const redis = getRedisClient();
+    const redis = getRedisClient()
     if (redis) {
-      await redis.del(`user_profile:${userId}`);
-      await redis.del(`user_profile_public:${userId}`);
-      console.log(`🗑️ Profile cache cleared for user: ${userId}`);
+      await redis.del(`user_profile:${userId}`)
+      await redis.del(`user_profile_public:${userId}`)
+      console.log(`🗑️ Profile cache cleared for user: ${userId}`)
     }
 
     res.status(200).json({
@@ -450,13 +450,83 @@ const GetUserEarnings = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
-
+/* 
+types of notifications:
+1:video:
+ -reshare
+ -like
+ -comment
+2:comment:
+-like
+-upvote
+-donation
+-reply
+3:community:
+-fee-payment
+4:user
+-follow
+ */
 const GetUserNotifications = async (req, res, next) => {
   try {
     const userId = req.user._id.toString()
     const { page = 1, limit = 20 } = req.query
 
     const notifications = []
+
+    const userLongVideos = await LongVideo.find({ creator: userId })
+      .populate('comments.user', 'username profile_photo')
+      .populate('liked_by', 'username profile_photo')
+      .select('_id name comments liked_by')
+
+    userLongVideos.forEach(async (video) => {
+      const recentComments = video.comments.slice(-3).map((comment) => ({
+        _id: comment._id,
+        group: 'non-revenue',
+        type: 'video comment',
+        content: `${comment.user.username} commented on your video "${video.name}"`,
+        videoId: video._id,
+        avatar: comment.user.profile_photo,
+        timeStamp: comment.createdAt,
+        read: false,
+        URL: `/api/v1/videos/${video._id}`,
+      }))
+
+      notifications.push(...recentComments) //comment on user video -notification
+
+      const recentLikes = video.liked_by.slice(-3).map((likedUser) => ({
+        _id: likedUser._id,
+        group: 'non-revenue',
+        type: 'video like',
+        content: `${likedUser.username} liked your video "${video.name}"`,
+        videoId: video._id,
+        avatar: likedUser.profile_photo,
+        timeStamp: new Date(),
+        read: false,
+        URL: `/api/v1/videos/${video._id}`,
+      }))
+
+      notifications.push(...recentLikes) //like on user video -notification
+
+      const userVideoReshares = await Reshare.find({ long_video: video._id })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .populate('user', 'username profile_photo')
+        .select('_id long_video user createdAt')
+
+      const recentReshares = userVideoReshares.map((reshare) => ({
+        _id: reshare._id,
+        group: 'non-revenue',
+        type: 'video reshare',
+        content: `${reshare.user.username} reshared your video "${video.name}"`,
+        videoId: video._id,
+        avatar: reshare.user.profile_photo,
+        timeStamp: reshare.createdAt,
+        read: false,
+        URL: `/api/v1/videos/${video._id}`,
+      }))
+
+      notifications.push(...recentReshares) //reshare user video -notification
+    })
 
     const user = await User.findById(userId)
       .populate('followers', 'username profile_photo')
@@ -473,7 +543,7 @@ const GetUserNotifications = async (req, res, next) => {
         select: '_id comments name',
         populate: {
           path: 'comments',
-          select: '_id upvoted_by replies user',
+          select: '_id upvoted_by replies user liked_by donated_by',
           populate: [
             {
               path: 'upvoted_by',
@@ -481,6 +551,15 @@ const GetUserNotifications = async (req, res, next) => {
             },
             {
               path: 'replies.user',
+              select: '_id username profile_photo',
+            },
+
+            {
+              path: 'liked_by',
+              select: '_id username profile_photo',
+            },
+            {
+              path: 'donated_by',
               select: '_id username profile_photo',
             },
           ],
@@ -502,6 +581,9 @@ const GetUserNotifications = async (req, res, next) => {
               read: false,
               URL: `/api/v1/user/profile/${userId}`,
             }))
+
+          notifications.push(...recentCommentUpvote) //user comment upvote -notification
+
           const recentCommentReplies = comment.replies
             .slice(-5)
             .map((reply) => ({
@@ -514,7 +596,37 @@ const GetUserNotifications = async (req, res, next) => {
               read: false,
               URL: `/api/v1/user/profile/${userId}`,
             }))
-          notifications.push(...recentCommentUpvote, ...recentCommentReplies) //user comment upvote -notification
+          notifications.push(...recentCommentReplies) //user comment replies -notification
+
+          const recentCommentDonation = comment.donated_by
+            .slice(-5)
+            .map((donatedUser) => ({
+              _id: comment._id,
+              group: 'revenue',
+              type: 'comment donation',
+              content: `${donatedUser.username} donated to your comment on the video ${video.name}`,
+              timeStamp: new Date(),
+              avatar: donatedUser.profile_photo,
+              read: false,
+              URL: `/api/v1/user/profile/${userId}`,
+            }))
+
+          notifications.push(...recentCommentDonation) //user comment donation -notification
+
+          const recentCommentLikes = comment.liked_by
+            .slice(-5)
+            .map((likedUser) => ({
+              _id: comment._id,
+              group: 'non-revenue',
+              type: 'comment like',
+              content: `${likedUser.username} liked your comment on the video ${video.name}`,
+              timeStamp: new Date(),
+              avatar: likedUser.profile_photo,
+              read: false,
+              URL: `/api/v1/user/profile/${userId}`,
+            }))
+
+          notifications.push(...recentCommentLikes) //user comment like -notification
         }
       })
     })
@@ -547,41 +659,6 @@ const GetUserNotifications = async (req, res, next) => {
           }))
         notifications.push(...recentCommunityFeePayers) //user community fee payment -notification
       }
-    })
-
-    const userLongVideos = await LongVideo.find({ creator: userId })
-      .populate('comments.user', 'username profile_photo')
-      .populate('liked_by', 'username profile_photo')
-      .select('_id name comments liked_by')
-
-    userLongVideos.forEach((video) => {
-      const recentComments = video.comments.slice(-3).map((comment) => ({
-        _id: comment._id,
-        group: 'non-revenue',
-        type: 'comment',
-        content: `${comment.user.username} commented on your video "${video.name}"`,
-        videoId: video._id,
-        avatar: comment.user.profile_photo,
-        timeStamp: comment.createdAt,
-        read: false,
-        URL: `/api/v1/videos/${video._id}`,
-      }))
-
-      notifications.push(...recentComments) //comment on user video -notification
-
-      const recentLikes = video.liked_by.slice(-3).map((likedUser) => ({
-        _id: likedUser._id,
-        group: 'non-revenue',
-        type: 'video like',
-        content: `${likedUser.username} liked your video "${video.name}"`,
-        videoId: video._id,
-        avatar: likedUser.profile_photo,
-        timeStamp: new Date(),
-        read: false,
-        URL: `/api/v1/videos/${video._id}`,
-      }))
-
-      notifications.push(...recentLikes) //like on user video -notification
     })
 
     notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -686,21 +763,20 @@ const GetUserFollowing = async (req, res, next) => {
 const getUserProfileDetails = async (req, res, next) => {
   try {
     const userId = req.user.id
-    const redis = getRedisClient();
-    const cacheKey = `user_profile:${userId}`;
-    
+    const redis = getRedisClient()
+    const cacheKey = `user_profile:${userId}`
+
     if (redis) {
-      const cachedProfile = await redis.get(cacheKey);
+      const cachedProfile = await redis.get(cacheKey)
       if (cachedProfile) {
-        console.log(`📦 Profile cache HIT for user: ${userId}`);
+        console.log(`📦 Profile cache HIT for user: ${userId}`)
         return res.status(200).json({
           ...JSON.parse(cachedProfile),
-          cached: true
-        });
+          cached: true,
+        })
       }
     }
-    console.log(`🔄 Profile cache MISS for user: ${userId} - fetching fresh`);
-
+    console.log(`🔄 Profile cache MISS for user: ${userId} - fetching fresh`)
 
     const userDetails = await User.findById(userId).select(
       'username profile_photo followers following my_communities interests onboarding_completed creator_profile'
@@ -714,7 +790,7 @@ const getUserProfileDetails = async (req, res, next) => {
     const totalFollowing = userDetails.following?.length || 0
     const totalCommunities = userDetails.my_communities?.length || 0
 
-     const result = {
+    const result = {
       message: 'User profile details retrieved successfully',
       user: {
         username: userDetails.username,
@@ -727,16 +803,16 @@ const getUserProfileDetails = async (req, res, next) => {
         creator_pass_price:
           userDetails.creator_profile?.creator_pass_price || 0,
       },
-      cached: false
-    };
+      cached: false,
+    }
 
     // Cache for 5 minutes
     if (redis) {
-      await redis.setex(cacheKey, 300, JSON.stringify(result));
-      console.log(`💾 Profile cached for user: ${userId}`);
+      await redis.setex(cacheKey, 300, JSON.stringify(result))
+      console.log(`💾 Profile cached for user: ${userId}`)
     }
 
-    res.status(200).json(result);
+    res.status(200).json(result)
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -745,17 +821,17 @@ const getUserProfileDetails = async (req, res, next) => {
 const GetUserProfileById = async (req, res, next) => {
   try {
     const userId = req.params.id
-    const redis = getRedisClient();
-    const cacheKey = `user_profile_public:${userId}`;
-    
+    const redis = getRedisClient()
+    const cacheKey = `user_profile_public:${userId}`
+
     if (redis) {
-      const cachedProfile = await redis.get(cacheKey);
+      const cachedProfile = await redis.get(cacheKey)
       if (cachedProfile) {
-        console.log(`📦 Public profile cache HIT for user: ${userId}`);
+        console.log(`📦 Public profile cache HIT for user: ${userId}`)
         return res.status(200).json({
           ...JSON.parse(cachedProfile),
-          cached: true
-        });
+          cached: true,
+        })
       }
     }
     const userDetails = await User.findById(userId).select(
@@ -779,15 +855,15 @@ const GetUserProfileById = async (req, res, next) => {
         totalFollowing,
         totalCommunities,
       },
-      cached: false
-    };
+      cached: false,
+    }
 
     // Cache for 3 minutes
     if (redis) {
-      await redis.setex(cacheKey, 180, JSON.stringify(result));
+      await redis.setex(cacheKey, 180, JSON.stringify(result))
     }
 
-    res.status(200).json(result);
+    res.status(200).json(result)
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -883,8 +959,6 @@ const SetCreatorPassPrice = async (req, res, next) => {
   try {
     const userId = req.user.id
     const { price } = req.body
-
-  
 
     await User.findByIdAndUpdate(userId, {
       'creator_profile.creator_pass_price': price,
