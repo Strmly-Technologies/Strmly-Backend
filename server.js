@@ -18,6 +18,7 @@ const webhookRoutes = require('./routes/webhook.routes')
 const cors = require('cors')
 const validateEnv = require('./config/validateEnv')
 const { testS3Connection } = require('./utils/connection_testing')
+const { connectRedis } = require('./config/redis')
 
 dotenv.config()
 validateEnv()
@@ -73,6 +74,7 @@ app.listen(PORT, async () => {
 
   try {
     await connectDB()
+    await connectRedis()
   } catch (err) {
     console.error(' Database connection failed:', err)
   }
