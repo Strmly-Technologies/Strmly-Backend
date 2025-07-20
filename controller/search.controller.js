@@ -3,6 +3,7 @@ const User = require('../models/User')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
 const Community = require('../models/Community')
+const { getRedisClient } = require('../config/redis')
 
 const GlobalSearch = async (req, res, next) => {
   try {
@@ -187,6 +188,20 @@ const PersonalizedSearch = async (req, res, next) => {
       return res.status(400).json({ message: 'Search query is required' })
     }
 
+     const redis = getRedisClient();
+    const cacheKey = `personalized_search:${userId}:${query}:${page}:${limit}`;
+    
+    if (redis) {
+      const cachedResult = await redis.get(cacheKey);
+      if (cachedResult) {
+        console.log(`📦 Personalized search cache HIT for user: ${userId}, query: ${query}`);         
+        return res.status(200).json({
+          ...JSON.parse(cachedResult),
+          cached: true
+        });
+      }
+    }
+
     const user = await User.findById(userId)
       .populate('saved_videos')
       .populate('saved_series')
@@ -247,14 +262,13 @@ const PersonalizedSearch = async (req, res, next) => {
 
     const totalResults = videos.length + series.length  
 
-    res.status(200).json({
+    const result = {
       message: 'Personalized search completed successfully',
       query,
       totalResults,
       results: {
         videos,
         series,
-     
       },
       userPreferences: {
         favoriteGenres: userGenres,
@@ -263,9 +277,16 @@ const PersonalizedSearch = async (req, res, next) => {
       pagination: {
         currentPage: parseInt(page),
         limit: limitNum,
-        hasMore: totalResults === limitNum * 3,
+        hasMore: totalResults === limitNum * 2, 
       },
-    })
+      cached: false
+    };
+
+    if (redis && totalResults > 0) {
+      await redis.setex(cacheKey, 180, JSON.stringify(result));
+    }
+
+    res.status(200).json(result);
   } catch (error) {
     handleError(error, req, res, next)
   }
