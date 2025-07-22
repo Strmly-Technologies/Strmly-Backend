@@ -598,20 +598,20 @@ const GetUserNotifications = async (req, res, next) => {
             }))
           notifications.push(...recentCommentReplies) //user comment replies -notification
 
-          const recentCommentDonation = comment.donated_by
+          const recentCommentGift = comment.donated_by
             .slice(-5)
             .map((donatedUser) => ({
               _id: comment._id,
               group: 'revenue',
-              type: 'comment donation',
-              content: `${donatedUser.username} donated to your comment on the video ${video.name}`,
+              type: 'comment gift',
+              content: `${donatedUser.username} gifted to your comment on the video ${video.name}`,
               timeStamp: new Date(),
               avatar: donatedUser.profile_photo,
               read: false,
               URL: `/api/v1/user/profile/${userId}`,
             }))
 
-          notifications.push(...recentCommentDonation) //user comment donation -notification
+          notifications.push(...recentCommentGift) //user comment gift -notification
 
           const recentCommentLikes = comment.liked_by
             .slice(-5)
@@ -1099,11 +1099,11 @@ const getUserHistory = async (req, res, next) => {
   try {
     const userId = req.user.id
     const { page = 1, limit = 10 } = req.query
-    
+
     // Try Redis cache first
     const redis = getRedisClient()
     const cacheKey = `user_history:${userId}:${page}:${limit}`
-    
+
     if (redis) {
       const cachedHistory = await redis.get(cacheKey)
       if (cachedHistory) {
@@ -1121,7 +1121,7 @@ const getUserHistory = async (req, res, next) => {
 
     // First get user with viewed_videos (no populate yet)
     const user = await User.findById(userId).select('viewed_videos')
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
@@ -1136,7 +1136,7 @@ const getUserHistory = async (req, res, next) => {
           hasMore: false,
           totalVideos: 0,
         },
-        cached: false
+        cached: false,
       })
     }
 
@@ -1151,17 +1151,21 @@ const getUserHistory = async (req, res, next) => {
 
     // Now populate the actual video details
     const viewedVideos = await LongVideo.find({
-      _id: { $in: paginatedVideoIds }
+      _id: { $in: paginatedVideoIds },
     })
       .populate('created_by', 'username profile_photo')
       .select('_id name thumbnailUrl description views likes createdAt')
 
-    const orderedVideos = paginatedVideoIds.map(videoId => 
-      viewedVideos.find(video => video._id.toString() === videoId.toString())
-    ).filter(Boolean) // Remove any null/undefined entries
+    const orderedVideos = paginatedVideoIds
+      .map((videoId) =>
+        viewedVideos.find(
+          (video) => video._id.toString() === videoId.toString()
+        )
+      )
+      .filter(Boolean) // Remove any null/undefined entries
 
     // Format the response
-    const formattedVideos = orderedVideos.map(video => ({
+    const formattedVideos = orderedVideos.map((video) => ({
       _id: video._id,
       name: video.name,
       thumbnailUrl: video.thumbnailUrl,
@@ -1186,7 +1190,7 @@ const getUserHistory = async (req, res, next) => {
         totalVideos,
         totalPages: Math.ceil(totalVideos / parseInt(limit)),
       },
-      cached: false
+      cached: false,
     }
 
     // Cache for 2 minutes (history changes frequently)
@@ -1205,56 +1209,61 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
   try {
     const userId = req.user.id
     const { communityId, page = 1, limit = 10 } = req.query
-    
+
     // Validate required parameters
     if (!communityId) {
       return res.status(400).json({ message: 'Community ID is required' })
     }
-    
+
     const skip = (page - 1) * limit
     const redis = getRedisClient()
     const cacheKey = `user_liked_videos_community:${userId}:${communityId}:${page}:${limit}`
-    
+
     // Try Redis cache first
     if (redis) {
       const cachedVideos = await redis.get(cacheKey)
       if (cachedVideos) {
-        console.log(`📦 Liked videos cache HIT for user: ${userId} in community: ${communityId}`)
+        console.log(
+          `📦 Liked videos cache HIT for user: ${userId} in community: ${communityId}`
+        )
         return res.status(200).json({
           ...JSON.parse(cachedVideos),
           cached: true,
         })
       }
     }
-    
-    console.log(`🔄 Liked videos cache MISS for user: ${userId} in community: ${communityId} - fetching fresh`)
-    
+
+    console.log(
+      `🔄 Liked videos cache MISS for user: ${userId} in community: ${communityId} - fetching fresh`
+    )
+
     // Get user with populated liked_videos
-    const user = await User.findById(userId)
-      .populate({
-        path: 'liked_videos',
-        select: '_id name thumbnailUrl description views likes createdAt community created_by',
-        populate: [
-          {
-            path: 'created_by',
-            select: '_id username profile_photo'
-          },
-          {
-            path: 'community',
-            select: '_id name profile_photo'
-          }
-        ]
-      })
-    
+    const user = await User.findById(userId).populate({
+      path: 'liked_videos',
+      select:
+        '_id name thumbnailUrl description views likes createdAt community created_by',
+      populate: [
+        {
+          path: 'created_by',
+          select: '_id username profile_photo',
+        },
+        {
+          path: 'community',
+          select: '_id name profile_photo',
+        },
+      ],
+    })
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
 
     // Filter videos by community
-    const likedVideos = user.liked_videos.filter(video =>
-      video.community && video.community._id.toString() === communityId
+    const likedVideos = user.liked_videos.filter(
+      (video) =>
+        video.community && video.community._id.toString() === communityId
     )
-    
+
     if (likedVideos.length === 0) {
       return res.status(200).json({
         message: 'No liked videos found in this community',
@@ -1265,16 +1274,16 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
           hasMore: false,
           totalVideos: 0,
         },
-        cached: false
+        cached: false,
       })
     }
-    
+
     // Apply pagination
     const totalVideos = likedVideos.length
     const paginatedVideos = likedVideos.slice(skip, skip + parseInt(limit))
-    
+
     // Format the response
-    const formattedVideos = paginatedVideos.map(video => ({
+    const formattedVideos = paginatedVideos.map((video) => ({
       _id: video._id,
       name: video.name,
       thumbnailUrl: video.thumbnailUrl,
@@ -1293,7 +1302,7 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
         profile_photo: video.community.profile_photo,
       },
     }))
-    
+
     const result = {
       message: 'User liked videos in community retrieved successfully',
       videos: formattedVideos,
@@ -1304,15 +1313,17 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
         totalVideos,
         totalPages: Math.ceil(totalVideos / parseInt(limit)),
       },
-      cached: false
+      cached: false,
     }
-    
+
     // Cache for 2 minutes
     if (redis && formattedVideos.length > 0) {
       await redis.setex(cacheKey, 120, JSON.stringify(result))
-      console.log(`💾 Liked videos cached for user: ${userId} in community: ${communityId}`)
+      console.log(
+        `💾 Liked videos cached for user: ${userId} in community: ${communityId}`
+      )
     }
-    
+
     res.status(200).json(result)
   } catch (error) {
     handleError(error, req, res, next)

@@ -32,10 +32,26 @@ class S3UploadError extends Error {
     this.name = 'S3_upload_error'
   }
 }
+
+class RedisConnectionError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'redis_connection_error'
+  }
+}
+
+class NotificationQueueError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'notification_queue_error'
+  }
+}
 module.exports = {
   FileSaveError,
   FFProbeError,
   FFmpegError,
   UnknownResolutionError,
   S3UploadError,
+  RedisConnectionError,
+  NotificationQueueError,
 }

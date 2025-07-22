@@ -234,6 +234,29 @@ const createVideoABSSegments = async (req, res, next) => {
   }
 }
 
+const getVideoABSSegments = async (req, res, next) => {
+  const userId = req.user.id.toString()
+  const { videoId } = req.query
+
+  if (!userId || !videoId) {
+    console.error(' User ID or Video ID not found in request')
+    return res.status(400).json({ error: 'User ID, Video ID is required' })
+  }
+
+  const video = await LongVideo.findById(videoId).select('videoResolutions')
+  if (!video) {
+    return res.status(404).json({ error: 'Video not found' })
+  }
+  res.status(200).json({
+    message: 'Segments retrieved successfully',
+    segments: video.videoResolutions,
+  })
+  try {
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 const searchVideos = async (req, res, next) => {
   try {
     const { query, page = 1, limit = 10 } = req.query
@@ -501,4 +524,5 @@ module.exports = {
   getRelatedVideos,
   uploadVideoToCommunity,
   createVideoABSSegments,
+  getVideoABSSegments,
 }

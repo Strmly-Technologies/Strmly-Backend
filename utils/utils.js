@@ -10,6 +10,7 @@ const {
   FFProbeError,
   UnknownResolutionError,
   S3UploadError,
+  NotificationQueueError,
 } = require('./errors')
 
 const dynamicVideoUpload = (req, res, next) => {
@@ -371,7 +372,7 @@ const handleError = (err, req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'FILE_SAVE_ERROR',
     })
   }
 
@@ -380,7 +381,7 @@ const handleError = (err, req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'FFMPEG_ERROR',
     })
   }
 
@@ -389,7 +390,7 @@ const handleError = (err, req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'FFPROBE_ERROR',
     })
   }
 
@@ -405,9 +406,19 @@ const handleError = (err, req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR',
+      code: 'S3_UPLOAD_ERROR',
     })
   }
+
+  if (err instanceof NotificationQueueError) {
+    console.error('Notification queue error', err)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'NOTIFICATION_QUEUE_ERROR',
+    })
+  }
+
   // Default error response
   res.status(err.statusCode || 500).json({
     success: false,
