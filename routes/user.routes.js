@@ -22,7 +22,6 @@ const {
   getUserHistory,
   getUserLikedVideosInCommunity,
   updateSocialMediaLinks,
-  updateDisplayTimeSettings,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
