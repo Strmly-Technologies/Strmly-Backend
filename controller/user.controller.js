@@ -779,7 +779,7 @@ const getUserProfileDetails = async (req, res, next) => {
     console.log(`🔄 Profile cache MISS for user: ${userId} - fetching fresh`)
 
     const userDetails = await User.findById(userId).select(
-      'username profile_photo followers following my_communities interests onboarding_completed creator_profile'
+      'username profile_photo followers following my_communities interests onboarding_completed creator_profile social_media_links '
     )
 
     if (!userDetails) {
@@ -802,6 +802,7 @@ const getUserProfileDetails = async (req, res, next) => {
         tags: userDetails.interests || [],
         creator_pass_price:
           userDetails.creator_profile?.creator_pass_price || 0,
+        social_media_links: userDetails.social_media_links || {},
       },
       cached: false,
     }
@@ -835,7 +836,7 @@ const GetUserProfileById = async (req, res, next) => {
       }
     }
     const userDetails = await User.findById(userId).select(
-      'username profile_photo followers following my_communities'
+      'username profile_photo followers following my_communities social_media_links'
     )
 
     if (!userDetails) {
@@ -854,6 +855,7 @@ const GetUserProfileById = async (req, res, next) => {
         totalFollowers,
         totalFollowing,
         totalCommunities,
+        social_media_links: userDetails.social_media_links || {},
       },
       cached: false,
     }
@@ -1319,6 +1321,80 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
   }
 }
 
+const updateSocialMediaLinks = async (req, res, next) => {
+  try {
+    const userId = req.user._id
+    const { facebook, twitter, instagram, youtube, snapchat } = req.body
+
+    // Validate URLs if provided
+    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/
+    
+    const socialMediaData = {}
+    
+    if (facebook !== undefined) {
+      if (facebook && !urlPattern.test(facebook)) {
+        return res.status(400).json({ message: 'Invalid Facebook URL format' })
+      }
+      socialMediaData['social_media_links.facebook'] = facebook
+    }
+    
+    if (twitter !== undefined) {
+      if (twitter && !urlPattern.test(twitter)) {
+        return res.status(400).json({ message: 'Invalid Twitter URL format' })
+      }
+      socialMediaData['social_media_links.twitter'] = twitter
+    }
+    
+    if (instagram !== undefined) {
+      if (instagram && !urlPattern.test(instagram)) {
+        return res.status(400).json({ message: 'Invalid Instagram URL format' })
+      }
+      socialMediaData['social_media_links.instagram'] = instagram
+    }
+    
+    if (youtube !== undefined) {
+      if (youtube && !urlPattern.test(youtube)) {
+        return res.status(400).json({ message: 'Invalid YouTube URL format' })
+      }
+      socialMediaData['social_media_links.youtube'] = youtube
+    }
+    
+    if (snapchat !== undefined) {
+      if (snapchat && !urlPattern.test(snapchat)) {
+        return res.status(400).json({ message: 'Invalid Snapchat URL format' })
+      }
+      socialMediaData['social_media_links.snapchat'] = snapchat
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: socialMediaData },
+      { new: true, runValidators: true }
+    ).select('social_media_links username')
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    // Clear cache if Redis is available
+    const redis = getRedisClient()
+    if (redis) {
+      await redis.del(`user_profile:${userId}`)
+      await redis.del(`user_profile_public:${userId}`)
+      console.log(`🗑️ Profile cache cleared for user: ${userId}`)
+    }
+
+    res.status(200).json({
+      message: 'Social media links updated successfully',
+      social_media_links: updatedUser.social_media_links,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -1340,4 +1416,5 @@ module.exports = {
   unfollowUser,
   getUserHistory,
   getUserLikedVideosInCommunity,
+  updateSocialMediaLinks,
 }

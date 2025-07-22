@@ -66,6 +66,8 @@ const uploadVideo = async (req, res, next) => {
       age_restriction,
       communityId,
       seriesId,
+      start_time,
+      display_till_time,
     } = req.body
 
     if (!userId) {
@@ -156,6 +158,8 @@ const uploadVideo = async (req, res, next) => {
       age_restriction:
         age_restriction === 'true' || age_restriction === true || false,
       Videolanguage: language || 'English',
+      start_time: start_time ? Number(start_time) : 0,
+      display_till_time: display_till_time ? Number(display_till_time) : 0,
       subtitles: [],
     }
     let savedVideo = new LongVideo(longVideo)
@@ -185,6 +189,8 @@ const uploadVideo = async (req, res, next) => {
         type: savedVideo.type,
         language: savedVideo.language,
         age_restriction: savedVideo.age_restriction,
+        start_time: savedVideo.start_time,
+        display_till_time: savedVideo.display_till_time,
       },
       nextSteps: {
         message: 'Use videoId to add this video to a community',
@@ -261,7 +267,11 @@ const getVideoById = async (req, res, next) => {
 
     res.status(200).json({
       message: 'Video retrieved successfully',
-      data: video,
+      data: {
+        ...video.toObject(),
+        start_time: video.start_time,
+        display_till_time: video.display_till_time,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -272,7 +282,7 @@ const updateVideo = async (req, res, next) => {
   try {
     const { id } = req.params
     const userId = req.user.id
-    const { name, description, genre, language, age_restriction } = req.body
+    const { name, description, genre, language, age_restriction, start_time, display_till_time } = req.body
 
     const updateData = {
       ...(name && { name }),
@@ -284,6 +294,8 @@ const updateVideo = async (req, res, next) => {
     if (language) updateData.language = language
     if (age_restriction !== undefined)
       updateData.age_restriction = age_restriction
+    if (start_time !== undefined) updateData.start_time = Number(start_time)
+    if (display_till_time !== undefined) updateData.display_till_time = Number(display_till_time)
 
     let video = await LongVideo.findById(id)
     if (!video) {
