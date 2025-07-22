@@ -5,11 +5,13 @@ const {
   handleError,
   generateVideoThumbnail,
   uploadImageToS3,
+  getFileFromS3Url,
 } = require('../utils/utils')
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
 const videoCompressor = require('../utils/video_compressor')
+const generateVideoABSSegments = require('../utils/ABS')
 
 const uploadVideoToCommunity = async (req, res, next) => {
   try {
@@ -66,6 +68,7 @@ const uploadVideo = async (req, res, next) => {
       age_restriction,
       communityId,
       seriesId,
+      is_standalone,
     } = req.body
 
     if (!userId) {
@@ -76,6 +79,10 @@ const uploadVideo = async (req, res, next) => {
     if (!videoFile) {
       console.error(' No video file found in request')
       return res.status(400).json({ error: 'No video file uploaded' })
+    }
+    if (!is_standalone) {
+      console.error('is_standalone field not found')
+      return res.status(400).json({ error: 'is_standalone field required' })
     }
 
     // Check upload permission using the proper function
@@ -141,7 +148,6 @@ const uploadVideo = async (req, res, next) => {
       console.log(thumbnailUploadResult.error)
       return res.status(500).json({ message: 'Failed to upload thumbnail' })
     }
-
     const longVideo = {
       name: name || videoFile.originalname,
       description: description || 'No description provided',
@@ -157,6 +163,7 @@ const uploadVideo = async (req, res, next) => {
         age_restriction === 'true' || age_restriction === true || false,
       Videolanguage: language || 'English',
       subtitles: [],
+      is_standalone: is_standalone === 'true',
     }
     let savedVideo = new LongVideo(longVideo)
 
@@ -191,6 +198,36 @@ const uploadVideo = async (req, res, next) => {
         endpoint: '/api/v1/videos/upload/community',
         requiredFields: ['communityId', 'videoId'],
       },
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const createVideoABSSegments = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const { videoId } = req.body
+
+    if (!userId || !videoId) {
+      console.error(' User ID or Video ID not found in request')
+      return res.status(400).json({ error: 'User ID, Video ID is required' })
+    }
+
+    const video = await LongVideo.findById(videoId)
+
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' })
+    }
+    const videoUrl = video.videoUrl
+    const videoFile = await getFileFromS3Url(videoUrl)
+
+    const videoSegmentUrls = await generateVideoABSSegments(videoFile, videoId)
+    video.videoResolutions = videoSegmentUrls
+    await video.save()
+    res.status(200).json({
+      message: 'Segments created successfully',
+      segments: videoSegmentUrls,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -463,4 +500,5 @@ module.exports = {
   incrementVideoView,
   getRelatedVideos,
   uploadVideoToCommunity,
+  createVideoABSSegments,
 }

@@ -10,6 +10,7 @@ const {
   incrementVideoView,
   getRelatedVideos,
   uploadVideoToCommunity,
+  createVideoABSSegments,
 } = require('../controller/video.controller')
 const {
   checkVideoAccess,
@@ -33,6 +34,10 @@ router.post(
   uploadVideo,
   handleMulterError
 )
+
+//Route to create video segments for different quality for Adaptive Bitrate Streaming
+//accepts: videoId
+router.post('/create-segments', authenticateToken, createVideoABSSegments)
 
 // Route to search for videos with pagination
 router.get('/search', searchVideos)

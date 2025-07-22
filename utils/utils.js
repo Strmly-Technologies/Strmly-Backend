@@ -4,6 +4,13 @@ const { v4: uuidv4 } = require('uuid')
 const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
+const {
+  FileSaveError,
+  FFmpegError,
+  FFProbeError,
+  UnknownResolutionError,
+  S3UploadError,
+} = require('./errors')
 
 const dynamicVideoUpload = (req, res, next) => {
   const fileFilter = (req, file, cb) => {
@@ -264,6 +271,19 @@ const uploadImageToS3 = async (
   }
 }
 
+const getFileFromS3Url = async (videoUrl) => {
+  const { host, pathname } = new URL(videoUrl)
+  const Bucket = host.split('.')[0]
+  const Key = decodeURIComponent(pathname.slice(1))
+
+  const result = await s3.getObject({ Bucket, Key }).promise()
+
+  return {
+    buffer: result.Body,
+    mimetype: result.ContentType,
+  }
+}
+
 const handleError = (err, req, res) => {
   // Log error for debugging (remove sensitive information)
   const sanitizedError = {
@@ -346,6 +366,48 @@ const handleError = (err, req, res) => {
     })
   }
 
+  if (err instanceof FileSaveError) {
+    console.error('File save error:', err)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
+    })
+  }
+
+  if (err instanceof FFmpegError) {
+    console.error('FFmpeg error:', err)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
+    })
+  }
+
+  if (err instanceof FFProbeError) {
+    console.error('FFProbe error:', err)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
+    })
+  }
+
+  if (err instanceof UnknownResolutionError) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid Video Resolution',
+      code: 'INVALID_VIDEO_RESOLUTION_ERROR',
+    })
+  }
+  if (err instanceof S3UploadError) {
+    console.error('Error uploading segment to S3:', err)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
+    })
+  }
   // Default error response
   res.status(err.statusCode || 500).json({
     success: false,
@@ -426,4 +488,5 @@ module.exports = {
   validateCommunityProfilePhotoFormData,
   communityProfilePhotoUpload,
   generateVideoThumbnail,
+  getFileFromS3Url,
 }
