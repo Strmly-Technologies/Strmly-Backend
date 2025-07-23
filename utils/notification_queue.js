@@ -1,9 +1,34 @@
 const { Queue } = require('bullmq')
-const { RedisClient } = require('../config/redis')
-const { NotificationQueueError } = require('./errors')
-const notificationQueue = new Queue('notificationQueue', {
-  RedisClient,
-})
+
+let notificationQueue
+
+try {
+  const redisConnection = {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6379,
+    maxRetriesPerRequest: 3,
+    retryDelayOnFailover: 100,
+    lazyConnect: true,
+  }
+  
+  notificationQueue = new Queue('notificationQueue', {
+    connection: redisConnection,
+    defaultJobOptions: {
+      // Fix: Use objects instead of numbers
+      removeOnComplete: { count: 50 },
+      removeOnFail: { count: 25 },
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      }
+    }
+  })
+  
+  console.log('✅ Notification queue initialized')
+} catch (error) {
+  console.warn('⚠️ Could not initialize notification queue:', error.message)
+}
 
 const addVideoLikeNotificationToQueue = async (
   userId,

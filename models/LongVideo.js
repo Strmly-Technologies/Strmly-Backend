@@ -46,7 +46,7 @@ const longVideoSchema = new mongoose.Schema(
     },
     thumbnailUrl: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     series: {
@@ -93,7 +93,7 @@ const longVideoSchema = new mongoose.Schema(
     },
     Videolanguage: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       maxlength: 100,
     },

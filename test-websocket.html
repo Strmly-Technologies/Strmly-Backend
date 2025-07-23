@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Socket.IO Notification Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+    .connected { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+    #notifications { max-height: 400px; overflow-y: auto; }
+    #notifications li { margin: 5px 0; padding: 10px; background: #f8f9fa; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h2>📡 Socket.IO Notification Tester</h2>
+
+  <label for="token">Enter JWT Token:</label><br>
+  <input type="text" id="token" size="80" placeholder="Paste your JWT here"><br><br>
+
+  <button onclick="connectSocket()">Connect to WebSocket</button>
+  <button onclick="disconnectSocket()">Disconnect</button>
+  <button onclick="testNotification()">Test Mark as Read</button>
+
+  <div id="status" style="margin-top: 20px; font-weight: bold;">⏳ Not connected</div>
+
+  <h3>📥 Notifications</h3>
+  <ul id="notifications"></ul>
+
+  <h3>🛠️ Debug Info</h3>
+  <pre id="debug"></pre>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    let socket;
+
+    function updateStatus(message, isError = false) {
+      const statusEl = document.getElementById("status");
+      statusEl.innerText = message;
+      statusEl.className = isError ? 'error' : 'connected';
+    }
+
+    function addDebug(message) {
+      const debugEl = document.getElementById("debug");
+      debugEl.textContent += `[${new Date().toLocaleTimeString()}] ${message}\n`;
+      debugEl.scrollTop = debugEl.scrollHeight;
+    }
+
+    function connectSocket() {
+      const token = document.getElementById("token").value;
+      if (!token) return alert("Please enter a token");
+
+      if (socket) {
+        socket.disconnect();
+      }
+
+      addDebug("Attempting to connect...");
+
+      socket = io("http://localhost:3001", {
+        auth: { token },
+        transports: ['websocket', 'polling'], // Try both transports
+        timeout: 10000,
+        forceNew: true
+      });
+
+      socket.on("connect", () => {
+        updateStatus(`✅ Connected with socket ID: ${socket.id}`);
+        addDebug(`Connected successfully with ID: ${socket.id}`);
+      });
+
+      socket.on("connected", (data) => {
+        addDebug(`Welcome message: ${JSON.stringify(data)}`);
+        console.log("Connected event:", data);
+      });
+
+      socket.on("new_notification", (data) => {
+        addDebug(`New notification: ${data.type} - ${data.message}`);
+        console.log("New notification received:", data);
+        
+        const list = document.getElementById("notifications");
+        const item = document.createElement("li");
+        item.innerHTML = `
+          <strong>${data.type.toUpperCase()}</strong><br>
+          ${data.message}<br>
+          <small>Time: ${new Date(data.timestamp).toLocaleTimeString()}</small>
+        `;
+        list.prepend(item);
+      });
+
+      socket.on("disconnect", (reason) => {
+        updateStatus(`❌ Disconnected: ${reason}`, true);
+        addDebug(`Disconnected: ${reason}`);
+      });
+
+      socket.on("connect_error", (err) => {
+        updateStatus(`⚠️ Connection failed: ${err.message}`, true);
+        addDebug(`Connection error: ${err.message}`);
+        console.error("Connection error:", err);
+      });
+
+      socket.on("error", (err) => {
+        addDebug(`Socket error: ${err}`);
+        console.error("Socket error:", err);
+      });
+    }
+
+    function disconnectSocket() {
+      if (socket) {
+        socket.disconnect();
+        updateStatus("🔌 Manually disconnected");
+        addDebug("Manually disconnected");
+      }
+    }
+
+    function testNotification() {
+      if (socket && socket.connected) {
+        socket.emit('mark_notification_read', 'test_notification_id');
+        addDebug("Sent mark_notification_read event");
+      } else {
+        alert("Not connected to socket");
+      }
+    }
+  </script>
+</body>
+</html>

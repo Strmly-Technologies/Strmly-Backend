@@ -20,6 +20,8 @@ const validateEnv = require('./config/validateEnv')
 const { testS3Connection } = require('./utils/connection_testing')
 const { connectRedis } = require('./config/redis')
 const { RedisConnectionError } = require('./utils/errors')
+const { initializeWebSocket } = require('./utils/websocket')
+require('./utils/notification_worker') // Start the notification worker
 
 dotenv.config()
 validateEnv()
@@ -33,15 +35,15 @@ const corsOptions = {
   credentials: true,
 }
 app.use(cors(corsOptions))
+
 // Raw body parser for webhooks (before express.json())
 app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }))
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-const PORT = process.env.PORT
+const PORT = process.env.PORT || 3001
 
-// Add error handling for route registration
 const routes = [
   { path: '/api/v1/auth', handler: authRoutes },
   { path: '/api/v1/videos', handler: videoRoutes },
@@ -54,6 +56,7 @@ const routes = [
   { path: '/api/v1/wallet', handler: walletRoutes },
   { path: '/api/v1/withdrawals', handler: withdrawalRoutes },
   { path: '/api/v1/webhooks', handler: webhookRoutes },
+  {path: '/api/v1/test', handler: require('./routes/test.routes') } // Test routes
 ]
 
 try {
@@ -70,15 +73,23 @@ app.get('/health', (req, res) => {
   res.send('Server is healthy')
 })
 
-app.listen(PORT, async () => {
-  console.log(`Server is running on port ${PORT}`)
+const server = app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`)
 
   try {
     await connectDB()
+    console.log(' MongoDB connected')
+    
     await connectRedis()
+    console.log(' Redis connected')
+    
+    // Initialize WebSocket after Redis is connected
+    initializeWebSocket(server)
+    console.log(' WebSocket initialized')
+    
   } catch (err) {
     if (err instanceof RedisConnectionError) {
-      console.log(err)
+      console.error(' Redis connection failed:', err.message)
     } else {
       console.error(' Database connection failed:', err)
     }

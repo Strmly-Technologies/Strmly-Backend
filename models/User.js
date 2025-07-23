@@ -107,18 +107,6 @@ const userSchema = new mongoose.Schema(
     },
     interests: {
       type: [String],
-      enum: [
-        'Action',
-        'Comedy', 
-        'Drama',
-        'Horror',
-        'Sci-Fi',
-        'Romance',
-        'Documentary',
-        'Thriller',
-        'Fantasy',
-        'Animation',
-      ],
       default: [],
     },
     viewed_videos: {
