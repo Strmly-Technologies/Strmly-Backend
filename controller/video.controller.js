@@ -275,11 +275,16 @@ const searchVideos = async (req, res, next) => {
     const searchRegex = new RegExp(query, 'i')
 
     const longVideos = await LongVideo.find({
-      $or: [
-        { name: searchRegex },
-        { description: searchRegex },
-        { genre: searchRegex },
-      ],
+      $and: [
+        {
+          $or: [
+            { name: searchRegex },
+            { description: searchRegex },
+            { genre: searchRegex },
+          ],
+        },
+        { visibility: { $ne: 'hidden' } }
+      ]
     })
       .populate('created_by', 'username email')
       .populate('community', 'name')
@@ -288,11 +293,16 @@ const searchVideos = async (req, res, next) => {
       .sort({ createdAt: -1 })
 
     const totalLong = await LongVideo.countDocuments({
-      $or: [
-        { name: searchRegex },
-        { description: searchRegex },
-        { genre: searchRegex },
-      ],
+      $and: [
+        {
+          $or: [
+            { name: searchRegex },
+            { description: searchRegex },
+            { genre: searchRegex },
+          ],
+        },
+        { visibility: { $ne: 'hidden' } }
+      ]
     })
 
     res.status(200).json({
@@ -419,7 +429,9 @@ const getTrendingVideos = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
-    let videos = await LongVideo.find()
+    let videos = await LongVideo.find({
+      visibility: { $ne: 'hidden' },
+    })
       .populate('created_by', 'username email')
       .populate('community', 'name')
       .populate('series', 'title')
@@ -450,7 +462,10 @@ const getVideosByGenre = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
-    const videos = await LongVideo.find({ genre })
+    const videos = await LongVideo.find({ 
+      genre, 
+      visibility: { $ne: 'hidden' } 
+    })
       .populate('created_by', 'username email')
       .populate('community', 'name')
       .populate('series', 'title')
@@ -458,7 +473,10 @@ const getVideosByGenre = async (req, res, next) => {
       .skip(skip)
       .limit(parseInt(limit))
 
-    const total = await LongVideo.countDocuments({ genre })
+    const total = await LongVideo.countDocuments({ 
+      genre, 
+      visibility: { $ne: 'hidden' } 
+    })
 
     res.status(200).json({
       message: `Videos in ${genre} genre retrieved successfully`,
@@ -510,6 +528,7 @@ const getRelatedVideos = async (req, res, next) => {
     const relatedVideos = await LongVideo.find({
       _id: { $ne: id },
       genre: video.genre,
+      visibility: { $ne: 'hidden' }
     })
       .populate('created_by', 'username email')
       .populate('community', 'name')

@@ -238,9 +238,41 @@ const userSchema = new mongoose.Schema(
       ref: 'Draft',
       default: [],
     },
+account_status: {
+  is_deactivated: {
+    type: Boolean,
+    default: false
+  },
+  deactivated_at: {
+    type: Date,
+    default: null
+  },
+  deactivation_reason: {
+    type: String,
+    default: null
+  }
+},
   },
   { timestamps: true }
 )
+
+userSchema.methods.deactivateAccount = function(reason = null) {
+  this.account_status.is_deactivated = true
+  this.account_status.deactivated_at = new Date()
+  this.account_status.deactivation_reason = reason
+  return this.save()
+}
+
+userSchema.methods.reactivateAccount = function() {
+  this.account_status.is_deactivated = false
+  this.account_status.deactivated_at = null
+  this.account_status.deactivation_reason = null
+  return this.save()
+}
+
+userSchema.methods.isDeactivated = function() {
+  return this.account_status.is_deactivated === true
+}
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next()

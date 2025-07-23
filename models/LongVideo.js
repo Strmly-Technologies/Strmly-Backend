@@ -124,6 +124,20 @@ const longVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    visibility: {
+      type: String,
+      enum: ['public', 'private', 'hidden'],
+      default: 'public'
+  },
+     hidden_reason: {
+      type: String,
+      enum: ['account_deactivated', 'user_request', 'admin_action'],
+      default: null
+  },
+    hidden_at: {
+     type: Date,
+     default: null
+  }
 
   },
   { timestamps: true }

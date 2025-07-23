@@ -213,6 +213,25 @@ const LoginUserWithEmail = async (req, res, next) => {
     }
 
     const token = generateToken(user._id)
+    if(user.isDeactivated()){
+      console.log('Reactivating deactivated user:', user._id)
+
+     await user.reactivateAccount();
+     await LongVideo.updateMany(
+    { 
+      created_by: user._id,
+      hidden_reason: 'account_deactivated'
+    },
+    {
+      $set: { visibility: 'public' },
+      $unset: { 
+        hidden_reason: 1,
+        hidden_at: 1
+      }
+    }
+  )
+    console.log(`Account reactivated for user: ${user.username}`)
+}
 
     res.status(200).json({
       message: 'Login successful',
