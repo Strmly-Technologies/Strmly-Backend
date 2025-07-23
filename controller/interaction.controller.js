@@ -12,7 +12,6 @@ const {
   addVideoLikeNotificationToQueue,
   addVideoCommentNotificationToQueue,
   addCommentUpvoteNotificationToQueue,
-  addCommentLikeNotificationToQueue,
   addCommentGiftNotificationToQueue,
   addVideoReshareNotificationToQueue,
   addCommentReplyNotificationToQueue,
@@ -360,7 +359,7 @@ const getVideoComments = async (req, res, next) => {
 
 const getCommentReplies = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const { videoId, commentId } = req.params
 
     if (!videoId || !commentId) {
@@ -371,31 +370,18 @@ const getCommentReplies = async (req, res, next) => {
       })
     }
 
-    const video = await LongVideo.findById(videoId).populate(
-      'comments.replies.user',
-      'username profile_photo'
-    )
+    const commentReplies = await Comment.find({
+      parent_comment: commentId,
+    }).populate('user', '_id username profile_photo')
 
-    if (!video) {
-      return res.status(404).json({
-        success: false,
-        error: 'Video not found',
-        code: 'VIDEO_NOT_FOUND',
-      })
+    if (!commentReplies || commentReplies.length === 0) {
+      res.status(200).json({ replies: [] })
+      return
     }
 
-    const comment = video.comments.id(commentId)
-    if (!comment) {
-      return res.status(404).json({
-        success: false,
-        error: 'Comment not found',
-        code: 'COMMENT_NOT_FOUND',
-      })
-    }
-
-    const replies = comment.replies.map((reply) => ({
+    const replies = commentReplies.map((reply) => ({
       _id: reply._id,
-      content: reply.reply,
+      content: reply.content,
       parentId: commentId,
       timestamp: reply.createdAt,
       donations: reply.donations || 0,
@@ -443,7 +429,8 @@ const upvoteComment = async (req, res, next) => {
     }
 
     // Toggle upvote
-    if (comment.upvoted_by.includes(userId)) {
+    const alreadyUpvoted = comment.upvoted_by.includes(userId)
+    if (alreadyUpvoted) {
       comment.upvoted_by.pull(userId)
       comment.upvotes = Math.max(0, comment.upvotes - 1)
     } else {
@@ -452,20 +439,22 @@ const upvoteComment = async (req, res, next) => {
     }
 
     await video.save()
-    //add upvote notification to queue
-    const commentcreator = comment.user.toString()
-    const userName = user.username
-    const userProfilePhoto = user.profile_photo
-    const videoName = video.name
-    await addCommentUpvoteNotificationToQueue(
-      commentcreator,
-      userId,
-      videoId,
-      userName,
-      videoName,
-      userProfilePhoto,
-      commentId
-    )
+    if (!alreadyUpvoted) {
+      //add upvote notification to queue
+      const commentcreator = comment.user.toString()
+      const userName = user.username
+      const userProfilePhoto = user.profile_photo
+      const videoName = video.name
+      await addCommentUpvoteNotificationToQueue(
+        commentcreator,
+        userId,
+        videoId,
+        userName,
+        videoName,
+        userProfilePhoto,
+        commentId
+      )
+    }
     res.status(200).json({
       success: true,
       upvotes: comment.upvotes,
@@ -583,7 +572,7 @@ const GiftComment = async (req, res, next) => {
     }
 
     // Find the comment
-    const comment = video.comments.id(commentId)
+    const comment = await Comment.findById(commentId)
     if (!comment) {
       return res.status(404).json({
         success: false,
@@ -593,9 +582,8 @@ const GiftComment = async (req, res, next) => {
     }
 
     if (comment.replies && comment.replies.length > 0) {
-      const isTopLevelComment = video.comments.some(
-        (c) => c._id.toString() === commentId
-      )
+      const isTopLevelComment = comment.parent_comment === null
+
       if (!isTopLevelComment) {
         return res.status(400).json({
           success: false,
@@ -682,7 +670,7 @@ const GiftComment = async (req, res, next) => {
           transfer_type: 'comment_gift',
           content_id: videoId,
           content_type: 'LongVideo',
-          description: `Gift for comment: ${comment.comment.substring(0, 50)}...`,
+          description: `Gift for comment: ${comment.content.substring(0, 50)}...`,
           sender_balance_before: gifterBalanceBefore,
           sender_balance_after: gifterBalanceAfter,
           receiver_balance_before: receiverBalanceBefore,
@@ -695,7 +683,7 @@ const GiftComment = async (req, res, next) => {
             creator_name: receiver.username,
             transfer_note: giftNote || '',
             comment_id: commentId,
-            comment_text: comment.comment.substring(0, 100),
+            comment_text: comment.content.substring(0, 100),
             video_id: videoId,
           },
         })
@@ -731,7 +719,7 @@ const GiftComment = async (req, res, next) => {
             video_title: video.name,
             creator_name: receiver.username,
             comment_id: commentId,
-            comment_text: comment.comment.substring(0, 100),
+            comment_text: comment.content.substring(0, 100),
             video_id: videoId,
             transfer_id: walletTransfer._id,
           },
@@ -757,7 +745,7 @@ const GiftComment = async (req, res, next) => {
             video_title: video.name,
             creator_name: req.user.username,
             comment_id: commentId,
-            comment_text: comment.comment.substring(0, 100),
+            comment_text: comment.content.substring(0, 100),
             video_id: videoId,
             transfer_id: walletTransfer._id,
           },
@@ -767,7 +755,18 @@ const GiftComment = async (req, res, next) => {
       })
 
       await session.endSession()
-
+      //send comment gift notification
+      const gifter = User.findById(gifterId).select('username profile_photo')
+      await addCommentGiftNotificationToQueue(
+        comment.user.toString(),
+        gifterId,
+        videoId,
+        gifter.username,
+        video.name,
+        gifter.profile_photo,
+        commentId,
+        amount
+      )
       res.status(200).json({
         success: true,
         message: 'Gift sent successfully!',
@@ -776,7 +775,7 @@ const GiftComment = async (req, res, next) => {
           from: req.user.username,
           to: receiver.username,
           videoTitle: video.name,
-          commentPreview: comment.comment.substring(0, 100),
+          commentPreview: comment.content.substring(0, 100),
           giftNote: giftNote || '',
           transferType: 'comment_gift',
         },
@@ -804,19 +803,6 @@ const GiftComment = async (req, res, next) => {
         await session.endSession()
       }
     }
-
-    //send comment gift notification
-    const gifter = User.findById(gifterId).select('username profile_photo')
-    await addCommentGiftNotificationToQueue(
-      comment.user,
-      gifterId,
-      videoId,
-      gifter.username,
-      video.name,
-      gifter.profile_photo,
-      commentId,
-      amount
-    )
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -847,7 +833,7 @@ const reshareVideo = async (req, res, next) => {
     // send video reshare notification
     const video = LongVideo.findById(videoId).select('name created_by')
     await addVideoReshareNotificationToQueue(
-      video.created_by,
+      video.created_by.toString(),
       userId,
       videoId,
       user.username,
@@ -960,7 +946,7 @@ const checkForSaveVideo = async (req, res, next) => {
 
 const ReplyToComment = async (req, res, next) => {
   const { videoId, commentId, reply } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
   if (!videoId || !commentId || !reply) {
     return res.status(400).json({
       message: 'Video ID, comment ID and reply are required',
@@ -972,25 +958,39 @@ const ReplyToComment = async (req, res, next) => {
     if (!video) {
       return res.status(404).json({ message: 'Video not found' })
     }
-    const comment = video.comments.id(commentId)
+    const comment = await Comment.findById(commentId)
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' })
     }
-    comment.replies.push({ user: userId, reply, replyTo: comment.user })
-    await video.save()
+    if (comment.long_video.toString() !== videoId) {
+      return res
+        .status(404)
+        .json({ message: 'Comment not associated with this video' })
+    }
 
-    /*     //send reply notification
+    const newReply = await Comment.create({
+      user: userId,
+      long_video: videoId,
+      parent_comment: commentId,
+      content: reply,
+    })
+    comment.replies.push(newReply._id)
+    await comment.save()
+
+    //send reply notification
+    const user = await User.findById(userId).select('username profile_photo')
     await addCommentReplyNotificationToQueue(
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
+      comment.user.toString(),
+      userId,
+      videoId,
+      user.username,
+      video.name,
+      user.profile_photo,
       commentId,
-      '',
+      newReply._id.toString(),
       reply
-    ) */
+    )
+
     res.status(200).json({
       message: 'Reply added successfully',
       repliesCount: comment.replies.length,
@@ -1001,9 +1001,9 @@ const ReplyToComment = async (req, res, next) => {
 }
 
 const UpvoteReply = async (req, res, next) => {
-  const { videoId, commentId, replyId } = req.body
-  const userId = req.user.id
-  if (!videoId || !commentId || !replyId) {
+  const { videoId, replyId } = req.body
+  const userId = req.user.id.toString()
+  if (!videoId || !replyId) {
     return res.status(400).json({
       message: 'Video ID, comment ID and reply ID are required',
     })
@@ -1014,22 +1014,39 @@ const UpvoteReply = async (req, res, next) => {
     if (!video) {
       return res.status(404).json({ message: 'Video not found' })
     }
-    const comment = video.comments.id(commentId)
-    if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' })
-    }
-    const reply = comment.replies.id(replyId)
+
+    const reply = await Comment.findById(replyId)
     if (!reply) {
       return res.status(404).json({ message: 'Reply not found' })
     }
-    if (reply.upvoted_by.includes(userId)) {
+    if (reply.long_video.toString() !== videoId) {
+      return res
+        .status(400)
+        .json({ message: 'Reply not associated with this video' })
+    }
+    const alreadyUpvoted = reply.upvoted_by.includes(userId)
+    if (alreadyUpvoted) {
       reply.upvoted_by.pull(userId)
       reply.upvotes = Math.max(0, reply.upvotes - 1)
     } else {
       reply.upvoted_by.push(userId)
       reply.upvotes += 1
     }
-    await video.save()
+    await reply.save()
+    if (!alreadyUpvoted) {
+      //send reply upvote notification
+      const user = await User.findById(userId).select('username profile_photo')
+      await addCommentUpvoteNotificationToQueue(
+        reply.user.toString(),
+        userId,
+        videoId,
+        user.username,
+        video.name,
+        user.profile_photo,
+        reply._id.toString()
+      )
+    }
+
     res
       .status(200)
       .json({ message: 'Reply upvoted successfully', upvotes: reply.upvotes })
@@ -1040,7 +1057,7 @@ const UpvoteReply = async (req, res, next) => {
 
 const DownvoteReply = async (req, res, next) => {
   const { videoId, commentId, replyId } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
   if (!videoId || !commentId || !replyId) {
     return res.status(400).json({
       message: 'Video ID, comment ID and reply ID are required',
@@ -1052,11 +1069,12 @@ const DownvoteReply = async (req, res, next) => {
     if (!video) {
       return res.status(404).json({ message: 'Video not found' })
     }
-    const comment = video.comments.id(commentId)
+    const comment = await Comment.findById(commentId)
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' })
     }
-    const reply = comment.replies.id(replyId)
+
+    const reply = await Comment.findById(replyId)
     if (!reply) {
       return res.status(404).json({ message: 'Reply not found' })
     }
@@ -1067,7 +1085,7 @@ const DownvoteReply = async (req, res, next) => {
       reply.downvoted_by.push(userId)
       reply.downvotes += 1
     }
-    await video.save()
+    await reply.save()
     res.status(200).json({
       message: 'Reply downvoted successfully',
       downvotes: reply.downvotes,
