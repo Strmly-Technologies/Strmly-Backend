@@ -10,6 +10,8 @@ const {
   incrementVideoView,
   getRelatedVideos,
   uploadVideoToCommunity,
+  createVideoABSSegments,
+  getVideoABSSegments,
 } = require('../controller/video.controller')
 const {
   checkVideoAccess,
@@ -33,6 +35,13 @@ router.post(
   uploadVideo,
   handleMulterError
 )
+
+//Route to create video segments for different quality for Adaptive Bitrate Streaming
+//accepts: videoId
+router.post('/create-segments', authenticateToken, createVideoABSSegments)
+
+//Route to get the video segments' .m3u8 files' s3 url
+router.get('/get-segments', authenticateToken, getVideoABSSegments)
 
 // Route to search for videos with pagination
 router.get('/search', searchVideos)

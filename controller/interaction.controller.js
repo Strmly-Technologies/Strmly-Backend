@@ -8,6 +8,15 @@ const Series = require('../models/Series')
 const mongoose = require('mongoose')
 const Reshare = require('../models/Reshare')
 const { handleError } = require('../utils/utils')
+const {
+  addVideoLikeNotificationToQueue,
+  addVideoCommentNotificationToQueue,
+  addCommentUpvoteNotificationToQueue,
+  addCommentLikeNotificationToQueue,
+  addCommentGiftNotificationToQueue,
+  addVideoReshareNotificationToQueue,
+  addCommentReplyNotificationToQueue,
+} = require('../utils/notification_queue')
 
 const MIN_GIFT_AMOUNT = 1
 const MAX_GIFT_AMOUNT = 1000
@@ -86,7 +95,7 @@ const statusOfLike = async (req, res, next) => {
 
 const LikeVideo = async (req, res, next) => {
   const { videoId } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
 
   if (!videoId) {
     return res
@@ -132,7 +141,18 @@ const LikeVideo = async (req, res, next) => {
       if (!user.liked_videos.includes(videoId)) {
         user.liked_videos.push(videoId)
       }
-
+      const videoCreator = video.created_by.toString()
+      const videoName = video.name
+      const userName = user.username
+      const userProfilePhoto = user.profile_photo
+      await addVideoLikeNotificationToQueue(
+        videoCreator,
+        userId,
+        videoId,
+        userName,
+        videoName,
+        userProfilePhoto
+      )
       await video.save()
       await user.save()
 
@@ -219,7 +239,7 @@ const getTotalSharesByVideoId = async (req, res, next) => {
 
 const CommentOnVideo = async (req, res, next) => {
   const { videoId, comment } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
 
   if (!videoId || !comment) {
     return res.status(400).json({
@@ -242,7 +262,6 @@ const CommentOnVideo = async (req, res, next) => {
 
     await newComment.save()
     video.comments.push(newComment._id)
-
     await video.save()
 
     const user = await User.findById(userId)
@@ -260,6 +279,23 @@ const CommentOnVideo = async (req, res, next) => {
     }
 
     await user.save()
+    //add comment notification to queue:
+    const videoCreator = video.created_by.toString()
+    const videoName = video.name
+    const userName = user.username
+    const userProfilePhoto = user.profile_photo
+    const commentId = newComment._id
+    const commentText = comment
+    await addVideoCommentNotificationToQueue(
+      videoCreator,
+      userId,
+      videoId,
+      userName,
+      videoName,
+      userProfilePhoto,
+      commentId,
+      commentText
+    )
     res.status(200).json({
       message: 'Comment added successfully',
       comments: video.comments.length,
@@ -390,7 +426,7 @@ const upvoteComment = async (req, res, next) => {
     const userId = req.user.id
 
     const video = await LongVideo.findById(videoId)
-
+    const user = await User.findById(userId).select('username profile_photo')
     if (!video) {
       return res.status(404).json({ error: 'Video not found' })
     }
@@ -416,7 +452,20 @@ const upvoteComment = async (req, res, next) => {
     }
 
     await video.save()
-
+    //add upvote notification to queue
+    const commentcreator = comment.user.toString()
+    const userName = user.username
+    const userProfilePhoto = user.profile_photo
+    const videoName = video.name
+    await addCommentUpvoteNotificationToQueue(
+      commentcreator,
+      userId,
+      videoId,
+      userName,
+      videoName,
+      userProfilePhoto,
+      commentId
+    )
     res.status(200).json({
       success: true,
       upvotes: comment.upvotes,
@@ -477,7 +526,7 @@ const downvoteComment = async (req, res, next) => {
 const GiftComment = async (req, res, next) => {
   try {
     const { videoId, commentId, amount, giftNote } = req.body
-    const gifterId = req.user.id
+    const gifterId = req.user.id.toString()
 
     // Validation
     if (!videoId || !commentId || !amount) {
@@ -755,6 +804,19 @@ const GiftComment = async (req, res, next) => {
         await session.endSession()
       }
     }
+
+    //send comment gift notification
+    const gifter = User.findById(gifterId).select('username profile_photo')
+    await addCommentGiftNotificationToQueue(
+      comment.user,
+      gifterId,
+      videoId,
+      gifter.username,
+      video.name,
+      gifter.profile_photo,
+      commentId,
+      amount
+    )
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -782,11 +844,19 @@ const reshareVideo = async (req, res, next) => {
         message: `video:${videoId} already reshared by user:${userId}`,
       })
     }
-    return res
-      .status(200)
-      .json({
-        message: `video:${videoId} reshared by user:${userId} successfully`,
-      })
+    // send video reshare notification
+    const video = LongVideo.findById(videoId).select('name created_by')
+    await addVideoReshareNotificationToQueue(
+      video.created_by,
+      userId,
+      videoId,
+      user.username,
+      video.name,
+      user.profile_photo
+    )
+    return res.status(200).json({
+      message: `video:${videoId} reshared by user:${userId} successfully`,
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -908,6 +978,19 @@ const ReplyToComment = async (req, res, next) => {
     }
     comment.replies.push({ user: userId, reply, replyTo: comment.user })
     await video.save()
+
+    /*     //send reply notification
+    await addCommentReplyNotificationToQueue(
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      commentId,
+      '',
+      reply
+    ) */
     res.status(200).json({
       message: 'Reply added successfully',
       repliesCount: comment.replies.length,

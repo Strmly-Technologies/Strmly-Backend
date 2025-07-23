@@ -1,11 +1,11 @@
-const Redis = require('ioredis');
+const Redis = require('ioredis')
+const { RedisConnectionError } = require('../utils/errors')
 
-let redisClient=null;
-
+let RedisClient = null
 
 const createRedisClient = () => {
   try {
-    redisClient = new Redis({
+    RedisClient = new Redis({
       host: process.env.REDIS_HOST || 'localhost',
       port: process.env.REDIS_PORT || 6379,
       password: process.env.REDIS_PASSWORD || undefined,
@@ -13,50 +13,37 @@ const createRedisClient = () => {
       enableReadyCheck: true,
       maxRetriesPerRequest: 3,
       lazyConnect: true,
-    });
+    })
 
-    redisClient.on('connect', () => {
-      console.log(' Redis connected successfully');
-    });
+    RedisClient.on('connect', () => {
+      console.log(' Redis connected successfully')
+    })
 
-    redisClient.on('error', (err) => {
-      console.error(' Redis connection error:', err);
-    });
+    RedisClient.on('error', (err) => {
+      console.error(' Redis connection error:', err)
+    })
 
-    redisClient.on('ready', () => {
-      console.log(' Redis ready for operations');
-    });
-
-    return redisClient;
+    RedisClient.on('ready', () => {
+      console.log(' Redis ready for operations')
+    })
   } catch (error) {
-    console.error(' Failed to create Redis client:', error);
-    return null;
+    throw error
   }
-};
-
-const getRedisClient = () => {
-  if (!redisClient) {
-    redisClient = createRedisClient();
-  }
-  return redisClient;
-};
-
+}
 
 const connectRedis = async () => {
   try {
-    const client = getRedisClient();
-    if (client && !client.status === 'ready') {
-      await client.connect();
+    createRedisClient()
+    if (RedisClient && !RedisClient.status === 'ready') {
+      await RedisClient.connect()
     }
-    return client;
+    console.log('Redis connection established successfully')
   } catch (error) {
-    console.error(' Redis connection failed:', error);
-    return null;
+    throw new RedisConnectionError("Couldn't connect to Redis instance:", error)
   }
-};
+}
 
 module.exports = {
-  createRedisClient,
-  getRedisClient,
   connectRedis,
-};
+  RedisClient,
+}

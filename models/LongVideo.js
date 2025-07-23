@@ -1,5 +1,5 @@
 const mongoose = require('mongoose')
-
+const { Schema } = mongoose
 const longVideoSchema = new mongoose.Schema(
   {
     name: {
@@ -26,16 +26,27 @@ const longVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],  
+    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {
       type: String,
       required: true,
       trim: true,
     },
+    videoResolutions: {
+      type: Map,
+      of: new Schema(
+        {
+          url: { type: String, required: true },
+          key: { type: String, required: true },
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
     thumbnailUrl: {
       type: String,
-      required:true,
+      required: true,
       trim: true,
     },
     series: {

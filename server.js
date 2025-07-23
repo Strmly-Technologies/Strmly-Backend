@@ -19,6 +19,7 @@ const cors = require('cors')
 const validateEnv = require('./config/validateEnv')
 const { testS3Connection } = require('./utils/connection_testing')
 const { connectRedis } = require('./config/redis')
+const { RedisConnectionError } = require('./utils/errors')
 
 dotenv.config()
 validateEnv()
@@ -77,7 +78,11 @@ app.listen(PORT, async () => {
     await connectDB()
     await connectRedis()
   } catch (err) {
-    console.error(' Database connection failed:', err)
+    if (err instanceof RedisConnectionError) {
+      console.log(err)
+    } else {
+      console.error(' Database connection failed:', err)
+    }
   }
 
   await testS3Connection()
