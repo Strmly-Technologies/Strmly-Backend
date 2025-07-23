@@ -116,6 +116,15 @@ const longVideoSchema = new mongoose.Schema(
       ref: 'Community',
       required: false,
     },
+    start_time:{
+      type: Number,
+      default: 0,
+    },
+    display_till_time:{
+      type: Number,
+      default: 0,
+    },
+
   },
   { timestamps: true }
 )

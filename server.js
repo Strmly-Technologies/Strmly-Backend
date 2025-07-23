@@ -4,7 +4,7 @@ const connectDB = require('./config/database')
 const authRoutes = require('./routes/auth.routes')
 const videoRoutes = require('./routes/video.routes')
 const seriesRoutes = require('./routes/series.routes')
-
+const draftRoutes=require('./routes/draft.routes')
 const userRoutes = require('./routes/user.routes')
 const communityRoutes = require('./routes/community.routes')
 const interactionRoutes = require('./routes/interaction.routes')
@@ -47,6 +47,7 @@ const routes = [
   { path: '/api/v1/videos', handler: videoRoutes },
   { path: '/api/v1/series', handler: seriesRoutes },
   { path: '/api/v1/user', handler: userRoutes },
+   {path:'/api/v1/drafts',handler: draftRoutes},
   { path: '/api/v1/community', handler: communityRoutes },
   { path: '/api/v1/interaction', handler: interactionRoutes },
   { path: '/api/v1/caution', handler: cautionRoutes },

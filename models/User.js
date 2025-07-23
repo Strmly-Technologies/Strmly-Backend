@@ -223,6 +223,33 @@ const userSchema = new mongoose.Schema(
         default: null,
       },
     },
+    social_media_links:{
+      facebook: {
+        type: String,
+        trim: true,
+      },
+      twitter: {
+        type: String,
+        trim: true,
+      },
+      instagram: {
+        type: String,
+        trim: true,
+      },
+      youtube: {
+        type: String,
+        trim: true,
+      },
+      snapchat: {
+        type: String,
+        trim: true,
+      },
+    },
+    drafts: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'Draft',
+      default: [],
+    },
   },
   { timestamps: true }
 )

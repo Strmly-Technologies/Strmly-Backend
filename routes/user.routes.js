@@ -21,6 +21,7 @@ const {
   unfollowUser,
   getUserHistory,
   getUserLikedVideosInCommunity,
+  updateSocialMediaLinks,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -89,5 +90,8 @@ router.get('/history', authenticateToken, getUserHistory)
 
 // Get user liked videos in a community
 router.get('/liked-videos-community',authenticateToken,getUserLikedVideosInCommunity)
+
+// Update social media links
+router.put('/social-media-links', authenticateToken, updateSocialMediaLinks)
 
 module.exports = router
