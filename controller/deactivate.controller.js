@@ -52,7 +52,7 @@ const deactivateAccount = async (req, res, next) => {
       success: true,
       message: 'Account deactivated successfully',
       data: {
-        deactivatedAt: user.account_status.deactivated_at,
+        deactivatedAt: new Date(),
         reason: user.account_status.deactivation_reason,
         note: 'Your videos are now hidden. Login again anytime to reactivate your account.'
       }
