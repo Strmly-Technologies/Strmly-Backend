@@ -15,27 +15,24 @@ const {
 
 const dynamicVideoUpload = (req, res, next) => {
   const fileFilter = (req, file, cb) => {
-    const allowedMimeTypes = [
-      'video/mp4',
-      'video/mpeg',
-      'video/quicktime',
-      'video/x-msvideo',
-      'video/x-ms-wmv',
-      'application/octet-stream',
-    ]
+    const allowedMimeTypes = ['video/mp4']
 
-    const allowedExtensions = ['.mp4', '.avi', '.mov', '.wmv']
-    const fileExtension = file.originalname.toLowerCase().slice(-4)
-
+    const allowedExtensions = ['.mp4']
+    const fileExtension = file?.originalname
+      ? path.extname(file.originalname.toLowerCase())
+      : req.body?.originalname
+        ? path.extname(req.body.originalname.toLowerCase())
+        : ''
+    const fileMimeType = file.mimetype || req.body.mimetype || ''
     if (
-      allowedMimeTypes.includes(file.mimetype) ||
+      allowedMimeTypes.includes(fileMimeType) ||
       allowedExtensions.includes(fileExtension)
     ) {
       console.log('✅ File accepted')
       cb(null, true)
     } else {
       console.log('File rejected')
-      cb(new Error('Only video files are allowed (MP4, AVI, MOV, WMV)'))
+      cb(new Error('Only mp4 files are allowed'))
     }
   }
 
@@ -43,6 +40,11 @@ const dynamicVideoUpload = (req, res, next) => {
     storage: multer.memoryStorage(),
     fileFilter: fileFilter,
   }).fields([
+    { name: 'fileId', maxCount: 1 },
+    { name: 'originalname', maxCount: 1 },
+    { name: 'mimetype', maxCount: 1 },
+    { name: 'chunkIndex', maxCount: 1 },
+    { name: 'totalChunks', maxCount: 1 },
     { name: 'videoFile', maxCount: 1 },
     { name: 'name', maxCount: 1 },
     { name: 'description', maxCount: 1 },
@@ -190,7 +192,9 @@ const uploadVideoToS3 = async (
       },
     }
 
-    const result = await s3.upload(uploadParams).promise()
+    const result = await s3
+      .upload(uploadParams, { partSize: 1024 * 1024 * 10, queueSize: 4 }) //each chunk is 10Mib and 4 chunks are sent in parallel
+      .promise()
     return {
       success: true,
       message: 'Video uploaded successfully',

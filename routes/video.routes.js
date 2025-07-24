@@ -12,6 +12,8 @@ const {
   uploadVideoToCommunity,
   createVideoABSSegments,
   getVideoABSSegments,
+  uploadVideoChunks,
+  finaliseChunkUpload,
 } = require('../controller/video.controller')
 const {
   checkVideoAccess,
@@ -26,6 +28,7 @@ const {
 const { authenticateToken } = require('../middleware/auth')
 
 // Route to upload a new video
+//videoFile needed
 //accepts: FormData(name, description, genre, type, language, age_restriction, communityId, seriesId, videoFile)
 router.post(
   '/upload',
@@ -35,6 +38,18 @@ router.post(
   uploadVideo,
   handleMulterError
 )
+// Routes to upload a new video as chunk
+// videoFile needed
+//accepts: FormData( fileId, chunkIndex, totalChunks,originalname,mimetype) -- chunkIndex: starts from 1
+router.post(
+  '/upload-chunks',
+  authenticateToken,
+  dynamicVideoUpload,
+  validateVideoFormData,
+  uploadVideoChunks
+)
+//accepts: req.body(fileId, totalChunks,originalname,mimetype,name, description, genre, type, language, age_restriction, communityId, seriesId, videoFile) -- chunkIndex: starts from 1
+router.post('/finalise-chunk-upload', authenticateToken, finaliseChunkUpload)
 
 //Route to create video segments for different quality for Adaptive Bitrate Streaming
 //accepts: videoId
