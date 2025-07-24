@@ -3,6 +3,7 @@ const User = require('../models/User')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
 const Community = require('../models/Community')
+const { getRedisClient } = require('../config/redis')
 
 const GlobalSearch = async (req, res, next) => {
   try {

@@ -20,10 +20,10 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     let recommendedVideos = []
     
     if (userInterests.length > 0) {
-    
       const interestedVideos = await LongVideo.find({
         genre: { $in: userInterests },
         _id: { $nin: viewedVideoIds },
+        visibility: { $ne: 'hidden' }
       })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
@@ -43,6 +43,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       const randomVideos = await LongVideo.find({
         genre: { $in: otherGenres },
         _id: { $nin: viewedVideoIds },
+        visibility: { $ne: 'hidden' }
       })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')

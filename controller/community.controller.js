@@ -394,6 +394,7 @@ const getCommunityVideos = async (req, res, next) => {
     if (videoType === 'long') {
       const populated = await Community.findById(communityId).populate({
         path: 'long_videos',
+        match: { visibility: { $ne: 'hidden' } },
         populate: {
           path: 'created_by',
           select: 'username profile_photo',
@@ -433,7 +434,7 @@ const getTrendingCommunityVideos = async (req, res, next) => {
     const skip = (page - 1) * limit
     const limitNum = parseInt(limit)
 
-    let query = {}
+    let query = { visibility: { $ne: 'hidden' } }
     if (communityId) {
       query.community = communityId
     }
@@ -511,7 +512,10 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
 
     let trendingVideos = []
 
-    const longVideos = await LongVideo.find({ community: communityId })
+    const longVideos = await LongVideo.find({ 
+      community: communityId,
+      visibility: { $ne: 'hidden' }
+    })
       .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo')
       .sort(sortObject)
@@ -544,6 +548,7 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
     // Get totals for this community
     const totalLongVideos = await LongVideo.countDocuments({
       community: communityId,
+      visibility: { $ne: 'hidden' }
     })
 
     res.status(200).json({
