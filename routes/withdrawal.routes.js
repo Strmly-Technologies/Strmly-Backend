@@ -3,8 +3,12 @@ const {
   createWithdrawalRequest,
   getWithdrawalHistory,
   checkWithdrawalStatus,
+  createUPIWithdrawalRequest,
 } = require('../controller/withdrawal.controller')
-const { setupCreatorBankAccount } = require('../controller/creator.controller')
+const {
+  setupCreatorBankAccount,
+  setupCreatorUPI,
+} = require('../controller/creator.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
   withdrawalRateLimiter,
@@ -13,6 +17,7 @@ const {
 } = require('../middleware/rateLimiter')
 const {
   validateBankSetup,
+  validateUPISetup,
   validateWithdrawal,
 } = require('../middleware/validation')
 
@@ -24,6 +29,14 @@ router.post(
   validateBankSetup,
   setupCreatorBankAccount
 )
+// Setup UPI for withdrawals
+router.post(
+  '/setup-upi',
+  authenticateToken,
+  bankSetupRateLimiter,
+  validateUPISetup,
+  setupCreatorUPI
+)
 
 // Create withdrawal request
 router.post(
@@ -32,6 +45,15 @@ router.post(
   withdrawalRateLimiter,
   validateWithdrawal,
   createWithdrawalRequest
+)
+
+// Create withdrawal request using UPI
+router.post(
+  '/create/upi',
+  authenticateToken,
+  withdrawalRateLimiter,
+  validateWithdrawal,
+  createUPIWithdrawalRequest
 )
 
 // Get withdrawal history

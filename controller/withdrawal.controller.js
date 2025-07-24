@@ -264,10 +264,220 @@ const createWithdrawalRequest = async (req, res, next) => {
   }
 }
 
+const createUPIWithdrawalRequest = async (req, res, next) => {
+  try {
+    const { amount, notes } = req.body
+    const creatorId = req.user.id
+
+    const amountValidation = validateAmount(amount)
+    if (!amountValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error,
+        code: 'INVALID_AMOUNT',
+      })
+    }
+
+    if (notes && notes.length > MAX_NOTES_LENGTH) {
+      return res.status(400).json({
+        success: false,
+        error: `Notes must be less than ${MAX_NOTES_LENGTH} characters`,
+        code: 'INVALID_NOTES_LENGTH',
+      })
+    }
+
+    const creator = await User.findById(creatorId)
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'Creator not found',
+        code: 'CREATOR_NOT_FOUND',
+      })
+    }
+
+    if (!creator.creator_profile?.upi_fund_account_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'UPI ID not setup. Please add your UPI ID first.',
+        action: 'setup_UPI_ID',
+        code: 'UPI_ID_NOT_SETUP',
+      })
+    }
+
+    const wallet = await Wallet.findOne({ user_id: creatorId })
+    if (!wallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'Wallet not found',
+        code: 'WALLET_NOT_FOUND',
+      })
+    }
+
+    if (wallet.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: 'Wallet is not active',
+        code: 'WALLET_INACTIVE',
+      })
+    }
+
+    if (wallet.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient wallet balance',
+        currentBalance: wallet.balance,
+        requestedAmount: amount,
+        shortfall: amount - wallet.balance,
+        code: 'INSUFFICIENT_BALANCE',
+      })
+    }
+
+    const platformFee = 0
+    const razorpayFee = Math.ceil((amount * RAZORPAY_FEE_PERCENTAGE) / 100)
+    const finalAmount = amount - platformFee - razorpayFee
+
+    const referenceId = generateReferenceId(creatorId)
+
+    const session = await mongoose.startSession()
+
+    try {
+      await session.withTransaction(async () => {
+        const withdrawal = new Withdrawal({
+          creator_id: creatorId,
+          wallet_id: wallet._id,
+          amount: amount,
+          currency: 'INR',
+          fund_account_id: creator.creator_profile.upi_fund_account_id,
+          upi_id: creator.creator_profile.upi_id,
+          status: 'pending',
+          wallet_balance_before: wallet.balance,
+          wallet_balance_after: wallet.balance - amount,
+          platform_fee: platformFee,
+          razorpay_fee: razorpayFee,
+          final_amount: finalAmount,
+          reference_id: referenceId,
+          internal_notes: notes || '',
+          requested_at: new Date(),
+        })
+
+        await withdrawal.save({ session })
+
+        wallet.balance -= amount
+        wallet.total_withdrawn += amount
+        wallet.last_transaction_at = new Date()
+        await wallet.save({ session })
+
+        const walletTransaction = new WalletTransaction({
+          wallet_id: wallet._id,
+          user_id: creatorId,
+          transaction_type: 'debit',
+          transaction_category: 'withdrawal_request',
+          amount: amount,
+          currency: 'INR',
+          description: `Withdrawal request: ₹${amount} to bank account`,
+          balance_before: wallet.balance + amount,
+          balance_after: wallet.balance,
+          status: 'pending',
+          metadata: {
+            withdrawal_id: withdrawal._id,
+            reference_id: referenceId,
+          },
+        })
+
+        await walletTransaction.save({ session })
+
+        try {
+          const payout = await razorpay.payouts.create({
+            fund_account_id: creator.creator_profile.upi_fund_account_id,
+            amount: finalAmount * 100,
+            currency: 'INR',
+            mode: 'IMPS',
+            purpose: 'payout',
+            queue_if_low_balance: true,
+            reference_id: referenceId,
+            narration: `Strmly Creator Withdrawal - ${referenceId}`,
+            notes: {
+              creator_id: creatorId,
+              creator_name: creator.username,
+              withdrawal_amount: amount,
+              platform_fee: platformFee,
+            },
+          })
+
+          withdrawal.razorpay_payout_id = payout.id
+          withdrawal.status = payout.status
+          if (payout.status === 'processed') {
+            withdrawal.processed_at = new Date()
+            withdrawal.utr = payout.utr
+          }
+          await withdrawal.save({ session })
+
+          walletTransaction.status = 'completed'
+          await walletTransaction.save({ session })
+        } catch (payoutError) {
+          wallet.balance += amount
+          wallet.total_withdrawn -= amount
+          await wallet.save({ session })
+
+          withdrawal.status = 'failed'
+          withdrawal.failure_reason = payoutError.message
+          await withdrawal.save({ session })
+
+          walletTransaction.status = 'failed'
+          await walletTransaction.save({ session })
+
+          throw new Error(`Payout initiation failed: ${payoutError.message}`)
+        }
+      })
+
+      const finalWithdrawal = await Withdrawal.findOne({
+        reference_id: referenceId,
+      }).populate('creator_id', 'username email')
+
+      res.status(201).json({
+        success: true,
+        message: 'Withdrawal request submitted successfully',
+        withdrawal: {
+          id: finalWithdrawal._id,
+          referenceId: finalWithdrawal.reference_id,
+          amount: finalWithdrawal.amount,
+          finalAmount: finalWithdrawal.final_amount,
+          platformFee: finalWithdrawal.platform_fee,
+          razorpayFee: finalWithdrawal.razorpay_fee,
+          status: finalWithdrawal.status,
+          requestedAt: finalWithdrawal.requested_at,
+          processedAt: finalWithdrawal.processed_at,
+          upiId: creator.creator_profile.upi_id,
+        },
+        wallet: {
+          balanceBefore: finalWithdrawal.wallet_balance_before,
+          balanceAfter: finalWithdrawal.wallet_balance_after,
+          currentBalance: wallet.balance,
+        },
+        timeline: {
+          estimatedDelivery: '2-3 business days',
+          trackingInfo: finalWithdrawal.razorpay_payout_id
+            ? `Track with ID: ${finalWithdrawal.razorpay_payout_id}`
+            : 'Processing...',
+        },
+      })
+    } catch (error) {
+      await session.abortTransaction()
+      throw error
+    } finally {
+      if (session.inTransaction()) {
+        await session.endSession()
+      }
+    }
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 const getWithdrawalHistory = async (req, res, next) => {
   try {
     const creatorId = req.user.id
-    const { page = 1, limit = 20, status,timePeriod='7d' } = req.query
+    const { page = 1, limit = 20, status, timePeriod = '7d' } = req.query
 
     const pageNum = parseInt(page)
     const limitNum = parseInt(limit)
@@ -310,36 +520,36 @@ const getWithdrawalHistory = async (req, res, next) => {
       filter.status = status
     }
 
-    const now = new Date();
-    let startDate;
+    const now = new Date()
+    let startDate
 
-switch (timePeriod) {
-  case '7d':
-    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    break;
-  case '15d':
-    startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-    break;
-  case '30d':
-    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    break;
-  case '3m':
-    startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
-    break;
-  case '6m':
-    startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
-    break;
-  case '1y':
-    startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
-    break;
-  default:
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid time period',
-      code: 'INVALID_TIME_PERIOD',
-    });
- }
-  filter.createdAt = { $gte: startDate };
+    switch (timePeriod) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case '15d':
+        startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
+        break
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      case '3m':
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 3))
+        break
+      case '6m':
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 6))
+        break
+      case '1y':
+        startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1))
+        break
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid time period',
+          code: 'INVALID_TIME_PERIOD',
+        })
+    }
+    filter.createdAt = { $gte: startDate }
 
     const withdrawals = await Withdrawal.find(filter)
       .sort({ createdAt: -1 })
@@ -363,8 +573,11 @@ switch (timePeriod) {
         status: wd.status,
         requestedAt: wd.requested_at,
         processedAt: wd.processed_at,
-        bankAccount: wd.bank_details?.account_number?.slice(-4),
-        ifscCode: wd.bank_details?.ifsc_code,
+        bankAccount: wd.bank_details?.account_number
+          ? wd.bank_details.account_number.slice(-4)
+          : null,
+        upiId: wd.upi_id ?? null,
+        ifscCode: wd.bank_details?.ifsc_code ?? null,
         utr: wd.utr,
         failureReason: wd.failure_reason,
       })),
@@ -478,6 +691,7 @@ const getWithdrawalTimeline = (status) => {
 
 module.exports = {
   createWithdrawalRequest,
+  createUPIWithdrawalRequest,
   getWithdrawalHistory,
   checkWithdrawalStatus,
 }

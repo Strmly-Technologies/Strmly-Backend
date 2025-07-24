@@ -55,6 +55,11 @@ const withdrawalSchema = new mongoose.Schema(
       bank_name: String,
     },
 
+    upi_id: {
+      type: String,
+      default: null,
+    },
+
     wallet_balance_before: {
       type: Number,
       required: true,

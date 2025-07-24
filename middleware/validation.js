@@ -81,6 +81,20 @@ const validateAndSanitize = {
     }
     return { isValid: true, value: cleaned }
   },
+  upiId: (upiId) => {
+    if (!upiId || typeof upiId !== 'string') {
+      return { isValid: false, error: 'UPI ID must be a valid string' }
+    }
+
+    const trimmedUpiId = upiId.trim()
+
+    const upiRegex = /^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/
+    if (!upiRegex.test(trimmedUpiId)) {
+      return { isValid: false, error: 'Invalid UPI ID format' }
+    }
+
+    return { isValid: true, value: trimmedUpiId }
+  },
 
   phone: (phone) => {
     if (!phone || typeof phone !== 'string') {
@@ -234,6 +248,22 @@ const validateBankSetup = (req, res, next) => {
   next()
 }
 
+const validateUPISetup = (req, res, next) => {
+  const { upi_id } = req.body
+
+  const UPIValidation = validateAndSanitize.upiId(upi_id)
+  if (!UPIValidation.isValid) {
+    return res.status(400).json({
+      success: false,
+      error: UPIValidation.error,
+      code: 'VALIDATION_ERROR',
+    })
+  }
+
+  req.body.upi_id = UPIValidation.value
+  next()
+}
+
 const validateWithdrawal = (req, res, next) => {
   const { amount, notes } = req.body
 
@@ -367,6 +397,7 @@ module.exports = {
   validateWalletLoad,
   validateSeriesPurchase,
   validateBankSetup,
+  validateUPISetup,
   validateWithdrawal,
   validateCommunityFee,
   validateCommunitySettings,
