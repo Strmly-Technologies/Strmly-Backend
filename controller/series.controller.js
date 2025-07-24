@@ -14,6 +14,7 @@ const createSeries = async (req, res, next) => {
       language,
       age_restriction,
       type,
+      price,
       release_date,
       seasons,
       communityId,
@@ -27,9 +28,25 @@ const createSeries = async (req, res, next) => {
       !type     ) {
       return res.status(400).json({
         error:
-          'Required fields: title, description, type',
+          'Required fields: title, description, genre, language, type',
       })
     }
+
+    // Validate price based on type
+    if (type === 'Paid') {
+      if (!price || price <= 0) {
+        return res.status(400).json({
+          error: 'Paid series must have a price greater than 0',
+        })
+      }
+      if (price > 10000) {
+        return res.status(400).json({
+          error: 'Series price cannot exceed ₹10,000',
+        })
+      }
+    }
+
+    const seriesPrice = type === 'Paid' ? price : 0
 
     const series = new Series({
       title,
@@ -40,6 +57,7 @@ const createSeries = async (req, res, next) => {
       language,
       age_restriction: age_restriction || false,
       type,
+      price: seriesPrice,
       release_date: release_date ? release_date : new Date(),
       seasons: seasons || 1,
       created_by: userId,
@@ -114,7 +132,7 @@ const updateSeries = async (req, res, next) => {
   try {
     const { id } = req.params
     const userId = req.user.id
-    const { title, description, posterUrl, bannerUrl, status, seasons } =
+    const { title, description, posterUrl, bannerUrl, status, seasons, price, type } =
       req.body
 
     const series = await Series.findById(id)
@@ -136,6 +154,30 @@ const updateSeries = async (req, res, next) => {
       ...(status && { status }),
       ...(seasons && { seasons }),
       updated_by: userId,
+    }
+
+    // Handle price and type updates
+    if (type !== undefined) {
+      updateData.type = type
+      if (type === 'Paid') {
+        if (!price || price <= 0) {
+          return res.status(400).json({
+            error: 'Paid series must have a price greater than 0',
+          })
+        }
+        updateData.price = price
+      } else {
+        updateData.price = 0
+      }
+    } else if (price !== undefined) {
+      if (series.type === 'Paid') {
+        if (price <= 0) {
+          return res.status(400).json({
+            error: 'Paid series must have a price greater than 0',
+          })
+        }
+        updateData.price = price
+      }
     }
 
     const updatedSeries = await Series.findByIdAndUpdate(id, updateData, {
@@ -246,7 +288,13 @@ const addEpisodeToSeries = async (req, res, next) => {
 
     await Series.findByIdAndUpdate(id, {
       $addToSet: { episodes: videoId },
-      $inc: { total_episodes: 1 },
+      $inc: { 
+        total_episodes: 1,
+        'analytics.total_likes': video.likes,
+        'analytics.total_views': video.views,
+        'analytics.total_shares': video.shares
+      },
+      $set: { 'analytics.last_analytics_update': new Date() }
     })
 
     res.status(200).json({

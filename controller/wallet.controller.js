@@ -325,13 +325,13 @@ const verifyWalletLoad = async (req, res, next) => {
 
 const transferToCreatorForSeries = async (req, res, next) => {
   try {
-    const { seriesId, amount, transferNote } = req.body
+    const { seriesId,amount, transferNote } = req.body
     const buyerId = req.user.id
 
-    if (!seriesId || !amount) {
+    if (!seriesId) {
       return res.status(400).json({
         success: false,
-        error: 'Series ID and amount are required',
+        error: 'Series ID is required',
         code: 'MISSING_REQUIRED_FIELDS',
       })
     }
@@ -342,24 +342,6 @@ const transferToCreatorForSeries = async (req, res, next) => {
         success: false,
         error: seriesValidation.error,
         code: 'INVALID_SERIES_ID',
-      })
-    }
-
-    const amountValidation = validateAmount(amount, 1, 10000)
-    if (!amountValidation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: amountValidation.error,
-        code: 'INVALID_AMOUNT',
-      })
-    }
-
-    const sanitizedNote = sanitizeString(transferNote, MAX_DESCRIPTION_LENGTH)
-    if (transferNote && transferNote.length > MAX_DESCRIPTION_LENGTH) {
-      return res.status(400).json({
-        success: false,
-        error: `Transfer note must be less than ${MAX_DESCRIPTION_LENGTH} characters`,
-        code: 'INVALID_TRANSFER_NOTE',
       })
     }
 
@@ -382,6 +364,41 @@ const transferToCreatorForSeries = async (req, res, next) => {
         success: false,
         error: 'This series is free to watch',
         code: 'SERIES_NOT_PAID',
+      })
+    }
+    const seriesAmount=series.price
+    if (Number(seriesAmount) !== Number(amount)){
+      // if user amount and series amount are not same 
+      return res.status(400).json({
+        success: false,
+        error: 'Series price does not match the provided amount',
+        code: 'SERIES_PRICE_MISMATCH',
+      })
+    }
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Series price is not set or invalid',
+        code: 'INVALID_SERIES_PRICE',
+      })
+    }
+
+    const amountValidation = validateAmount(amount, 1, 10000)
+    if (!amountValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error,
+        code: 'INVALID_AMOUNT',
+      })
+    }
+
+    const sanitizedNote = sanitizeString(transferNote, MAX_DESCRIPTION_LENGTH)
+    if (transferNote && transferNote.length > MAX_DESCRIPTION_LENGTH) {
+      return res.status(400).json({
+        success: false,
+        error: `Transfer note must be less than ${MAX_DESCRIPTION_LENGTH} characters`,
+        code: 'INVALID_TRANSFER_NOTE',
       })
     }
 
@@ -464,6 +481,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
         series: {
           id: seriesId,
           title: series.title,
+          price: series.price,
         },
         creatorPass: {
           message: "This content is free with your Creator Pass",
@@ -640,6 +658,10 @@ const transferToCreatorForSeries = async (req, res, next) => {
               total_revenue: amount,
               platform_commission: platformAmount,
               total_purchases: 1,
+              'analytics.total_revenue': amount,
+            },
+            $set: {
+              'analytics.last_analytics_update': new Date(),
             },
           },
           { session }
@@ -650,9 +672,10 @@ const transferToCreatorForSeries = async (req, res, next) => {
 
       res.status(200).json({
         success: true,
-        message: 'Series purchased successfully with 70/30 split!',
+        message: `Series purchased successfully for ₹${amount}!`,
         transfer: {
           totalAmount: amount,
+          seriesPrice: series.price,
           creatorAmount: creatorAmount,
           platformAmount: platformAmount,
           splitPercentage: `Creator: ${CREATOR_SHARE_PERCENTAGE}%, Platform: ${PLATFORM_FEE_PERCENTAGE}%`,
@@ -953,6 +976,10 @@ const transferCommunityFee = async (req, res, next) => {
             $inc: {
               total_fee_collected: founderAmount,
               total_uploads: 1,
+              'analytics.total_revenue': amount,
+            },
+            $set: {
+              'analytics.last_analytics_update': new Date(),
             },
           },
           { session }

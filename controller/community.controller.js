@@ -130,7 +130,10 @@ const FollowCommunity = async (req, res, next) => {
   try {
     await Community.updateOne(
       { _id: communityId },
-      { $addToSet: { followers: userId } }
+      { 
+        $addToSet: { followers: userId },
+        $set: { 'analytics.last_analytics_update': new Date() }
+      }
     )
 
     res.status(200).json({ message: 'Successfully followed the community' })
