@@ -554,6 +554,51 @@ const resetPassword = async (req, res, next) => {
   }
 }
 
+const checkUsernameExists=async(req,res,next)=>{
+  const {username}=req.params;
+  if(!username){
+    return res.status(400).json({ message: 'Username is required' })
+  }
+  try {
+    const user= await User.findOne({username})
+    if(user){
+      return res.status(200).json({ 
+        exists: true,
+        message: 'Username already exists'
+      })
+    }
+    res.status(200).json({
+      exists: false,
+      message: 'Username is available'
+    })    
+  } catch (error) {
+    handleError(error, req, res, next)
+    
+  }
+}
+
+const checkEmailExists=async(req,res,next)=>{
+  const {email}=req.params;
+  if(!email){
+    return res.status(400).json({ message: 'Email is required' })
+  }
+  try {
+    const user= await User.findOne({email})
+    if(user){
+      return res.status(200).json({ 
+        exists: true,
+        message: 'Email already exists'
+      })
+    }
+    res.status(200).json({
+      exists: false,
+      message: 'Email is available'
+    })    
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   RegisterNewUser,
   LoginUserWithEmail,
@@ -567,5 +612,6 @@ module.exports = {
   forgotPassword,
   verifyResetToken,
   resetPassword,
-
+  checkUsernameExists,
+  checkEmailExists
 }
