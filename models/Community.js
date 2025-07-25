@@ -95,6 +95,32 @@ const communitySchema = new mongoose.Schema(
         max: 100,
       },
     },
+    analytics: {
+      total_likes: {
+        type: Number,
+        default: 0,
+      },
+      total_views: {
+        type: Number,
+        default: 0,
+      },
+      total_shares: {
+        type: Number,
+        default: 0,
+      },
+      total_revenue: {
+        type: Number,
+        default: 0,
+      },
+      total_content_earnings: {
+        type: Number,
+        default: 0,
+      },
+      last_analytics_update: {
+        type: Date,
+        default: Date.now,
+      },
+    },
   },
   { timestamps: true }
 )

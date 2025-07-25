@@ -11,6 +11,8 @@ const interactionRoutes = require('./routes/interaction.routes')
 const cautionRoutes = require('./routes/caution.routes')
 const searchRoutes = require('./routes/search.routes')
 const deactivateRoutes=require('./routes/deactivate.routes')
+const seriesAnalyticsRoutes = require('./routes/seriesAnalytics.routes')
+const communityAnalyticsRoutes = require('./routes/communityAnalytics.routes')
 
 const walletRoutes = require('./routes/wallet.routes')
 const withdrawalRoutes = require('./routes/withdrawal.routes')
@@ -59,7 +61,11 @@ const routes = [
   { path: '/api/v1/withdrawals', handler: withdrawalRoutes },
   { path: '/api/v1/webhooks', handler: webhookRoutes },
   {path: '/api/v1/test', handler: require('./routes/test.routes') }, 
-  { path: '/api/v1/deactivate', handler: deactivateRoutes} 
+  { path: '/api/v1/deactivate', handler: deactivateRoutes} ,
+  { path: '/api/v1/analytics/series', handler: seriesAnalyticsRoutes },
+  { path: '/api/v1/analytics/community', handler: communityAnalyticsRoutes }
+
+
 ]
 
 try {
