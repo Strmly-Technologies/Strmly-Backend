@@ -1338,38 +1338,39 @@ const updateSocialMediaLinks = async (req, res, next) => {
     const { facebook, twitter, instagram, youtube, snapchat } = req.body
 
     // Validate URLs if provided
-    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/
-    
+    const urlPattern =
+      /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/
+
     const socialMediaData = {}
-    
+
     if (facebook !== undefined) {
       if (facebook && !urlPattern.test(facebook)) {
         return res.status(400).json({ message: 'Invalid Facebook URL format' })
       }
       socialMediaData['social_media_links.facebook'] = facebook
     }
-    
+
     if (twitter !== undefined) {
       if (twitter && !urlPattern.test(twitter)) {
         return res.status(400).json({ message: 'Invalid Twitter URL format' })
       }
       socialMediaData['social_media_links.twitter'] = twitter
     }
-    
+
     if (instagram !== undefined) {
       if (instagram && !urlPattern.test(instagram)) {
         return res.status(400).json({ message: 'Invalid Instagram URL format' })
       }
       socialMediaData['social_media_links.instagram'] = instagram
     }
-    
+
     if (youtube !== undefined) {
       if (youtube && !urlPattern.test(youtube)) {
         return res.status(400).json({ message: 'Invalid YouTube URL format' })
       }
       socialMediaData['social_media_links.youtube'] = youtube
     }
-    
+
     if (snapchat !== undefined) {
       if (snapchat && !urlPattern.test(snapchat)) {
         return res.status(400).json({ message: 'Invalid Snapchat URL format' })
@@ -1404,7 +1405,293 @@ const updateSocialMediaLinks = async (req, res, next) => {
   }
 }
 
+const getUserDashboardAnalytics = async (req, res, next) => {
+  const userId = req.user._id.toString()
+  const group = req.body.group
+  const response = {}
 
+  try {
+    //both created and joined communities
+    if (
+      group === undefined ||
+      group.length === 0 ||
+      group.includes('communities')
+    ) {
+      const userComunities = {}
+      createdCommunities = await Community.find({ founder: userId })
+        .populate('followers', 'username profile_photo')
+        .populate('creators', 'username profile_photo')
+
+      const user = await User.findById(userId).populate({
+        path: 'community',
+        populate: {
+          path: 'founder',
+          select: 'username profile_photo',
+        },
+      })
+      const joinedCommunities = user.community
+      userComunities.created = createdCommunities
+      userComunities.joined = joinedCommunities
+      response.communities = userComunities
+    }
+    //videos created by the user
+    if (group === undefined || group.length === 0 || group.includes('videos')) {
+      const page = 1,
+        limit = 10
+      const skip = (page - 1) * limit
+      videos = await LongVideo.find({ created_by: userId })
+        .populate('created_by', 'username profile_photo')
+        .populate('community', 'name profile_photo')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+      const totalVideos = await LongVideo.countDocuments({ created_by: userId })
+      const result = {
+        videos,
+        pagination: {
+          page: page,
+          limit: limit,
+          hasMore: skip + limit < totalVideos,
+          totalVideos,
+          totalPages: Math.ceil(totalVideos / limit),
+        },
+      }
+      response.videos = result
+    }
+    //user followers
+    if (
+      group === undefined ||
+      group.length === 0 ||
+      group.includes('followers')
+    ) {
+      const user = await User.findById(userId).populate(
+        'followers',
+        'username profile_photo followers'
+      )
+      const enrichedUserFollowers = user.followers.map((follower) => ({
+        _id: follower._id,
+        username: follower.username,
+        profile_photo: follower.profile_photo,
+        total_followers: follower.followers?.length || 0,
+        is_following: follower.followers?.includes(userId) || false, //determines whether the user also follows the follower or not (mutual following)
+      }))
+      response.followers = {
+        data: enrichedUserFollowers,
+        count: user.followers.length,
+      }
+    }
+    //user following
+    if (
+      group === undefined ||
+      group.length === 0 ||
+      group.includes('following')
+    ) {
+      const user = await User.findById(userId).populate(
+        'following',
+        'username profile_photo'
+      )
+
+      response.following = {
+        data: user.following,
+        count: user.following.length,
+      }
+    }
+
+    //video likes, comment upvotes, video reshares, comments and replies
+    if (
+      group === undefined ||
+      group.length === 0 ||
+      group.includes('interactions')
+    ) {
+      const interactions = {}
+      //video likes
+      const user = await User.findById(userId).populate({
+        path: 'liked_videos',
+        select: 'name thumbnailUrl creator views likes',
+        populate: {
+          path: 'creator',
+          select: 'username profile_photo',
+        },
+      })
+      interactions.liked_videos = user.liked_videos
+      //reshares
+      const reshares = await Reshare.find({ user: userId }).populate({
+        path: 'long_video',
+        select: 'name description videoUrl thumbnailUrl created_by',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      })
+      interactions.reshares = reshares
+      //comments
+      const comments = await Comment.find({ user: userId })
+        .populate({
+          path: 'long_video',
+          select: 'name description videoUrl thumbnailUrl created_by',
+          populate: {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+        })
+        .populate({
+          path: 'parent_comment',
+          select: 'content user',
+          populate: {
+            path: 'user',
+            select: 'username profile_photo',
+          },
+        })
+      interactions.comments = comments
+
+      //comment upvotes
+      const upvotedComments = await Comment.find({ upvoted_by: userId })
+        .populate({
+          path: 'user',
+          select: 'username profile_photo',
+        })
+        .populate({
+          path: 'long_video',
+          select: 'name',
+        })
+        .populate({
+          path: 'parent_comment',
+          select: 'content user',
+          populate: {
+            path: 'user',
+            select: 'username profile_photo',
+          },
+        })
+      interactions.upvoted_comments = upvotedComments
+
+      response.interactions = interactions
+    }
+    //user earnings
+    if (
+      group === undefined ||
+      group.length === 0 ||
+      group.includes('earnings')
+    ) {
+      const userVideos = await LongVideo.find({ creator: userId }).select(
+        'name views likes shares'
+      )
+
+      const totalViews = userVideos.reduce((sum, video) => sum + video.views, 0)
+      const totalLikes = userVideos.reduce((sum, video) => sum + video.likes, 0)
+      const totalShares = userVideos.reduce(
+        (sum, video) => sum + video.shares,
+        0
+      )
+
+      const viewsEarnings = totalViews * 0.001
+      const engagementBonus = (totalLikes + totalShares) * 0.01
+      const totalEarnings = viewsEarnings + engagementBonus
+
+      const earnings = {
+        totalEarnings: parseFloat(totalEarnings.toFixed(2)),
+        viewsEarnings: parseFloat(viewsEarnings.toFixed(2)),
+        engagementBonus: parseFloat(engagementBonus.toFixed(2)),
+        totalViews,
+        totalLikes,
+        totalShares,
+        totalVideos: userVideos.length,
+      }
+      response.earnings = earnings
+    }
+    //user history
+    if (
+      group === undefined ||
+      group.length === 0 ||
+      group.includes('history')
+    ) {
+      const page = 1,
+        limit = 10
+      let history
+      // Try Redis cache first
+      const redis = getRedisClient()
+      const cacheKey = `user_history:${userId}:${page}:${limit}`
+      const cachedHistory = await redis?.get(cacheKey)
+      if (redis && cachedHistory) {
+        console.log(`📦 History cache HIT for user: ${userId}`)
+        history = JSON.parse(cachedHistory)
+      } else {
+        const skip = (page - 1) * limit
+
+        // First get user with viewed_videos (no populate yet)
+        const user = await User.findById(userId).select('viewed_videos')
+
+        if (!user.viewed_videos || user.viewed_videos.length === 0) {
+          history = []
+        } else {
+          // Get the total count first
+          const totalVideos = user.viewed_videos.length
+
+          // Get paginated video IDs (most recent first)
+          const paginatedVideoIds = user.viewed_videos
+            .slice()
+            .reverse() // Most recent first
+            .slice(skip, skip + parseInt(limit))
+
+          // Now populate the actual video details
+          const viewedVideos = await LongVideo.find({
+            _id: { $in: paginatedVideoIds },
+          })
+            .populate('created_by', 'username profile_photo')
+            .select('_id name thumbnailUrl description views likes createdAt')
+
+          const orderedVideos = paginatedVideoIds
+            .map((videoId) =>
+              viewedVideos.find(
+                (video) => video._id.toString() === videoId.toString()
+              )
+            )
+            .filter(Boolean) // Remove any null/undefined entries
+
+          // Format the response
+          const formattedVideos = orderedVideos.map((video) => ({
+            _id: video._id,
+            name: video.name,
+            thumbnailUrl: video.thumbnailUrl,
+            description: video.description,
+            views: video.views,
+            likes: video.likes,
+            created_by: {
+              _id: video.created_by._id,
+              username: video.created_by.username,
+              profile_photo: video.created_by.profile_photo,
+            },
+            createdAt: video.createdAt,
+          }))
+
+          history = {
+            videos: formattedVideos,
+            pagination: {
+              page: page,
+              limit: limit,
+              hasMore: skip + limit < totalVideos,
+              totalVideos,
+              totalPages: Math.ceil(totalVideos / limit),
+            },
+          }
+
+          // Cache for 2 minutes (history changes frequently)
+          if (redis && formattedVideos.length > 0) {
+            await redis.setex(cacheKey, 120, JSON.stringify(history))
+            console.log(`💾 History cached for user: ${userId}`)
+          }
+        }
+      }
+      response.history = history
+    }
+
+    res.status(200).json({
+      message: 'Dashboard data retrieved successfully',
+      data: response,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
 
 module.exports = {
   getUserProfileDetails,
@@ -1428,4 +1715,5 @@ module.exports = {
   getUserHistory,
   getUserLikedVideosInCommunity,
   updateSocialMediaLinks,
+  getUserDashboardAnalytics,
 }

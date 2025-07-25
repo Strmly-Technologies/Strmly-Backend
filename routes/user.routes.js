@@ -22,6 +22,7 @@ const {
   getUserHistory,
   getUserLikedVideosInCommunity,
   updateSocialMediaLinks,
+  getUserDashboardAnalytics,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -40,6 +41,12 @@ router.put(
   handleMulterError
 )
 
+//get combined user analytics (revenue and non-revenue)
+//get data based on 'group' passed in req.body eg: ['videos','communities']
+//if group isn't passed then by default all the data is retrieved
+//possible groups: [videos, communities, followers, following, interactions, earnings, history ]
+router.get('/dashboard', authenticateToken, getUserDashboardAnalytics)
+
 // Get user communities
 router.get('/communities', authenticateToken, GetUserCommunities)
 
@@ -55,7 +62,7 @@ router.get('/earnings', authenticateToken, GetUserEarnings)
 // Get user notifications
 router.get('/notifications', authenticateToken, GetUserNotifications)
 
-// Update user interests 
+// Update user interests
 router.put('/interests', authenticateToken, UpdateUserInterests)
 
 // Get all user followers
@@ -89,7 +96,11 @@ router.post('/unfollow', authenticateToken, unfollowUser)
 router.get('/history', authenticateToken, getUserHistory)
 
 // Get user liked videos in a community
-router.get('/liked-videos-community',authenticateToken,getUserLikedVideosInCommunity)
+router.get(
+  '/liked-videos-community',
+  authenticateToken,
+  getUserLikedVideosInCommunity
+)
 
 // Update social media links
 router.put('/social-media-links', authenticateToken, updateSocialMediaLinks)
