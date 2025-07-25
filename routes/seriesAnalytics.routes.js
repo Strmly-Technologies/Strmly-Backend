@@ -1,8 +1,7 @@
 const router = require('express').Router()
 const { authenticateToken } = require('../middleware/auth')
 const {
-  getSeriesAnalytics,
-  getSeriesEngagementStats
+  getSeriesAnalytics
 } = require('../controller/seriesAnalytics.controller')
 
 // Get comprehensive series analytics (creator only)
