@@ -33,35 +33,42 @@ const getCommunityAnalytics = async (req, res, next) => {
     // Get total creators count
     const totalCreators = community.creators.length
 
-    // Get total videos count
-    const totalLongVideos = await LongVideo.countDocuments({ 
-      community: communityId,
-      visibility: { $ne: 'hidden' }
-    })
-
-    // Get total series count
-    const totalSeries = await Series.countDocuments({ 
-      community: communityId 
-    })
-
-    // Get total likes across all videos in community
-    const videosLikesAgg = await LongVideo.aggregate([
-      { 
-        $match: { 
-          community: communityId,
-          visibility: { $ne: 'hidden' }
-        } 
-      },
-      {
-        $group: {
-          _id: null,
-          totalLikes: { $sum: '$likes' },
-          totalViews: { $sum: '$views' },
-          totalShares: { $sum: '$shares' }
+    // Combine queries into a single aggregation pipeline
+    const [longVideoStats, seriesStats] = await Promise.all([
+      LongVideo.aggregate([
+        { 
+          $match: { 
+            community: communityId,
+            visibility: { $ne: 'hidden' }
+          } 
+        },
+        {
+          $facet: {
+            totalLongVideos: [{ $count: "count" }],
+            stats: [
+              {
+                $group: {
+                  _id: null,
+                  totalLikes: { $sum: '$likes' },
+                  totalViews: { $sum: '$views' },
+                  totalShares: { $sum: '$shares' }
+                }
+              }
+            ]
+          }
         }
-      }
+      ]),
+      Series.aggregate([
+        { $match: { community: communityId } },
+        { $count: "totalSeries" }
+      ])
     ])
 
+    const totalLongVideos = longVideoStats[0]?.totalLongVideos[0]?.count || 0
+    const totalLikes = longVideoStats[0]?.stats[0]?.totalLikes || 0
+    const totalViews = longVideoStats[0]?.stats[0]?.totalViews || 0
+    const totalShares = longVideoStats[0]?.stats[0]?.totalShares || 0
+    const totalSeries = seriesStats[0]?.totalSeries || 0
     const videoStats = videosLikesAgg[0] || { 
       totalLikes: 0, 
       totalViews: 0, 
