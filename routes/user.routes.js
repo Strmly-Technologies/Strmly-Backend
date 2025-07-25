@@ -23,6 +23,7 @@ const {
   getUserLikedVideosInCommunity,
   updateSocialMediaLinks,
   getUserDashboardAnalytics,
+  getUserPurchasedAccess,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -42,10 +43,13 @@ router.put(
 )
 
 //get combined user analytics (revenue and non-revenue)
-//get data based on 'group' passed in req.body eg: ['videos','communities']
+//get data based on 'group' passed in req.query eg: ['videos','communities']
 //if group isn't passed then by default all the data is retrieved
 //possible groups: [videos, communities, followers, following, interactions, earnings, history ]
 router.get('/dashboard', authenticateToken, getUserDashboardAnalytics)
+
+//gets the videos, series and creator pass data which the user has purchased
+router.get('/purchased-access', authenticateToken, getUserPurchasedAccess)
 
 // Get user communities
 router.get('/communities', authenticateToken, GetUserCommunities)

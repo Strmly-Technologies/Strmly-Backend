@@ -815,21 +815,24 @@ const reshareVideo = async (req, res, next) => {
     if (!videoId) {
       return res.status(400).json({ message: 'Video ID is required' })
     }
+
+    const existingReshare = await Reshare.findOne({
+      user: userId,
+      long_video: videoId,
+    })
+    if (existingReshare) {
+      await Reshare.deleteOne({ _id: existingReshare._id })
+      return res.status(200).json({
+        message: `video:${videoId} un-reshared by user:${userId} successfully`,
+      })
+    }
     const user = await User.findById(userId)
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
-    const result = await Reshare.updateOne(
-      { user: userId, long_video: videoId },
-      { $setOnInsert: { user: userId, long_video: videoId } },
-      { upsert: true }
-    )
 
-    if (result.upsertedCount === 0) {
-      return res.status(400).json({
-        message: `video:${videoId} already reshared by user:${userId}`,
-      })
-    }
+    await Reshare.create({ user: userId, long_video: videoId })
+
     // send video reshare notification
     const video = LongVideo.findById(videoId).select('name created_by')
     await addVideoReshareNotificationToQueue(
