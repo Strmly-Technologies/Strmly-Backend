@@ -489,6 +489,7 @@ const GetUserNotifications = async (req, res, next) => {
         videoId: video._id,
         avatar: comment.user.profile_photo,
         timeStamp: comment.createdAt,
+        is_monetized: comment.is_monetized,
         read: false,
         URL: `/api/v1/videos/${video._id}`,
       }))
@@ -1720,6 +1721,34 @@ const getUserPurchasedAccess = async (req, res, next) => {
   }
 }
 
+const toggleCommentMonetization = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+
+    const currentUser = await User.findById(userId).select(
+      'comment_monetization_enabled'
+    )
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const newStatus = !currentUser.comment_monetization_enabled
+
+    // Atomic update to avoid race conditions
+    await User.findByIdAndUpdate(
+      userId,
+      { $set: { comment_monetization_enabled: newStatus } },
+      { new: true }
+    )
+
+    return res.status(200).json({
+      message: `User comment monetization ${newStatus ? 'enabled' : 'disabled'} successfully`,
+    })
+  } catch (error) {
+    return handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -1744,4 +1773,5 @@ module.exports = {
   updateSocialMediaLinks,
   getUserDashboardAnalytics,
   getUserPurchasedAccess,
+  toggleCommentMonetization,
 }

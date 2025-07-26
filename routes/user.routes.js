@@ -24,6 +24,7 @@ const {
   updateSocialMediaLinks,
   getUserDashboardAnalytics,
   getUserPurchasedAccess,
+  toggleCommentMonetization,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -50,6 +51,13 @@ router.get('/dashboard', authenticateToken, getUserDashboardAnalytics)
 
 //gets the videos, series and creator pass data which the user has purchased
 router.get('/purchased-access', authenticateToken, getUserPurchasedAccess)
+
+//enable/disable comment monetization
+router.put(
+  '/toggle-comment-monetization',
+  authenticateToken,
+  toggleCommentMonetization
+)
 
 // Get user communities
 router.get('/communities', authenticateToken, GetUserCommunities)

@@ -134,6 +134,7 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
+    comment_monetization_enabled: { type: Boolean, default: false },
     creator_profile: {
       bank_details: {
         account_number: String,

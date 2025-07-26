@@ -6,11 +6,12 @@ try {
   const redisConnection = {
     host: process.env.REDIS_HOST || 'localhost',
     port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD,
     maxRetriesPerRequest: 3,
     retryDelayOnFailover: 100,
     lazyConnect: true,
   }
-  
+
   notificationQueue = new Queue('notificationQueue', {
     connection: redisConnection,
     defaultJobOptions: {
@@ -21,10 +22,10 @@ try {
       backoff: {
         type: 'exponential',
         delay: 2000,
-      }
-    }
+      },
+    },
   })
-  
+
   console.log('✅ Notification queue initialized')
 } catch (error) {
   console.warn('⚠️ Could not initialize notification queue:', error.message)

@@ -239,6 +239,7 @@ const getTotalSharesByVideoId = async (req, res, next) => {
 const CommentOnVideo = async (req, res, next) => {
   const { videoId, comment } = req.body
   const userId = req.user.id.toString()
+  const user = await User.findById(userId)
 
   if (!videoId || !comment) {
     return res.status(400).json({
@@ -257,13 +258,13 @@ const CommentOnVideo = async (req, res, next) => {
       user: userId,
       content: comment,
       long_video: videoId,
+      is_monetized: user.comment_monetization_enabled,
     })
 
     await newComment.save()
     video.comments.push(newComment._id)
     await video.save()
 
-    const user = await User.findById(userId)
     const userCommentType = 'commented_videos'
 
     if (!Array.isArray(user[userCommentType])) {
@@ -349,6 +350,7 @@ const getVideoComments = async (req, res, next) => {
         ? comment.downvoted_by.includes(userId)
         : false,
       liked: comment.liked_by ? comment.liked_by.includes(userId) : false,
+      is_monetized: comment.is_monetized,
     }))
 
     res.status(200).json(comments)
@@ -578,6 +580,14 @@ const GiftComment = async (req, res, next) => {
         success: false,
         error: 'Comment not found',
         code: 'COMMENT_NOT_FOUND',
+      })
+    }
+
+    if (!comment.is_monetized) {
+      return res.status(404).json({
+        success: false,
+        error: 'Comment not monetized',
+        code: 'COMMENT_NOT_MONETIZED',
       })
     }
 
@@ -815,7 +825,15 @@ const reshareVideo = async (req, res, next) => {
     if (!videoId) {
       return res.status(400).json({ message: 'Video ID is required' })
     }
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
 
+    const video = await LongVideo.findById(videoId).select('name created_by')
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' })
+    }
     const existingReshare = await Reshare.findOne({
       user: userId,
       long_video: videoId,
@@ -826,15 +844,9 @@ const reshareVideo = async (req, res, next) => {
         message: `video:${videoId} un-reshared by user:${userId} successfully`,
       })
     }
-    const user = await User.findById(userId)
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' })
-    }
 
     await Reshare.create({ user: userId, long_video: videoId })
-
     // send video reshare notification
-    const video = LongVideo.findById(videoId).select('name created_by')
     await addVideoReshareNotificationToQueue(
       video.created_by.toString(),
       userId,
@@ -976,6 +988,7 @@ const ReplyToComment = async (req, res, next) => {
       long_video: videoId,
       parent_comment: commentId,
       content: reply,
+      is_monetized: false, //no monetization on replies
     })
     comment.replies.push(newReply._id)
     await comment.save()
@@ -1168,6 +1181,69 @@ const UnsaveVideo = async (req, res, next) => {
   }
 }
 
+const deleteComment = async (req, res, next) => {
+  try {
+    const { commentId, videoId } = req.body
+    const userId = req.user.id.toString()
+    if (!commentId || !videoId) {
+      return res
+        .status(400)
+        .json({ error: 'commentId and videoId are required' })
+    }
+    const comment = await Comment.findById(commentId)
+    if (!comment) {
+      return res.status(404).json({ error: 'Comment not found' })
+    }
+    if (comment.is_monetized) {
+      return res
+        .status(403)
+        .json({ error: 'Monetized comment cannot be deleted', commentId })
+    }
+
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const video = await LongVideo.findById(videoId)
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' })
+    }
+
+    if (
+      comment.user.toString() !== userId &&
+      video.created_by.toString() !== userId
+    ) {
+      return res
+        .status(403)
+        .json({ error: 'User not authorized to delete this comment' })
+    }
+    //delete comment/reply
+    await Comment.deleteOne({ _id: commentId })
+    //delete it from video's list of comments
+    video.comments = video.comments.filter(
+      (comment) => comment.toString() !== commentId
+    )
+    //if reply:delete it from comment's list of replies
+    const parentCommentId = comment.parent_comment.toString()
+    if (parentCommentId) {
+      const parentComment = await Comment.findById(parentCommentId)
+      if (parentComment) {
+        parentComment.replies = parentComment.replies.filter(
+          (reply) => reply.toString() !== commentId
+        )
+        await parentComment.save()
+      }
+    }
+    await video.save()
+    return res
+      .status(200)
+      .json({ message: 'Comment deleted successfully', commentId })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   ReplyToComment,
   UpvoteReply,
@@ -1186,4 +1262,5 @@ module.exports = {
   statusOfLike,
   saveVideo,
   getTotalSharesByVideoId,
+  deleteComment,
 }

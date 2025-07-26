@@ -16,6 +16,7 @@ const {
   ReplyToComment,
   UpvoteReply,
   DownvoteReply,
+  deleteComment,
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -85,6 +86,14 @@ router.post(
   authenticateToken,
   generalRateLimiter,
   DownvoteReply
+)
+
+//delete comment/reply
+router.delete(
+  '/comments/delete',
+  authenticateToken,
+  generalRateLimiter,
+  deleteComment
 )
 
 // API to gift a comment
