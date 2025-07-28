@@ -38,6 +38,25 @@ const createCreatorPassOrder = async (req, res, next) => {
       })
     }
 
+    // Check if creator pass is marked for deletion
+    if (creator.creator_profile?.creator_pass_deletion?.deletion_requested) {
+      const deletionEligibleAt = creator.creator_profile.creator_pass_deletion.deletion_eligible_at
+      const daysRemaining = Math.ceil((deletionEligibleAt - new Date()) / (1000 * 60 * 60 * 24))
+      
+      return res.status(400).json({
+        success: false,
+        error: 'Creator Pass is no longer available for purchase',
+        code: 'CREATOR_PASS_DELETION_REQUESTED',
+        message: `This creator has requested to delete their Creator Pass. New purchases are disabled.`,
+        deletionInfo: {
+          deletionRequestedAt: creator.creator_profile.creator_pass_deletion.deletion_requested_at,
+          eligibleForDeletionAt: deletionEligibleAt,
+          daysUntilDeletion: Math.max(0, daysRemaining),
+          reason: creator.creator_profile.creator_pass_deletion.deletion_reason || 'Creator requested deletion'
+        }
+      })
+    }
+
     // Check if user is trying to buy their own pass
     if (creatorId === userId) {
       return res.status(400).json({
@@ -362,10 +381,376 @@ const cancelCreatorPass = async (req, res, next) => {
   }
 }
 
+const requestCreatorPassDeletion = async (req, res, next) => {
+  try {
+    const userId = req.user.id
+    const { reason } = req.body
+
+    // Get creator details
+    const creator = await User.findById(userId).select('creator_profile username')
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+        code: 'USER_NOT_FOUND'
+      })
+    }
+
+    // Check if creator pass is already enabled
+    const hasCreatorPass = creator.creator_profile?.creator_pass_price > 0
+    if (!hasCreatorPass) {
+      return res.status(400).json({
+        success: false,
+        error: 'You do not have an active Creator Pass to delete',
+        code: 'NO_CREATOR_PASS'
+      })
+    }
+
+    // Check if deletion is already requested
+    if (creator.creator_profile?.creator_pass_deletion?.deletion_requested) {
+      return res.status(400).json({
+        success: false,
+        error: 'Creator Pass deletion has already been requested',
+        code: 'DELETION_ALREADY_REQUESTED',
+        deletionInfo: {
+          requestedAt: creator.creator_profile.creator_pass_deletion.deletion_requested_at,
+          eligibleAt: creator.creator_profile.creator_pass_deletion.deletion_eligible_at
+        }
+      })
+    }
+
+    // Find the latest expiry date among active subscribers
+    const activeSubscriptions = await CreatorPass.find({
+      creator_id: userId,
+      status: 'active',
+      end_date: { $gt: new Date() }
+    }).sort({ end_date: -1 }).limit(1)
+
+    const now = new Date()
+    const deletionRequestedAt = now
+    
+    // Set deletion eligible date to 45 days from now OR last subscriber expiry + 15 days buffer, whichever is later
+    let deletionEligibleAt = new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000) // 45 days from now
+    let lastSubscriberExpiresAt = null
+
+    if (activeSubscriptions.length > 0) {
+      lastSubscriberExpiresAt = activeSubscriptions[0].end_date
+      const bufferDate = new Date(lastSubscriberExpiresAt.getTime() + 15 * 24 * 60 * 60 * 1000) // 15 days buffer
+      
+      // Use the later of the two dates
+      if (bufferDate > deletionEligibleAt) {
+        deletionEligibleAt = bufferDate
+      }
+    }
+
+    // Update creator profile with deletion request
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        'creator_profile.creator_pass_deletion': {
+          deletion_requested: true,
+          deletion_requested_at: deletionRequestedAt,
+          deletion_reason: reason || 'Creator requested deletion',
+          deletion_eligible_at: deletionEligibleAt,
+          last_subscriber_expires_at: lastSubscriberExpiresAt
+        }
+      }
+    })
+
+    // Count active subscribers
+    const activeSubscriberCount = await CreatorPass.countDocuments({
+      creator_id: userId,
+      status: 'active',
+      end_date: { $gt: new Date() }
+    })
+
+    const daysUntilDeletion = Math.ceil((deletionEligibleAt - now) / (1000 * 60 * 60 * 24))
+
+    res.status(200).json({
+      success: true,
+      message: 'Creator Pass deletion request submitted successfully',
+      deletionRequest: {
+        requestedAt: deletionRequestedAt,
+        eligibleForDeletionAt: deletionEligibleAt,
+        daysUntilEligible: daysUntilDeletion,
+        reason: reason || 'Creator requested deletion',
+        activeSubscribers: activeSubscriberCount,
+        lastSubscriberExpiresAt: lastSubscriberExpiresAt
+      },
+      important: {
+        message: 'Your Creator Pass is now disabled for new purchases',
+        timeline: [
+          'Immediate: New Creator Pass purchases are blocked',
+          `${daysUntilDeletion} days: Creator Pass will be eligible for manual deletion by admin`,
+          'Existing subscribers can continue using their passes until expiry'
+        ]
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const cancelCreatorPassDeletion = async (req, res, next) => {
+  try {
+    const userId = req.user.id
+
+    // Get creator details
+    const creator = await User.findById(userId).select('creator_profile username')
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+        code: 'USER_NOT_FOUND'
+      })
+    }
+
+    // Check if deletion was requested
+    if (!creator.creator_profile?.creator_pass_deletion?.deletion_requested) {
+      return res.status(400).json({
+        success: false,
+        error: 'No Creator Pass deletion request found to cancel',
+        code: 'NO_DELETION_REQUEST'
+      })
+    }
+
+    // Check if still within cancellable period (first 7 days)
+    const deletionRequestedAt = creator.creator_profile.creator_pass_deletion.deletion_requested_at
+    const daysSinceRequest = (new Date() - deletionRequestedAt) / (1000 * 60 * 60 * 24)
+    
+    if (daysSinceRequest > 7) {
+      return res.status(400).json({
+        success: false,
+        error: 'Deletion request can only be cancelled within 7 days of submission',
+        code: 'CANCELLATION_PERIOD_EXPIRED',
+        requestedAt: deletionRequestedAt,
+        daysSinceRequest: Math.floor(daysSinceRequest)
+      })
+    }
+
+    // Cancel the deletion request
+    await User.findByIdAndUpdate(userId, {
+      $unset: {
+        'creator_profile.creator_pass_deletion': 1
+      }
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Creator Pass deletion request cancelled successfully',
+      status: {
+        creatorPassActive: true,
+        availableForPurchase: true,
+        deletionCancelled: true
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getCreatorPassDeletionStatus = async (req, res, next) => {
+  try {
+    const userId = req.user.id
+
+    const creator = await User.findById(userId).select('creator_profile username')
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      })
+    }
+
+    const deletionInfo = creator.creator_profile?.creator_pass_deletion
+
+    if (!deletionInfo?.deletion_requested) {
+      return res.status(200).json({
+        success: true,
+        hasDeletionRequest: false,
+        creatorPassStatus: 'active',
+        message: 'No deletion request found'
+      })
+    }
+
+    // Count active subscribers
+    const activeSubscriberCount = await CreatorPass.countDocuments({
+      creator_id: userId,
+      status: 'active',
+      end_date: { $gt: new Date() }
+    })
+
+    const now = new Date()
+    const daysUntilDeletion = Math.ceil((deletionInfo.deletion_eligible_at - now) / (1000 * 60 * 60 * 24))
+    const daysSinceRequest = Math.floor((now - deletionInfo.deletion_requested_at) / (1000 * 60 * 60 * 24))
+    const canCancel = daysSinceRequest <= 7
+
+    res.status(200).json({
+      success: true,
+      hasDeletionRequest: true,
+      deletionRequest: {
+        requestedAt: deletionInfo.deletion_requested_at,
+        eligibleForDeletionAt: deletionInfo.deletion_eligible_at,
+        daysUntilEligible: Math.max(0, daysUntilDeletion),
+        daysSinceRequest: daysSinceRequest,
+        reason: deletionInfo.deletion_reason,
+        lastSubscriberExpiresAt: deletionInfo.last_subscriber_expires_at,
+        canCancel: canCancel
+      },
+      subscribers: {
+        activeCount: activeSubscriberCount,
+        message: activeSubscriberCount > 0 ? 
+          'Existing subscribers can continue using their passes' : 
+          'No active subscribers'
+      },
+      status: daysUntilDeletion <= 0 ? 'eligible_for_deletion' : 'pending_deletion'
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+// Admin function to get creators eligible for deletion
+const getCreatorsEligibleForDeletion = async (req, res, next) => {
+  try {
+    const now = new Date()
+
+    const eligibleCreators = await User.find({
+      'creator_profile.creator_pass_deletion.deletion_requested': true,
+      'creator_profile.creator_pass_deletion.deletion_eligible_at': { $lte: now }
+    }).select('username creator_profile.creator_pass_deletion creator_profile.creator_pass_price')
+
+    const enrichedCreators = await Promise.all(
+      eligibleCreators.map(async (creator) => {
+        const activeSubscribers = await CreatorPass.countDocuments({
+          creator_id: creator._id,
+          status: 'active',
+          end_date: { $gt: now }
+        })
+
+        return {
+          id: creator._id,
+          username: creator.username,
+          deletionInfo: creator.creator_profile.creator_pass_deletion,
+          currentPrice: creator.creator_profile.creator_pass_price,
+          activeSubscribers: activeSubscribers,
+          canDelete: activeSubscribers === 0
+        }
+      })
+    )
+
+    res.status(200).json({
+      success: true,
+      message: 'Creators eligible for deletion retrieved',
+      eligibleCreators: enrichedCreators,
+      summary: {
+        totalEligible: enrichedCreators.length,
+        readyForDeletion: enrichedCreators.filter(c => c.canDelete).length,
+        stillHaveSubscribers: enrichedCreators.filter(c => !c.canDelete).length
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+// Admin function to manually delete creator pass
+const manuallyDeleteCreatorPass = async (req, res, next) => {
+  try {
+    const { creatorId } = req.params
+    const { adminConfirmation } = req.body
+
+    if (!adminConfirmation) {
+      return res.status(400).json({
+        success: false,
+        error: 'Admin confirmation required',
+        code: 'ADMIN_CONFIRMATION_REQUIRED'
+      })
+    }
+
+    const creator = await User.findById(creatorId).select('username creator_profile')
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'Creator not found'
+      })
+    }
+
+    const deletionInfo = creator.creator_profile?.creator_pass_deletion
+    if (!deletionInfo?.deletion_requested) {
+      return res.status(400).json({
+        success: false,
+        error: 'No deletion request found for this creator'
+      })
+    }
+
+    // Check if eligible for deletion
+    if (deletionInfo.deletion_eligible_at > new Date()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Creator is not yet eligible for deletion',
+        eligibleAt: deletionInfo.deletion_eligible_at
+      })
+    }
+
+    // Check for active subscribers
+    const activeSubscribers = await CreatorPass.countDocuments({
+      creator_id: creatorId,
+      status: 'active',
+      end_date: { $gt: new Date() }
+    })
+
+    if (activeSubscribers > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot delete: ${activeSubscribers} active subscribers still exist`,
+        activeSubscribers: activeSubscribers
+      })
+    }
+
+    // Perform deletion
+    await User.findByIdAndUpdate(creatorId, {
+      $set: {
+        'creator_profile.creator_pass_price': 0
+      },
+      $unset: {
+        'creator_profile.creator_pass_deletion': 1
+      }
+    })
+
+    // Mark all creator passes as cancelled
+    await CreatorPass.updateMany(
+      { creator_id: creatorId },
+      { 
+        $set: { 
+          status: 'cancelled',
+          cancelled_at: new Date()
+        }
+      }
+    )
+
+    res.status(200).json({
+      success: true,
+      message: 'Creator Pass deleted successfully',
+      deletedCreator: {
+        id: creatorId,
+        username: creator.username,
+        deletedAt: new Date(),
+        deletionReason: deletionInfo.deletion_reason
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   createCreatorPassOrder,
   verifyCreatorPassPayment,
   getCreatorPassStatus,
   checkCreatorPassAccess,
   cancelCreatorPass,
+  requestCreatorPassDeletion,
+  cancelCreatorPassDeletion,
+  getCreatorPassDeletionStatus,
+  getCreatorsEligibleForDeletion,
+  manuallyDeleteCreatorPass,
 }

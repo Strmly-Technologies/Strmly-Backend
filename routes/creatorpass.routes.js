@@ -5,6 +5,11 @@ const {
   verifyCreatorPassPayment,
   getCreatorPassStatus,
   cancelCreatorPass,
+  requestCreatorPassDeletion,
+  cancelCreatorPassDeletion,
+  getCreatorPassDeletionStatus,
+  getCreatorsEligibleForDeletion,
+  manuallyDeleteCreatorPass,
 } = require("../controller/creatorpass.controller");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -19,5 +24,18 @@ router.get("/status/:creatorId", authenticateToken, getCreatorPassStatus);
 
 // Cancel creator pass
 router.post("/cancel/:creatorId", authenticateToken, cancelCreatorPass);
+
+// Request creator pass deletion
+router.post("/request-deletion", authenticateToken, requestCreatorPassDeletion);
+
+// Cancel creator pass deletion request (within 7 days)
+router.post("/cancel-deletion", authenticateToken, cancelCreatorPassDeletion);
+
+// Get creator pass deletion status
+router.get("/deletion-status", authenticateToken, getCreatorPassDeletionStatus);
+
+// Admin routes for manual deletion
+router.get("/admin/eligible-for-deletion", authenticateToken, getCreatorsEligibleForDeletion);
+router.delete("/admin/delete/:creatorId", authenticateToken, manuallyDeleteCreatorPass);
 
 module.exports = router;
