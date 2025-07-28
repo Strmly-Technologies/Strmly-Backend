@@ -1410,10 +1410,11 @@ const updateSocialMediaLinks = async (req, res, next) => {
 
 const getUserDashboardAnalytics = async (req, res, next) => {
   const userId = req.user._id.toString()
-  const group = Array.isArray(req.query.group)
-    ? req.query.group
-    : [req.query.group]
-
+  const group = req.query.group
+    ? Array.isArray(req.query.group)
+      ? req.query.group
+      : [req.query.group]
+    : null
   const response = {}
 
   try {

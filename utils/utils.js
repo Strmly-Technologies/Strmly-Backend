@@ -25,7 +25,7 @@ const dynamicVideoUpload = (req, res, next) => {
         : ''
     const fileMimeType = file.mimetype || req.body.mimetype || ''
     if (
-      allowedMimeTypes.includes(fileMimeType) ||
+      allowedMimeTypes.includes(fileMimeType) &&
       allowedExtensions.includes(fileExtension)
     ) {
       console.log('✅ File accepted')
@@ -39,22 +39,7 @@ const dynamicVideoUpload = (req, res, next) => {
   const upload = multer({
     storage: multer.memoryStorage(),
     fileFilter: fileFilter,
-  }).fields([
-    { name: 'fileId', maxCount: 1 },
-    { name: 'originalname', maxCount: 1 },
-    { name: 'mimetype', maxCount: 1 },
-    { name: 'chunkIndex', maxCount: 1 },
-    { name: 'totalChunks', maxCount: 1 },
-    { name: 'videoFile', maxCount: 1 },
-    { name: 'name', maxCount: 1 },
-    { name: 'description', maxCount: 1 },
-    { name: 'genre', maxCount: 1 },
-    { name: 'type', maxCount: 1 },
-    { name: 'language', maxCount: 1 },
-    { name: 'age_restriction', maxCount: 1 },
-    { name: 'communityId', maxCount: 1 },
-    { name: 'seriesId', maxCount: 1 },
-  ])
+  }).single('videoFile')
 
   upload(req, res, (err) => {
     if (err) {

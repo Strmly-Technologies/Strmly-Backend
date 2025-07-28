@@ -26,6 +26,10 @@ const longVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    is_unpublished: {
+      type: Boolean,
+      default: false,
+    },
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {
@@ -116,29 +120,28 @@ const longVideoSchema = new mongoose.Schema(
       ref: 'Community',
       required: false,
     },
-    start_time:{
+    start_time: {
       type: Number,
       default: 0,
     },
-    display_till_time:{
+    display_till_time: {
       type: Number,
       default: 0,
     },
     visibility: {
       type: String,
       enum: ['public', 'private', 'hidden'],
-      default: 'public'
-  },
-     hidden_reason: {
+      default: 'public',
+    },
+    hidden_reason: {
       type: String,
       enum: ['account_deactivated', 'user_request', 'admin_action'],
-      default: null
-  },
+      default: null,
+    },
     hidden_at: {
-     type: Date,
-     default: null
-  }
-
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 )

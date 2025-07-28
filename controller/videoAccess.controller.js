@@ -265,7 +265,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
       'username email'
     )
 
-    if (!video) {
+    if (!video || video.is_unpublished) {
       return res.status(404).json({
         success: false,
         error: 'Video not found',

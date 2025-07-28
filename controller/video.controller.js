@@ -640,28 +640,32 @@ const updateVideo = async (req, res, next) => {
 
 const deleteVideo = async (req, res, next) => {
   try {
-    const { id } = req.params
-    const userId = req.user.id
-
-    let video = await LongVideo.findById(id)
-    if (!video) {
+    const { videoId } = req.body
+    const userId = req.user.id.toString()
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+    let video = await LongVideo.findById(videoId)
+    if (!video || video.is_unpublished) {
       return res.status(404).json({ error: 'Long video not found' })
     }
-
+    //only video creator is allowed to delete the video
     if (video.created_by.toString() !== userId) {
       return res
         .status(403)
         .json({ error: 'Not authorized to delete this video' })
     }
-
+    //remove video from series  --series deletion handling has to be done later...
     if (video.series) {
       await Series.findByIdAndUpdate(video.series, {
         $pull: { episodes: id },
         $inc: { total_episodes: -1 },
       })
     }
-
-    await LongVideo.findByIdAndDelete(id)
+    //unpublish video
+    video.is_unpublished = true
+    await video.save()
 
     res.status(200).json({
       message: 'Video deleted successfully',
