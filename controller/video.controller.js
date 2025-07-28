@@ -176,6 +176,7 @@ const uploadVideo = async (req, res, next) => {
 
     await Community.findByIdAndUpdate(communityId, {
       $push: { long_videos: savedVideo._id },
+      $addToSet: { creators: userId },
     })
 
     res.status(200).json({

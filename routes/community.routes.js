@@ -12,7 +12,10 @@ const {
   getTrendingCommunityVideos,
   getTrendingVideosByCommunity,
   getCommunityVideos,
-  getUserCommunities
+  getUserCommunities,
+  getListOfCreators,
+  changeCommunityFounder,
+  makeFirstJoinedCreatorFounder
 } = require('../controller/community.controller')
 
 const { communityProfilePhotoUpload, validateCommunityProfilePhotoFormData } = require('../utils/utils')
@@ -69,4 +72,11 @@ router.get('/:id/trending-videos', getTrendingVideosByCommunity)
 // API to get community by ID
 router.get('/:id', authenticateToken, getCommunityById)
 
+router.get('/creators/:communityId',authenticateToken,getListOfCreators)
+
+// API to change community founder
+router.post('/change-founder', authenticateToken, changeCommunityFounder)
+
+// API to make the first joined creator the founder
+router.post('/make-first-founder', authenticateToken, makeFirstJoinedCreatorFounder)
 module.exports = router

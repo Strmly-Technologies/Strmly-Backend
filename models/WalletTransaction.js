@@ -32,6 +32,7 @@ const walletTransactionSchema = new mongoose.Schema(
         'comment_gift',
         'gift_received',
         'community_fee',
+        'community_subscription',
         'community_fee_received',
       ],
     },
