@@ -671,6 +671,40 @@ const changeCommunityFounder=async(req,res,next)=>{
  }
 }
 
+const makeFirstJoinedCreatorFounder=async(req,res,next)=>{
+  const { communityId } = req.body
+  const userId = req.user.id
+  if (!communityId) {
+    return res.status(400).json({ message: 'Community ID is required' })
+  }
+  try {
+    const community = await Community.findById(communityId)
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    if (!community.creators.includes(userId)) {
+      return res.status(403).json({ message: 'You are not a creator of this community' })
+    }
+    if(community.founder.toString()!==userId.toString()){
+      return res.status(403).json({ message: 'Only the current founder can change the founder' })
+    }
+    // get the first creator who joined
+    const firstCreator = community.creators[1]
+    if (!firstCreator) {
+      return res.status(404).json({ message: 'No creators found in this community' })
+    }
+    // update the community founder
+    community.founder = firstCreator
+    await community.save()
+    res.status(200).json({
+      message: 'Community founder changed to first creator successfully',
+      community,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   getCommunityProfileDetails,
   getAllCommunities,
@@ -687,5 +721,6 @@ module.exports = {
   getTrendingVideosByCommunity,
   getCommunityVideos,
   getListOfCreators,
-  changeCommunityFounder
+  changeCommunityFounder,
+  makeFirstJoinedCreatorFounder
 }
