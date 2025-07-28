@@ -26,10 +26,7 @@ const longVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    is_unpublished: {
-      type: Boolean,
-      default: false,
-    },
+
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {
@@ -135,7 +132,12 @@ const longVideoSchema = new mongoose.Schema(
     },
     hidden_reason: {
       type: String,
-      enum: ['account_deactivated', 'user_request', 'admin_action'],
+      enum: [
+        'account_deactivated',
+        'user_request',
+        'admin_action',
+        'video_deleted',
+      ],
       default: null,
     },
     hidden_at: {

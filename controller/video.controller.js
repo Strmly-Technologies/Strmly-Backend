@@ -18,7 +18,15 @@ const uploadVideoToCommunity = async (req, res, next) => {
   try {
     const { communityId, videoId } = req.body
     const userId = req.user.id
-
+    const video = await LongVideo.findById(videoId).select(
+      'visibility video_deleted'
+    )
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
+      return res.status(404).json({ error: 'Long video not found' })
+    }
     const hasPermission = await checkCommunityUploadPermission(
       userId,
       communityId
@@ -521,7 +529,6 @@ const searchVideos = async (req, res, next) => {
             { genre: searchRegex },
           ],
         },
-        { visibility: { $ne: 'hidden' } },
       ],
     })
       .populate('created_by', 'username email')
@@ -539,7 +546,6 @@ const searchVideos = async (req, res, next) => {
             { genre: searchRegex },
           ],
         },
-        { visibility: { $ne: 'hidden' } },
       ],
     })
 
@@ -647,7 +653,10 @@ const deleteVideo = async (req, res, next) => {
       return res.status(404).json({ error: 'User not found' })
     }
     let video = await LongVideo.findById(videoId)
-    if (!video || video.is_unpublished) {
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
       return res.status(404).json({ error: 'Long video not found' })
     }
     //only video creator is allowed to delete the video
@@ -664,7 +673,9 @@ const deleteVideo = async (req, res, next) => {
       })
     }
     //unpublish video
-    video.is_unpublished = true
+    video.visibility = 'hidden'
+    video.hidden_reason = 'video_deleted'
+    video.hidden_at = new Date()
     await video.save()
 
     res.status(200).json({
@@ -680,9 +691,7 @@ const getTrendingVideos = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
-    let videos = await LongVideo.find({
-      visibility: { $ne: 'hidden' },
-    })
+    let videos = await LongVideo.find({})
       .populate('created_by', 'username email')
       .populate('community', 'name')
       .populate('series', 'title')
@@ -715,7 +724,6 @@ const getVideosByGenre = async (req, res, next) => {
 
     const videos = await LongVideo.find({
       genre,
-      visibility: { $ne: 'hidden' },
     })
       .populate('created_by', 'username email')
       .populate('community', 'name')
@@ -726,7 +734,6 @@ const getVideosByGenre = async (req, res, next) => {
 
     const total = await LongVideo.countDocuments({
       genre,
-      visibility: { $ne: 'hidden' },
     })
 
     res.status(200).json({
@@ -779,7 +786,6 @@ const getRelatedVideos = async (req, res, next) => {
     const relatedVideos = await LongVideo.find({
       _id: { $ne: id },
       genre: video.genre,
-      visibility: { $ne: 'hidden' },
     })
       .populate('created_by', 'username email')
       .populate('community', 'name')
