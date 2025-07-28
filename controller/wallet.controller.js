@@ -785,15 +785,40 @@ const transferCommunityFee = async (req, res, next) => {
     const existingAccess = await CommunityAccess.findOne({
       user_id: creatorId,
       community_id: communityId,
-      status: 'active',
     })
 
     if (existingAccess) {
-      return res.status(400).json({
-        success: false,
-        error: 'You already have upload access to this community',
-        code: 'ALREADY_HAS_ACCESS',
-      })
+      // Check if access is expired
+      if (existingAccess.isExpired()) {
+        // Renew expired access
+        await existingAccess.renewSubscription()
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Community access renewed successfully!',
+          access: {
+            communityId: communityId,
+            accessType: 'paid',
+            status: 'renewed',
+            expiresAt: existingAccess.expires_at,
+            uploadPermission: true,
+          },
+          nextSteps: {
+            message: 'You can continue uploading videos to this community',
+            communityId: communityId,
+          },
+        })
+      } else if (existingAccess.status === 'active') {
+        return res.status(400).json({
+          success: false,
+          error: 'You already have active upload access to this community',
+          code: 'ALREADY_HAS_ACCESS',
+          currentAccess: {
+            expiresAt: existingAccess.expires_at,
+            daysRemaining: Math.ceil((existingAccess.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
+          },
+        })
+      }
     }
 
     // Check if creator is trying to pay themselves
@@ -955,7 +980,9 @@ const transferCommunityFee = async (req, res, next) => {
 
         await founderTransaction.save({ session })
 
-        // Create community access record
+        // Create community access record with 30-day expiry
+        const accessExpiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        
         const communityAccess = new CommunityAccess({
           user_id: creatorId,
           community_id: communityId,
@@ -963,6 +990,8 @@ const transferCommunityFee = async (req, res, next) => {
           payment_id: walletTransfer._id,
           payment_amount: amount,
           payment_date: new Date(),
+          expires_at: accessExpiryDate,
+          subscription_status: 'active',
           status: 'active',
           granted_at: new Date(),
         })
@@ -1001,7 +1030,7 @@ const transferCommunityFee = async (req, res, next) => {
 
       res.status(200).json({
         success: true,
-        message: 'Community upload fee paid successfully!',
+        message: 'Community monthly subscription activated successfully!',
         transfer: {
           totalAmount: amount,
           founderAmount: founderAmount,
@@ -1033,11 +1062,15 @@ const transferCommunityFee = async (req, res, next) => {
           communityId: communityId,
           accessType: 'paid',
           uploadPermission: true,
+          subscriptionType: 'monthly',
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          daysRemaining: 30,
           grantedAt: new Date(),
         },
         nextSteps: {
-          message: 'You can now upload videos to this community',
+          message: 'You can now upload videos to this community for 30 days',
           communityId: communityId,
+          renewalInfo: 'Your subscription will need to be renewed after 30 days',
         },
       })
     } catch (transactionError) {

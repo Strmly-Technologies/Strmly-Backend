@@ -50,6 +50,8 @@ const walletTransferSchema = new mongoose.Schema(
         'gift',
         'comment_gift',
         'community_fee',
+        'community_subscription',
+        'creator_pass',
       ],
     },
     content_id: {

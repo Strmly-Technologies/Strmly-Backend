@@ -191,23 +191,55 @@ const checkCommunityUploadPermission = async (userId, communityId) => {
     return { hasPermission: true, accessType: 'free' }
   }
 
-  // Check paid access
+  // Check paid access with expiry validation
   const access = await CommunityAccess.findOne({
     user_id: userId,
     community_id: communityId,
-    status: 'active',
   })
 
   if (!access) {
     return {
       hasPermission: false,
-      error: 'Upload fee required to upload content',
+      error: 'Monthly subscription required to upload content',
       requiredFee: community.community_fee_amount,
       communityName: community.name,
+      subscriptionInfo: 'Monthly subscription provides 30 days of upload access',
     }
   }
 
-  return { hasPermission: true, accessType: 'paid', access }
+  // Check if access is expired
+  if (access.isExpired()) {
+    // Update status to expired
+    access.status = 'expired'
+    access.subscription_status = 'expired'
+    await access.save()
+
+    return {
+      hasPermission: false,
+      error: 'Your community subscription has expired',
+      requiredFee: community.community_fee_amount,
+      communityName: community.name,
+      expiredAt: access.expires_at,
+      renewalRequired: true,
+    }
+  }
+
+  // Check if access is active
+  if (access.status !== 'active') {
+    return {
+      hasPermission: false,
+      error: 'Community access is not active',
+      accessStatus: access.status,
+    }
+  }
+
+  return { 
+    hasPermission: true, 
+    accessType: 'paid', 
+    access,
+    expiresAt: access.expires_at,
+    daysRemaining: Math.ceil((access.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
+  }
 }
 
 const getAllCommunities = async (req, res, next) => {
@@ -584,6 +616,61 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
   }
 }
 
+const getListOfCreators=async(req,res,next)=>{
+  const { communityId } = req.params
+  const userId = req.user.id
+  if (!communityId) {
+    return res.status(400).json({ message: 'Community ID is required' })
+  }
+  try {
+    const community = await Community.findById(communityId)
+    .populate('creators', 'username profile_photo')
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    if (!community.creators.includes(userId)) {
+      return res.status(403).json({ message: 'You are not a creator of this community' })
+    }
+    return res.status(200).json({
+      message: 'Creators fetched successfully',
+      creators: community.creators,
+    }) 
+  } catch (error) {
+    handleError(error, req, res, next) 
+  }
+}
+
+const changeCommunityFounder=async(req,res,next)=>{
+  const {communityId, newFounderId}=req.body
+  const userId=req.user.id;
+  if (!communityId || !newFounderId) {
+    return res.status(400).json({ message: 'Community ID and new founder ID are required' })
+  }
+  // get the community
+ try {
+   const community=await Community.findById(communityId)
+   if (!community) {
+     return res.status(404).json({ message: 'Community not found' })
+   }
+   // check if user is the founder
+   if(community.founder.toString()!==userId.toString()){
+     return res.status(403).json({ message: 'Only the current founder can change the founder' })
+   }
+   // check if new founder exists
+   const newFounder=await User.findById(newFounderId)
+   if (!newFounder) {
+     return res.status(404).json({ message: 'New founder not found' })
+   }
+   // update the community founder
+   community.founder=newFounderId
+   await community.save()
+   res.status(200).json({ message: 'Community founder changed successfully', community })
+ 
+ } catch (error) {
+  handleError(error, req, res, next)
+ }
+}
+
 module.exports = {
   getCommunityProfileDetails,
   getAllCommunities,
@@ -599,4 +686,6 @@ module.exports = {
   getTrendingCommunityVideos,
   getTrendingVideosByCommunity,
   getCommunityVideos,
+  getListOfCreators,
+  changeCommunityFounder
 }

@@ -222,6 +222,37 @@ const verifyCreatorPassPayment = async (req, res, next) => {
   }
 }
 
+const checkCreatorPassAccess = async (userId, creatorId) => {
+  try {
+    const activePass = await CreatorPass.findOne({
+      user_id: userId,
+      creator_id: creatorId,
+      status: 'active',
+      end_date: { $gt: new Date() }, // Only active and not expired
+    })
+
+    if (activePass) {
+      // Double-check expiry in case of edge cases
+      const now = new Date()
+      if (activePass.end_date <= now) {
+        // Mark as expired
+        activePass.status = 'expired'
+        await activePass.save()
+        return { hasAccess: false, pass: null, reason: 'expired' }
+      }
+    }
+
+    return {
+      hasAccess: !!activePass,
+      pass: activePass,
+      daysRemaining: activePass ? Math.ceil((activePass.end_date - new Date()) / (1000 * 60 * 60 * 24)) : 0,
+    }
+  } catch (error) {
+    console.error('Error checking Creator Pass access:', error)
+    return { hasAccess: false, pass: null, reason: 'error' }
+  }
+}
+
 const getCreatorPassStatus = async (req, res, next) => {
   try {
     const userId = req.user.id
@@ -235,17 +266,29 @@ const getCreatorPassStatus = async (req, res, next) => {
     }).populate('creator_id', 'username')
 
     if (!activePass) {
+      // Check if there's an expired pass
+      const expiredPass = await CreatorPass.findOne({
+        user_id: userId,
+        creator_id: creatorId,
+        status: { $in: ['active', 'expired'] },
+      }).populate('creator_id', 'username').sort({ end_date: -1 })
+
       const creator = await User.findById(creatorId).select(
         'username creator_profile'
       )
+
       return res.status(200).json({
         success: true,
         hasActivePass: false,
-        message: 'No active Creator Pass for this creator',
+        message: expiredPass ? 'Your Creator Pass has expired' : 'No Creator Pass for this creator',
         creator: {
           name: creator?.username,
           passPrice: creator?.creator_profile?.creator_pass_price || 199,
         },
+        lastPass: expiredPass ? {
+          expiredAt: expiredPass.end_date,
+          status: expiredPass.status,
+        } : null,
       })
     }
 
@@ -263,6 +306,7 @@ const getCreatorPassStatus = async (req, res, next) => {
         endDate: activePass.end_date,
         daysRemaining: daysRemaining,
         status: activePass.status,
+        subscriptionType: 'monthly',
       },
       benefits: {
         features: [
@@ -275,25 +319,6 @@ const getCreatorPassStatus = async (req, res, next) => {
     })
   } catch (error) {
     handleError(error, req, res, next)
-  }
-}
-
-const checkCreatorPassAccess = async (userId, creatorId) => {
-  try {
-    const activePass = await CreatorPass.findOne({
-      user_id: userId,
-      creator_id: creatorId,
-      status: 'active',
-      end_date: { $gt: new Date() },
-    })
-
-    return {
-      hasAccess: !!activePass,
-      pass: activePass,
-    }
-  } catch (error) {
-    console.error('Error checking Creator Pass access:', error)
-    return { hasAccess: false, pass: null }
   }
 }
 
