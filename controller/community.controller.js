@@ -691,7 +691,7 @@ const makeFirstJoinedCreatorFounder=async(req,res,next)=>{
     // get the first creator who joined
     const firstCreator = community.creators[1]
     if (!firstCreator) {
-      return res.status(404).json({ message: 'No creators found in this community' })
+      return res.status(404).json({ message: 'Community must have at least 2 creators' })
     }
     // update the community founder
     community.founder = firstCreator
