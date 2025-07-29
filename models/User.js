@@ -179,6 +179,28 @@ const userSchema = new mongoose.Schema(
         default: 0,
         max: 10000,
       },
+      creator_pass_deletion: {
+        deletion_requested: {
+          type: Boolean,
+          default: false,
+        },
+        deletion_requested_at: {
+          type: Date,
+          default: null,
+        },
+        deletion_reason: {
+          type: String,
+          default: null,
+        },
+        deletion_eligible_at: {
+          type: Date,
+          default: null,
+        },
+        last_subscriber_expires_at: {
+          type: Date,
+          default: null,
+        },
+      },
     },
     phone: {
       type: String,
