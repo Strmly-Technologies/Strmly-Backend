@@ -6,6 +6,7 @@ const UserAccess = require('../models/UserAccess')
 const Reshare = require('../models/Reshare')
 const { getRedisClient } = require('../config/redis')
 const CreatorPass = require('../models/CreatorPass')
+const Comment = require('../models/Comment')
 const Series = require('../models/Series')
 const GetUserFeed = async (req, res, next) => {
   try {
@@ -1750,6 +1751,29 @@ const toggleCommentMonetization = async (req, res, next) => {
   }
 }
 
+const saveUserFCMToken = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const { fcm_token } = req.body
+    if (!userId || !fcm_token) {
+      return res
+        .status(400)
+        .json({ message: 'userId and fcm_token are required' })
+    }
+    const user = await User.findById(userId).select('FCM_token')
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    user.FCM_token = fcm_token
+    await user.save()
+    return res.status(200).json({
+      message: 'User FCM token saved successfully',
+    })
+  } catch (error) {
+    return handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -1775,4 +1799,5 @@ module.exports = {
   getUserDashboardAnalytics,
   getUserPurchasedAccess,
   toggleCommentMonetization,
+  saveUserFCMToken,
 }

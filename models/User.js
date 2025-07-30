@@ -82,6 +82,10 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
+    FCM_token: {
+      type: String,
+      default: '',
+    },
     commented_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'LongVideo',

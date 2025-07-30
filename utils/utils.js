@@ -11,6 +11,7 @@ const {
   UnknownResolutionError,
   S3UploadError,
   NotificationQueueError,
+  FireBaseNotificationError,
 } = require('./errors')
 
 const dynamicVideoUpload = (req, res, next) => {
@@ -405,6 +406,15 @@ const handleError = (err, req, res) => {
       success: false,
       error: 'Internal server error',
       code: 'NOTIFICATION_QUEUE_ERROR',
+    })
+  }
+
+  if (err instanceof FireBaseNotificationError) {
+    console.error('firebase error', err)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'FIREBASE_NOTIFICATION_ERROR',
     })
   }
 

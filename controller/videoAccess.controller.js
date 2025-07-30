@@ -48,7 +48,7 @@ const checkVideoAccess = async (req, res, next) => {
     }
 
     // Check if video is free (all short videos are free, long videos check type)
-    if (video.type === 'Free') {
+    if (video.type === 'Free' && video.visibility === 'public') {
       return res.status(200).json({
         success: true,
         hasAccess: true,

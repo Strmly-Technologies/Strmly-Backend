@@ -1,6 +1,7 @@
 const Community = require('../models/Community')
 const CommunityAccess = require('../models/CommunityAccess')
 const LongVideo = require('../models/LongVideo')
+const User = require('../models/User')
 const { handleError, uploadImageToS3 } = require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
@@ -130,9 +131,9 @@ const FollowCommunity = async (req, res, next) => {
   try {
     await Community.updateOne(
       { _id: communityId },
-      { 
+      {
         $addToSet: { followers: userId },
-        $set: { 'analytics.last_analytics_update': new Date() }
+        $set: { 'analytics.last_analytics_update': new Date() },
       }
     )
 
@@ -203,7 +204,8 @@ const checkCommunityUploadPermission = async (userId, communityId) => {
       error: 'Monthly subscription required to upload content',
       requiredFee: community.community_fee_amount,
       communityName: community.name,
-      subscriptionInfo: 'Monthly subscription provides 30 days of upload access',
+      subscriptionInfo:
+        'Monthly subscription provides 30 days of upload access',
     }
   }
 
@@ -233,12 +235,14 @@ const checkCommunityUploadPermission = async (userId, communityId) => {
     }
   }
 
-  return { 
-    hasPermission: true, 
-    accessType: 'paid', 
+  return {
+    hasPermission: true,
+    accessType: 'paid',
     access,
     expiresAt: access.expires_at,
-    daysRemaining: Math.ceil((access.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
+    daysRemaining: Math.ceil(
+      (access.expires_at - new Date()) / (1000 * 60 * 60 * 24)
+    ),
   }
 }
 
@@ -547,9 +551,9 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
 
     let trendingVideos = []
 
-    const longVideos = await LongVideo.find({ 
+    const longVideos = await LongVideo.find({
       community: communityId,
-      visibility: { $ne: 'hidden' }
+      visibility: { $ne: 'hidden' },
     })
       .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo')
@@ -583,7 +587,7 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
     // Get totals for this community
     const totalLongVideos = await LongVideo.countDocuments({
       community: communityId,
-      visibility: { $ne: 'hidden' }
+      visibility: { $ne: 'hidden' },
     })
 
     res.status(200).json({
@@ -616,62 +620,71 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
   }
 }
 
-const getListOfCreators=async(req,res,next)=>{
+const getListOfCreators = async (req, res, next) => {
   const { communityId } = req.params
   const userId = req.user.id
   if (!communityId) {
     return res.status(400).json({ message: 'Community ID is required' })
   }
   try {
-    const community = await Community.findById(communityId)
-    .populate('creators', 'username profile_photo')
+    const community = await Community.findById(communityId).populate(
+      'creators',
+      'username profile_photo'
+    )
     if (!community) {
       return res.status(404).json({ message: 'Community not found' })
     }
     if (!community.creators.includes(userId)) {
-      return res.status(403).json({ message: 'You are not a creator of this community' })
+      return res
+        .status(403)
+        .json({ message: 'You are not a creator of this community' })
     }
     return res.status(200).json({
       message: 'Creators fetched successfully',
       creators: community.creators,
-    }) 
+    })
   } catch (error) {
-    handleError(error, req, res, next) 
+    handleError(error, req, res, next)
   }
 }
 
-const changeCommunityFounder=async(req,res,next)=>{
-  const {communityId, newFounderId}=req.body
-  const userId=req.user.id;
+const changeCommunityFounder = async (req, res, next) => {
+  const { communityId, newFounderId } = req.body
+  const userId = req.user.id
   if (!communityId || !newFounderId) {
-    return res.status(400).json({ message: 'Community ID and new founder ID are required' })
+    return res
+      .status(400)
+      .json({ message: 'Community ID and new founder ID are required' })
   }
   // get the community
- try {
-   const community=await Community.findById(communityId)
-   if (!community) {
-     return res.status(404).json({ message: 'Community not found' })
-   }
-   // check if user is the founder
-   if(community.founder.toString()!==userId.toString()){
-     return res.status(403).json({ message: 'Only the current founder can change the founder' })
-   }
-   // check if new founder exists
-   const newFounder=await User.findById(newFounderId)
-   if (!newFounder) {
-     return res.status(404).json({ message: 'New founder not found' })
-   }
-   // update the community founder
-   community.founder=newFounderId
-   await community.save()
-   res.status(200).json({ message: 'Community founder changed successfully', community })
- 
- } catch (error) {
-  handleError(error, req, res, next)
- }
+  try {
+    const community = await Community.findById(communityId)
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    // check if user is the founder
+    if (community.founder.toString() !== userId.toString()) {
+      return res
+        .status(403)
+        .json({ message: 'Only the current founder can change the founder' })
+    }
+    // check if new founder exists
+    const newFounder = await User.findById(newFounderId)
+    if (!newFounder) {
+      return res.status(404).json({ message: 'New founder not found' })
+    }
+    // update the community founder
+    community.founder = newFounderId
+    await community.save()
+    res
+      .status(200)
+      .json({ message: 'Community founder changed successfully', community })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
 }
 
-const makeFirstJoinedCreatorFounder=async(req,res,next)=>{
+const makeFirstJoinedCreatorFounder = async (req, res, next) => {
   const { communityId } = req.body
   const userId = req.user.id
   if (!communityId) {
@@ -683,15 +696,21 @@ const makeFirstJoinedCreatorFounder=async(req,res,next)=>{
       return res.status(404).json({ message: 'Community not found' })
     }
     if (!community.creators.includes(userId)) {
-      return res.status(403).json({ message: 'You are not a creator of this community' })
+      return res
+        .status(403)
+        .json({ message: 'You are not a creator of this community' })
     }
-    if(community.founder.toString()!==userId.toString()){
-      return res.status(403).json({ message: 'Only the current founder can change the founder' })
+    if (community.founder.toString() !== userId.toString()) {
+      return res
+        .status(403)
+        .json({ message: 'Only the current founder can change the founder' })
     }
     // get the first creator who joined
     const firstCreator = community.creators[1]
     if (!firstCreator) {
-      return res.status(404).json({ message: 'Community must have at least 2 creators' })
+      return res
+        .status(404)
+        .json({ message: 'Community must have at least 2 creators' })
     }
     // update the community founder
     community.founder = firstCreator
@@ -722,5 +741,5 @@ module.exports = {
   getCommunityVideos,
   getListOfCreators,
   changeCommunityFounder,
-  makeFirstJoinedCreatorFounder
+  makeFirstJoinedCreatorFounder,
 }

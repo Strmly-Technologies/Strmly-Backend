@@ -1,6 +1,7 @@
 const { Worker } = require('bullmq')
 const { emitNotificationToUser } = require('./websocket')
 const Notification = require('../models/Notification')
+const sendPushNotification = require('./push_notification')
 
 let notificationWorker
 const maxRetries = 3
@@ -69,7 +70,12 @@ const initializeWorker = async () => {
               replyId: notificationData.replyId,
             },
           }
-
+          await sendPushNotification(
+            notificationData.fcmToken,
+            socketNotification.title,
+            socketNotification.display,
+            socketNotification
+          )
           // Emit notification to specific user via WebSocket
           emitNotificationToUser(notificationData.to, socketNotification)
 

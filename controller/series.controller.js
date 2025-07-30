@@ -20,15 +20,9 @@ const createSeries = async (req, res, next) => {
       communityId,
     } = req.body
 
-    if (
-      !title ||
-      !description ||
-      !genre ||
-      !language ||
-      !type     ) {
+    if (!title || !description || !genre || !language || !type) {
       return res.status(400).json({
-        error:
-          'Required fields: title, description, genre, language, type',
+        error: 'Required fields: title, description, genre, language, type',
       })
     }
 
@@ -105,24 +99,23 @@ const getSeriesById = async (req, res, next) => {
   }
 }
 
-const getUserSeries=async(req,res,next)=>{
-  const userId=req.user.id
-  if(!userId){
+const getUserSeries = async (req, res, next) => {
+  const userId = req.user.id
+  if (!userId) {
     return res.status(400).json({ error: 'User ID is required' })
   }
   try {
-    const series=await Series.find({created_by:userId})
-    .populate('created_by', 'username email')
-    .populate('community', 'name')
+    const series = await Series.find({ created_by: userId })
+      .populate('created_by', 'username email')
+      .populate('community', 'name')
 
-    if(!series || series.length === 0){
+    if (!series || series.length === 0) {
       return res.status(404).json({ error: 'No series found for this user' })
     }
     res.status(200).json({
       message: 'User series retrieved successfully',
       data: series,
     })
-    
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -132,8 +125,16 @@ const updateSeries = async (req, res, next) => {
   try {
     const { id } = req.params
     const userId = req.user.id
-    const { title, description, posterUrl, bannerUrl, status, seasons, price, type } =
-      req.body
+    const {
+      title,
+      description,
+      posterUrl,
+      bannerUrl,
+      status,
+      seasons,
+      price,
+      type,
+    } = req.body
 
     const series = await Series.findById(id)
     if (!series) {
@@ -196,10 +197,14 @@ const updateSeries = async (req, res, next) => {
 const deleteSeries = async (req, res, next) => {
   try {
     const { id } = req.params
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
     const series = await Series.findById(id)
-    if (!series) {
+    if (
+      !series ||
+      (series.visibility === 'hidden' &&
+        series.hidden_reason === 'series_deleted')
+    ) {
       return res.status(404).json({ error: 'Series not found' })
     }
 
@@ -221,7 +226,10 @@ const deleteSeries = async (req, res, next) => {
       }
     )
 
-    await Series.findByIdAndDelete(id)
+    series.visibility = 'hidden'
+    series.hidden_reason = 'series_deleted'
+    series.hidden_at = new Date()
+    await series.save()
 
     res.status(200).json({
       message: 'Series deleted successfully',
@@ -263,7 +271,9 @@ const addEpisodeToSeries = async (req, res, next) => {
     }
 
     if (video.created_by.toString() !== userId.toString()) {
-      console.error(`${video.created_by.toString()} is not authorized to use video ${videoId} by user ${userId.toString()}`)
+      console.error(
+        `${video.created_by.toString()} is not authorized to use video ${videoId} by user ${userId.toString()}`
+      )
       return res.status(403).json({ error: 'Not authorized to use this video' })
     }
 
@@ -288,13 +298,13 @@ const addEpisodeToSeries = async (req, res, next) => {
 
     await Series.findByIdAndUpdate(id, {
       $addToSet: { episodes: videoId },
-      $inc: { 
+      $inc: {
         total_episodes: 1,
         'analytics.total_likes': video.likes,
         'analytics.total_views': video.views,
-        'analytics.total_shares': video.shares
+        'analytics.total_shares': video.shares,
       },
-      $set: { 'analytics.last_analytics_update': new Date() }
+      $set: { 'analytics.last_analytics_update': new Date() },
     })
 
     res.status(200).json({

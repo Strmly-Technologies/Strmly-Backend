@@ -46,6 +46,13 @@ class NotificationQueueError extends Error {
     this.name = 'notification_queue_error'
   }
 }
+
+class FireBaseNotificationError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'firebase_notification_error'
+  }
+}
 module.exports = {
   FileSaveError,
   FFProbeError,
@@ -54,4 +61,5 @@ module.exports = {
   S3UploadError,
   RedisConnectionError,
   NotificationQueueError,
+  FireBaseNotificationError,
 }

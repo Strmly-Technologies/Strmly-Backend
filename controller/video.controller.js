@@ -10,6 +10,8 @@ const {
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
+const path = require('path')
+const os = require('os')
 const videoCompressor = require('../utils/video_compressor')
 const generateVideoABSSegments = require('../utils/ABS')
 const fs = require('fs')
@@ -220,7 +222,7 @@ const uploadVideo = async (req, res, next) => {
   }
 }
 
-const uploadVideoChunks = () => {
+const uploadVideoChunks = (req, res, next) => {
   try {
     const userId = req.user.id.toString()
     const videoFile = req.files?.videoFile?.[0]
@@ -250,7 +252,7 @@ const uploadVideoChunks = () => {
       chunkIndex,
       totalChunks,
     })
-  } catch (e) {
+  } catch (error) {
     handleError(error, req, res, next)
   }
 }
@@ -260,7 +262,7 @@ const isMP4 = (originalname, mimetype) => {
   return isValidExtension && isValidMime
 }
 
-const finaliseChunkUpload = async () => {
+const finaliseChunkUpload = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
     const {
@@ -489,21 +491,20 @@ const createVideoABSSegments = async (req, res, next) => {
 const getVideoABSSegments = async (req, res, next) => {
   const userId = req.user.id.toString()
   const { videoId } = req.query
-
-  if (!userId || !videoId) {
-    console.error(' User ID or Video ID not found in request')
-    return res.status(400).json({ error: 'User ID, Video ID is required' })
-  }
-
-  const video = await LongVideo.findById(videoId).select('videoResolutions')
-  if (!video) {
-    return res.status(404).json({ error: 'Video not found' })
-  }
-  res.status(200).json({
-    message: 'Segments retrieved successfully',
-    segments: video.videoResolutions,
-  })
   try {
+    if (!userId || !videoId) {
+      console.error(' User ID or Video ID not found in request')
+      return res.status(400).json({ error: 'User ID, Video ID is required' })
+    }
+
+    const video = await LongVideo.findById(videoId).select('videoResolutions')
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' })
+    }
+    res.status(200).json({
+      message: 'Segments retrieved successfully',
+      segments: video.videoResolutions,
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -646,13 +647,13 @@ const updateVideo = async (req, res, next) => {
 
 const deleteVideo = async (req, res, next) => {
   try {
-    const { videoId } = req.body
+    const { id } = req.params
     const userId = req.user.id.toString()
     const user = await User.findById(userId)
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
-    let video = await LongVideo.findById(videoId)
+    let video = await LongVideo.findById(id)
     if (
       !video ||
       (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
@@ -664,13 +665,6 @@ const deleteVideo = async (req, res, next) => {
       return res
         .status(403)
         .json({ error: 'Not authorized to delete this video' })
-    }
-    //remove video from series  --series deletion handling has to be done later...
-    if (video.series) {
-      await Series.findByIdAndUpdate(video.series, {
-        $pull: { episodes: id },
-        $inc: { total_episodes: -1 },
-      })
     }
     //unpublish video
     video.visibility = 'hidden'

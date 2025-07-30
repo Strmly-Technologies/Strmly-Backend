@@ -1,9 +1,16 @@
 const User = require('../models/User')
-const { generateVerificationOTP, sendVerificationEmail, sendWelcomeEmail, generatePasswordResetToken, sendPasswordResetEmail, sendPasswordResetConfirmationEmail } = require('../utils/email')
+const {
+  generateVerificationOTP,
+  sendVerificationEmail,
+  sendWelcomeEmail,
+  generatePasswordResetToken,
+  sendPasswordResetEmail,
+  sendPasswordResetConfirmationEmail,
+} = require('../utils/email')
 const { generateToken } = require('../utils/jwt')
 const { handleError } = require('../utils/utils')
 const { validateAndSanitize } = require('../middleware/validation')
-
+const LongVideo = require('../models/LongVideo')
 const RegisterNewUser = async (req, res, next) => {
   const { email, password } = req.body
 
@@ -25,31 +32,38 @@ const RegisterNewUser = async (req, res, next) => {
     }
 
     //generate a verification OTP
-    const verificationOTP = generateVerificationOTP();
+    const verificationOTP = generateVerificationOTP()
     const verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
     const newUser = new User({
       username,
       email,
       password,
-      email_verification:{
-        is_verified:false,
+      email_verification: {
+        is_verified: false,
         verification_otp: verificationOTP,
         verification_otp_expires: verificationOTPExpires,
         verification_sent_at: new Date(),
-      }
-    });
+      },
+    })
 
     await newUser.save()
 
-    const emailResult=await sendVerificationEmail(email,username,verificationOTP);
-    if(!emailResult.success){
-      return res.status(500).json({ message: 'Failed to send verification email' })
+    const emailResult = await sendVerificationEmail(
+      email,
+      username,
+      verificationOTP
+    )
+    if (!emailResult.success) {
+      return res
+        .status(500)
+        .json({ message: 'Failed to send verification email' })
     }
     const token = generateToken(newUser._id)
 
     res.status(201).json({
-      message: 'User registered successfully. Please check your email for the 6-digit verification code',
+      message:
+        'User registered successfully. Please check your email for the 6-digit verification code',
       token,
       user: {
         id: newUser._id,
@@ -57,10 +71,10 @@ const RegisterNewUser = async (req, res, next) => {
         email: newUser.email,
         email_verified: false,
       },
-     verification: {
+      verification: {
         email_sent: emailResult.success,
-        message: emailResult.success 
-          ? 'Verification OTP sent successfully' 
+        message: emailResult.success
+          ? 'Verification OTP sent successfully'
           : 'Registration completed but verification email failed to send',
         otp_expires_in: '10 minutes',
       },
@@ -70,9 +84,9 @@ const RegisterNewUser = async (req, res, next) => {
   }
 }
 
-const verifyEmail=async(req,res,next)=>{
-  const { otp } = req.body;
-  
+const verifyEmail = async (req, res, next) => {
+  const { otp } = req.body
+
   if (!otp) {
     return res.status(400).json({ message: 'Verification OTP is required' })
   }
@@ -80,40 +94,40 @@ const verifyEmail=async(req,res,next)=>{
   // Validate OTP format
   const otpValidation = validateAndSanitize.otp(otp)
   if (!otpValidation.isValid) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       message: otpValidation.error,
-      code: 'INVALID_OTP_FORMAT'
+      code: 'INVALID_OTP_FORMAT',
     })
   }
 
   try {
-    const user=await User.findOne({
+    const user = await User.findOne({
       'email_verification.verification_otp': otpValidation.value,
       'email_verification.verification_otp_expires': { $gt: new Date() },
     })
-    
-    if(!user) {
-      return res.status(400).json({ 
+
+    if (!user) {
+      return res.status(400).json({
         message: 'Invalid or expired verification OTP',
-        code: 'INVALID_OTP'
+        code: 'INVALID_OTP',
       })
     }
 
-    if(user.email_verification.is_verified){
-      return res.status(400).json({ 
+    if (user.email_verification.is_verified) {
+      return res.status(400).json({
         message: 'Email is already verified',
-        code: 'ALREADY_VERIFIED'
+        code: 'ALREADY_VERIFIED',
       })
-    } 
-    
-    user.email_verification.is_verified = true;
-    user.email_verification.verification_otp = null;
-    user.email_verification.verification_otp_expires = null;
-    await user.save();
+    }
 
-    await sendWelcomeEmail(user.email, user.username);
-    
-   res.status(200).json({
+    user.email_verification.is_verified = true
+    user.email_verification.verification_otp = null
+    user.email_verification.verification_otp_expires = null
+    await user.save()
+
+    await sendWelcomeEmail(user.email, user.username)
+
+    res.status(200).json({
       message: 'Email verified successfully! You can now sign in.',
       user: {
         id: user._id,
@@ -142,18 +156,19 @@ const resendVerificationEmail = async (req, res, next) => {
     }
 
     if (user.email_verification.is_verified) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Email is already verified',
-        code: 'ALREADY_VERIFIED'
+        code: 'ALREADY_VERIFIED',
       })
     }
 
     // Check if we can resend (rate limiting)
     const lastSent = user.email_verification.verification_sent_at
-    if (lastSent && new Date() - lastSent < 60000) { // 1 minute cooldown
-      return res.status(429).json({ 
+    if (lastSent && new Date() - lastSent < 60000) {
+      // 1 minute cooldown
+      return res.status(429).json({
         message: 'Please wait before requesting another verification OTP',
-        code: 'RATE_LIMITED'
+        code: 'RATE_LIMITED',
       })
     }
 
@@ -167,12 +182,16 @@ const resendVerificationEmail = async (req, res, next) => {
     await user.save()
 
     // Send verification email
-    const emailResult = await sendVerificationEmail(user.email, user.username, verificationOTP)
+    const emailResult = await sendVerificationEmail(
+      user.email,
+      user.username,
+      verificationOTP
+    )
 
     if (!emailResult.success) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: 'Failed to send verification email',
-        code: 'EMAIL_SEND_FAILED'
+        code: 'EMAIL_SEND_FAILED',
       })
     }
 
@@ -199,7 +218,7 @@ const LoginUserWithEmail = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid email or password' })
     }
     if (!user.email_verification.is_verified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Please verify your email before signing in',
         code: 'EMAIL_NOT_VERIFIED',
         email: user.email,
@@ -213,25 +232,25 @@ const LoginUserWithEmail = async (req, res, next) => {
     }
 
     const token = generateToken(user._id)
-    if(user.isDeactivated()){
+    if (user.isDeactivated()) {
       console.log('Reactivating deactivated user:', user._id)
 
-     await user.reactivateAccount();
-     await LongVideo.updateMany(
-    { 
-      created_by: user._id,
-      hidden_reason: 'account_deactivated'
-    },
-    {
-      $set: { visibility: 'public' },
-      $unset: { 
-        hidden_reason: 1,
-        hidden_at: 1
-      }
+      await user.reactivateAccount()
+      await LongVideo.updateMany(
+        {
+          created_by: user._id,
+          hidden_reason: 'account_deactivated',
+        },
+        {
+          $set: { visibility: 'public' },
+          $unset: {
+            hidden_reason: 1,
+            hidden_at: 1,
+          },
+        }
+      )
+      console.log(`Account reactivated for user: ${user.username}`)
     }
-  )
-    console.log(`Account reactivated for user: ${user.username}`)
-}
 
     res.status(200).json({
       message: 'Login successful',
@@ -262,7 +281,7 @@ const LoginUserWithUsername = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid username or password' })
     }
     if (!user.email_verification.is_verified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Please verify your email before signing in',
         code: 'EMAIL_NOT_VERIFIED',
         email: user.email,
@@ -292,10 +311,10 @@ const LoginUserWithUsername = async (req, res, next) => {
 }
 
 const RegisterUserWithGoogle = async (req, res, next) => {
-const { email,picture } = req.googleUser; 
-if(!email){
-  return res.status(401).json({ message: 'Malformed google Id-token' })
-}
+  const { email, picture } = req.googleUser
+  if (!email) {
+    return res.status(401).json({ message: 'Malformed google Id-token' })
+  }
 
   try {
     const existingUser = await User.findOne({ email })
@@ -313,11 +332,11 @@ if(!email){
     const newUser = new User({
       username,
       email,
-      is_google_user:true,
+      is_google_user: true,
     })
 
-    if(picture){
-      newUser.profile_photo=picture;
+    if (picture) {
+      newUser.profile_photo = picture
     }
 
     await newUser.save()
@@ -338,14 +357,11 @@ if(!email){
   }
 }
 
-
 const LoginUserWithGoogle = async (req, res, next) => {
-  const { email} = req.googleUser; 
+  const { email } = req.googleUser
 
   if (!email) {
-    return res
-      .status(400)
-      .json({ message: 'Malformed google Id-token' })
+    return res.status(400).json({ message: 'Malformed google Id-token' })
   }
 
   try {
@@ -355,7 +371,9 @@ const LoginUserWithGoogle = async (req, res, next) => {
     }
 
     if (!user.is_google_user) {
-      return res.status(400).json({ message: 'Email is not linked with a google account' })
+      return res
+        .status(400)
+        .json({ message: 'Email is not linked with a google account' })
     }
 
     const token = generateToken(user._id)
@@ -373,9 +391,6 @@ const LoginUserWithGoogle = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
-
-
-
 
 const LogoutUser = (req, res) => {
   // Remove the token on the client side
@@ -411,18 +426,20 @@ const forgotPassword = async (req, res, next) => {
     const user = await User.findOne({ email })
     if (!user) {
       // Don't reveal if email exists or not for security
-      return res.status(200).json({ 
-        message: 'If an account with that email exists, we have sent a password reset link.',
-        email_sent: true
+      return res.status(200).json({
+        message:
+          'If an account with that email exists, we have sent a password reset link.',
+        email_sent: true,
       })
     }
 
     // Check if we can send reset email (rate limiting)
     const lastReset = user.password_reset.reset_requested_at
-    if (lastReset && new Date() - lastReset < 300000) { // 5 minutes cooldown
-      return res.status(429).json({ 
+    if (lastReset && new Date() - lastReset < 300000) {
+      // 5 minutes cooldown
+      return res.status(429).json({
         message: 'Please wait before requesting another password reset email',
-        code: 'RATE_LIMITED'
+        code: 'RATE_LIMITED',
       })
     }
 
@@ -436,17 +453,21 @@ const forgotPassword = async (req, res, next) => {
     await user.save()
 
     // Send reset email
-    const emailResult = await sendPasswordResetEmail(user.email, user.username, resetToken)
+    const emailResult = await sendPasswordResetEmail(
+      user.email,
+      user.username,
+      resetToken
+    )
 
     if (!emailResult.success) {
       // Reset the token if email fails
       user.password_reset.reset_token = null
       user.password_reset.reset_token_expires = null
       await user.save()
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         message: 'Failed to send password reset email',
-        code: 'EMAIL_SEND_FAILED'
+        code: 'EMAIL_SEND_FAILED',
       })
     }
 
@@ -464,9 +485,9 @@ const verifyResetToken = async (req, res, next) => {
     const { token } = req.body
 
     if (!token) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Reset token is required',
-        code: 'TOKEN_REQUIRED'
+        code: 'TOKEN_REQUIRED',
       })
     }
 
@@ -476,16 +497,16 @@ const verifyResetToken = async (req, res, next) => {
     })
 
     if (!user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid or expired reset token',
-        code: 'INVALID_TOKEN'
+        code: 'INVALID_TOKEN',
       })
     }
 
     res.status(200).json({
       message: 'Reset token is valid',
       valid: true,
-      email: user.email 
+      email: user.email,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -497,20 +518,20 @@ const resetPassword = async (req, res, next) => {
     const { token, newPassword, confirmPassword } = req.body
 
     if (!token || !newPassword || !confirmPassword) {
-      return res.status(400).json({ 
-        message: 'Token, new password, and password confirmation are required' 
+      return res.status(400).json({
+        message: 'Token, new password, and password confirmation are required',
       })
     }
 
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ 
-        message: 'Passwords do not match' 
+      return res.status(400).json({
+        message: 'Passwords do not match',
       })
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ 
-        message: 'Password must be at least 6 characters long' 
+      return res.status(400).json({
+        message: 'Password must be at least 6 characters long',
       })
     }
 
@@ -520,17 +541,17 @@ const resetPassword = async (req, res, next) => {
     }).select('+password')
 
     if (!user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Invalid or expired reset token',
-        code: 'INVALID_TOKEN'
+        code: 'INVALID_TOKEN',
       })
     }
 
     // Check if new password is different from current password
     const isSamePassword = await user.comparePassword(newPassword)
     if (isSamePassword) {
-      return res.status(400).json({ 
-        message: 'New password must be different from your current password' 
+      return res.status(400).json({
+        message: 'New password must be different from your current password',
       })
     }
 
@@ -545,55 +566,55 @@ const resetPassword = async (req, res, next) => {
     await sendPasswordResetConfirmationEmail(user.email, user.username)
 
     res.status(200).json({
-      message: 'Password reset successfully. You can now sign in with your new password.',
+      message:
+        'Password reset successfully. You can now sign in with your new password.',
       success: true,
-      redirect: '/login'
+      redirect: '/login',
     })
   } catch (error) {
     handleError(error, req, res, next)
   }
 }
 
-const checkUsernameExists=async(req,res,next)=>{
-  const {username}=req.params;
-  if(!username){
+const checkUsernameExists = async (req, res, next) => {
+  const { username } = req.params
+  if (!username) {
     return res.status(400).json({ message: 'Username is required' })
   }
   try {
-    const user= await User.findOne({username})
-    if(user){
-      return res.status(200).json({ 
+    const user = await User.findOne({ username })
+    if (user) {
+      return res.status(200).json({
         exists: true,
-        message: 'Username already exists'
+        message: 'Username already exists',
       })
     }
     res.status(200).json({
       exists: false,
-      message: 'Username is available'
-    })    
+      message: 'Username is available',
+    })
   } catch (error) {
     handleError(error, req, res, next)
-    
   }
 }
 
-const checkEmailExists=async(req,res,next)=>{
-  const {email}=req.params;
-  if(!email){
+const checkEmailExists = async (req, res, next) => {
+  const { email } = req.params
+  if (!email) {
     return res.status(400).json({ message: 'Email is required' })
   }
   try {
-    const user= await User.findOne({email})
-    if(user){
-      return res.status(200).json({ 
+    const user = await User.findOne({ email })
+    if (user) {
+      return res.status(200).json({
         exists: true,
-        message: 'Email already exists'
+        message: 'Email already exists',
       })
     }
     res.status(200).json({
       exists: false,
-      message: 'Email is available'
-    })    
+      message: 'Email is available',
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -613,5 +634,5 @@ module.exports = {
   verifyResetToken,
   resetPassword,
   checkUsernameExists,
-  checkEmailExists
+  checkEmailExists,
 }

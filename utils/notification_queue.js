@@ -1,5 +1,5 @@
 const { Queue } = require('bullmq')
-
+const { NotificationQueueError } = require('./errors.js')
 let notificationQueue
 
 try {
@@ -37,10 +37,12 @@ const addVideoLikeNotificationToQueue = async (
   videoId,
   likedUserName,
   videoName,
-  likedUserProfilePhoto
+  likedUserProfilePhoto,
+  fcmToken
 ) => {
   try {
     await notificationQueue.add('sendNotification', {
+      fcmToken,
       to: userId,
       from: likedUserId,
       group: 'non-revenue',
@@ -65,10 +67,12 @@ const addVideoCommentNotificationToQueue = async (
   videoName,
   commentedUserProfilePhoto,
   commentId,
-  commentText
+  commentText,
+  fcmToken
 ) => {
   try {
     await notificationQueue.add('sendNotification', {
+      fcmToken,
       to: userId,
       from: commentedUserId,
       group: 'non-revenue',
@@ -93,10 +97,12 @@ const addVideoReshareNotificationToQueue = async (
   videoId,
   resharedUserName,
   videoName,
-  resharedUserProfilePhoto
+  resharedUserProfilePhoto,
+  fcmToken
 ) => {
   try {
     await notificationQueue.add('sendNotification', {
+      fcmToken,
       to: userId,
       from: resharedUserId,
       group: 'non-revenue',
@@ -120,10 +126,12 @@ const addCommentUpvoteNotificationToQueue = async (
   upvotedUserName,
   videoName,
   upvotedUserProfilePhoto,
-  commentId
+  commentId,
+  fcmToken
 ) => {
   try {
     await notificationQueue.add('sendNotification', {
+      fcmToken,
       to: userId,
       from: upvotedUserId,
       group: 'non-revenue',
@@ -148,10 +156,12 @@ const addCommentLikeNotificationToQueue = async (
   likedUserName,
   videoName,
   likedUserProfilePhoto,
-  commentId
+  commentId,
+  fcmToken
 ) => {
   try {
     await notificationQueue.add('sendNotification', {
+      fcmToken,
       to: userId,
       from: likedUserId,
       group: 'non-revenue',
@@ -177,10 +187,12 @@ const addCommentGiftNotificationToQueue = async (
   videoName,
   giftedUserProfilePhoto,
   commentId,
-  amount
+  amount,
+  fcmToken
 ) => {
   try {
     await notificationQueue.add('sendNotification', {
+      fcmToken,
       to: userId,
       from: giftedUserId,
       group: 'revenue',
@@ -207,10 +219,12 @@ const addCommentReplyNotificationToQueue = async (
   repliedUserProfilePhoto,
   commentId,
   replyId,
-  replyText
+  replyText,
+  fcmToken
 ) => {
   try {
     await notificationQueue.add('sendNotification', {
+      fcmToken,
       to: userId,
       from: repliedUserId,
       group: 'non-revenue',
