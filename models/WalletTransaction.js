@@ -77,6 +77,15 @@ const walletTransactionSchema = new mongoose.Schema(
     razorpay_order_id: {
       type: String,
     },
+
+    google_product_id: {
+      //frontend sets it
+      type: String,
+    },
+    google_order_id: {
+      //google sets it
+      type: String,
+    },
     status: {
       type: String,
       enum: ['pending', 'completed', 'failed', 'cancelled'],

@@ -249,7 +249,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
     const { id } = req.params
 
     const { amount, transferNote } = req.body
-    const buyerId = req.user.id
+    const buyerId = req.user.id.toString()
 
     if (!amount) {
       return res.status(400).json({
@@ -276,7 +276,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
       })
     }
 
-    const creatorId = video.created_by._id
+    const creatorId = video.created_by._id.toString()
 
     // Check if video is free
     if (video.type === 'Free') {

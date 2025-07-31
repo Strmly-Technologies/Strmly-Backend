@@ -1,6 +1,7 @@
-const crypto = require('crypto')
+//const crypto = require('crypto')
 const mongoose = require('mongoose')
-const razorpay = require('../config/razorpay')
+//const razorpay = require('../config/razorpay')
+const verifyGooglePurchase = require('../utils/google_play_payments')
 const Wallet = require('../models/Wallet')
 const WalletTransaction = require('../models/WalletTransaction')
 const WalletTransfer = require('../models/WalletTransfer')
@@ -10,20 +11,20 @@ const Series = require('../models/Series')
 const User = require('../models/User')
 const Community = require('../models/Community')
 const { handleError } = require('../utils/utils')
-const { checkCreatorPassAccess } = require("./creatorpass.controller");
+const { checkCreatorPassAccess } = require('./creatorpass.controller')
 
 const MAX_WALLET_LOAD = 50000
 const MIN_WALLET_LOAD = 0
 const PLATFORM_FEE_PERCENTAGE = 30
 const CREATOR_SHARE_PERCENTAGE = 70
 const MAX_DESCRIPTION_LENGTH = 200
-
+/* 
 const generateShortReceipt = (prefix, userId) => {
   const shortUserId = userId.toString().slice(-8)
   const timestamp = Date.now().toString().slice(-6)
   const random = Math.random().toString(36).substr(2, 4)
   return `${prefix}_${shortUserId}_${timestamp}_${random}`
-}
+} */
 
 const validateAmount = (
   amount,
@@ -60,32 +61,42 @@ const sanitizeString = (str, maxLength = 200) => {
   return str.toString().trim().substring(0, maxLength)
 }
 
-const getOrCreateWallet = async (userId, walletType = 'user') => {
-  const validation = validateObjectId(userId, 'User ID')
-  if (!validation.isValid) {
-    throw new Error(validation.error)
-  }
+const getOrCreateWallet = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const { walletType = 'user' } = req.body
+    const validation = validateObjectId(userId, 'User ID')
+    if (!validation.isValid) {
+      throw new Error(validation.error)
+    }
 
-  let wallet = await Wallet.findOne({ user_id: userId })
+    let wallet = await Wallet.findOne({ user_id: userId })
 
-  if (!wallet) {
-    wallet = new Wallet({
-      user_id: userId,
-      balance: 0,
-      currency: 'INR',
-      wallet_type: walletType,
-      status: 'active',
+    if (!wallet) {
+      wallet = new Wallet({
+        user_id: userId,
+        balance: 0,
+        currency: 'INR',
+        wallet_type: walletType,
+        status: 'active',
+      })
+      await wallet.save()
+    }
+    res.status(200).json({
+      success: true,
+      message: {
+        wallet_id: wallet._id.toString(),
+      },
     })
-    await wallet.save()
+  } catch (error) {
+    handleError(error, req, res, next)
   }
-
-  return wallet
 }
 
 const createWalletLoadOrder = async (req, res, next) => {
   try {
     const { amount } = req.body
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
     const amountValidation = validateAmount(amount)
     if (!amountValidation.isValid) {
@@ -103,7 +114,13 @@ const createWalletLoadOrder = async (req, res, next) => {
       })
     }
 
-    const wallet = await getOrCreateWallet(userId, 'user')
+    const wallet = await Wallet.find({ user_id: userId })
+    if (!wallet) {
+      return res.status(404).json({
+        error: 'Wallet not found',
+        code: 'WALLET_NOT_FOUND',
+      })
+    }
 
     if (wallet.status !== 'active') {
       return res.status(400).json({
@@ -111,7 +128,7 @@ const createWalletLoadOrder = async (req, res, next) => {
         code: 'WALLET_INACTIVE',
       })
     }
-
+    /* 
     const orderOptions = {
       amount: Math.round(amount * 100),
       currency: 'INR',
@@ -124,9 +141,9 @@ const createWalletLoadOrder = async (req, res, next) => {
       },
     }
 
-    const razorpayOrder = await razorpay.orders.create(orderOptions)
+    const razorpayOrder = await razorpay.orders.create(orderOptions) */
 
-    res.status(201).json({
+    /*     res.status(201).json({
       success: true,
       message: 'Wallet load order created successfully',
       order: {
@@ -151,6 +168,14 @@ const createWalletLoadOrder = async (req, res, next) => {
           email: req.user.email,
         },
       },
+    }) */
+    res.status(201).json({
+      success: true,
+      message: 'Wallet load order created successfully',
+      wallet: {
+        currentBalance: wallet.balance,
+        balanceAfterLoad: wallet.balance + amount,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -159,12 +184,12 @@ const createWalletLoadOrder = async (req, res, next) => {
 
 const verifyWalletLoad = async (req, res, next) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+    const { google_purchase_token, google_product_id, google_order_id } =
       req.body
 
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    if (!google_purchase_token || !google_product_id || !google_order_id) {
       return res.status(400).json({
         success: false,
         error: 'Missing required payment verification fields',
@@ -172,7 +197,7 @@ const verifyWalletLoad = async (req, res, next) => {
       })
     }
 
-    if (
+    /*     if (
       typeof razorpay_order_id !== 'string' ||
       !razorpay_order_id.startsWith('order_')
     ) {
@@ -181,9 +206,9 @@ const verifyWalletLoad = async (req, res, next) => {
         error: 'Invalid order ID format',
         code: 'INVALID_ORDER_ID',
       })
-    }
+    } */
 
-    if (
+    /*     if (
       typeof razorpay_payment_id !== 'string' ||
       !razorpay_payment_id.startsWith('pay_')
     ) {
@@ -192,9 +217,9 @@ const verifyWalletLoad = async (req, res, next) => {
         error: 'Invalid payment ID format',
         code: 'INVALID_PAYMENT_ID',
       })
-    }
+    } */
 
-    const generated_signature = crypto
+    /*     const generated_signature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(razorpay_order_id + '|' + razorpay_payment_id)
       .digest('hex')
@@ -206,9 +231,9 @@ const verifyWalletLoad = async (req, res, next) => {
         code: 'SIGNATURE_VERIFICATION_FAILED',
       })
     }
-
+ */
     const existingTransaction = await WalletTransaction.findOne({
-      razorpay_payment_id: razorpay_payment_id,
+      google_order_id: google_order_id,
       user_id: userId,
     })
 
@@ -221,18 +246,14 @@ const verifyWalletLoad = async (req, res, next) => {
     }
 
     let payment
-    try {
-      payment = await razorpay.payments.fetch(razorpay_payment_id)
-    } catch (razorpayError) {
-      return res.status(400).json({
-        success: false,
-        error:
-          'Failed to verify payment with Razorpay: ' + razorpayError.message,
-        code: 'RAZORPAY_VERIFICATION_FAILED',
-      })
-    }
 
-    if (payment.status !== 'captured') {
+    payment = await verifyGooglePurchase(
+      google_product_id,
+      google_purchase_token
+    )
+
+    if (!payment.valid) {
+      console.log(payment)
       return res.status(400).json({
         success: false,
         error: 'Payment not captured successfully',
@@ -251,7 +272,14 @@ const verifyWalletLoad = async (req, res, next) => {
       })
     }
 
-    const wallet = await getOrCreateWallet(userId, 'user')
+    const wallet = await Wallet.find({ user_id: userId })
+    if (!wallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'wallet not found',
+        code: 'WALLET_NOT _FOUND',
+      })
+    }
     const balanceBefore = wallet.balance
     const balanceAfter = balanceBefore + amount
 
@@ -270,8 +298,8 @@ const verifyWalletLoad = async (req, res, next) => {
           description: `Loaded ₹${amount} from bank to wallet`,
           balance_before: balanceBefore,
           balance_after: balanceAfter,
-          razorpay_payment_id: razorpay_payment_id,
-          razorpay_order_id: razorpay_order_id,
+          google_product_id: google_product_id,
+          google_order_id: google_order_id,
           status: 'completed',
         })
 
@@ -325,8 +353,8 @@ const verifyWalletLoad = async (req, res, next) => {
 
 const transferToCreatorForSeries = async (req, res, next) => {
   try {
-    const { seriesId,amount, transferNote } = req.body
-    const buyerId = req.user.id
+    const { seriesId, amount, transferNote } = req.body
+    const buyerId = req.user.id.toString()
 
     if (!seriesId) {
       return res.status(400).json({
@@ -357,7 +385,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
       })
     }
 
-    const creatorId = series.created_by._id
+    const creatorId = series.created_by._id.toString()
 
     if (series.type !== 'Paid') {
       return res.status(400).json({
@@ -366,9 +394,9 @@ const transferToCreatorForSeries = async (req, res, next) => {
         code: 'SERIES_NOT_PAID',
       })
     }
-    const seriesAmount=series.price
-    if (Number(seriesAmount) !== Number(amount)){
-      // if user amount and series amount are not same 
+    const seriesAmount = series.price
+    if (Number(seriesAmount) !== Number(amount)) {
+      // if user amount and series amount are not same
       return res.status(400).json({
         success: false,
         error: 'Series price does not match the provided amount',
@@ -424,8 +452,22 @@ const transferToCreatorForSeries = async (req, res, next) => {
       })
     }
 
-    const buyerWallet = await getOrCreateWallet(buyerId, 'user')
-    const creatorWallet = await getOrCreateWallet(creatorId, 'creator')
+    const buyerWallet = await Wallet.find({ user_id: buyerId })
+    if (!buyerWallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'buyer wallet not found',
+        code: 'BUYER_WALLET_NOT _FOUND',
+      })
+    }
+    const creatorWallet = await Wallet.find({ user_id: creatorId })
+    if (!creatorWallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'creator wallet not found',
+        code: 'CREATOR_WALLET_NOT _FOUND',
+      })
+    }
 
     if (buyerWallet.status !== 'active') {
       return res.status(400).json({
@@ -456,42 +498,42 @@ const transferToCreatorForSeries = async (req, res, next) => {
     }
 
     // Check if user has active Creator Pass for this creator
-    const creatorPassCheck = await checkCreatorPassAccess(buyerId, creatorId);
+    const creatorPassCheck = await checkCreatorPassAccess(buyerId, creatorId)
     if (creatorPassCheck.hasAccess) {
       // Grant access directly without payment
       const userAccess = new UserAccess({
         user_id: buyerId,
         content_id: seriesId,
-        content_type: "series",
-        access_type: "creator_pass",
-        payment_method: "creator_pass",
+        content_type: 'series',
+        access_type: 'creator_pass',
+        payment_method: 'creator_pass',
         payment_amount: 0,
         granted_at: new Date(),
         metadata: {
           creator_pass_id: creatorPassCheck.pass._id,
         },
-      });
+      })
 
-      await userAccess.save();
+      await userAccess.save()
 
       return res.status(200).json({
         success: true,
-        message: "Access granted via Creator Pass!",
-        accessType: "creator_pass",
+        message: 'Access granted via Creator Pass!',
+        accessType: 'creator_pass',
         series: {
           id: seriesId,
           title: series.title,
           price: series.price,
         },
         creatorPass: {
-          message: "This content is free with your Creator Pass",
+          message: 'This content is free with your Creator Pass',
           creatorName: series.created_by.username,
         },
         nextSteps: {
-          message: "You can now watch all episodes of this series",
+          message: 'You can now watch all episodes of this series',
           seriesId: seriesId,
         },
-      });
+      })
     }
 
     const platformAmount = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))
@@ -727,7 +769,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
 const transferCommunityFee = async (req, res, next) => {
   try {
     const { communityId, amount, feeNote } = req.body
-    const creatorId = req.user.id
+    const creatorId = req.user.id.toString()
 
     if (!communityId || !amount) {
       return res.status(400).json({
@@ -770,7 +812,7 @@ const transferCommunityFee = async (req, res, next) => {
       })
     }
 
-    const founderId = community.founder._id
+    const founderId = community.founder._id.toString()
 
     // Check if community has upload fee
     if (community.community_fee_type !== 'paid') {
@@ -792,7 +834,7 @@ const transferCommunityFee = async (req, res, next) => {
       if (existingAccess.isExpired()) {
         // Renew expired access
         await existingAccess.renewSubscription()
-        
+
         return res.status(200).json({
           success: true,
           message: 'Community access renewed successfully!',
@@ -815,7 +857,9 @@ const transferCommunityFee = async (req, res, next) => {
           code: 'ALREADY_HAS_ACCESS',
           currentAccess: {
             expiresAt: existingAccess.expires_at,
-            daysRemaining: Math.ceil((existingAccess.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
+            daysRemaining: Math.ceil(
+              (existingAccess.expires_at - new Date()) / (1000 * 60 * 60 * 24)
+            ),
           },
         })
       }
@@ -831,8 +875,22 @@ const transferCommunityFee = async (req, res, next) => {
     }
 
     // Get wallets
-    const creatorWallet = await getOrCreateWallet(creatorId, 'creator')
-    const founderWallet = await getOrCreateWallet(founderId, 'creator')
+    const creatorWallet = await Wallet.find({ user_id: creatorId })
+    if (!creatorWallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'creator wallet not found',
+        code: 'CREATOR_WALLET_NOT _FOUND',
+      })
+    }
+    const founderWallet = await Wallet.find({ user_id: founderId })
+    if (!founderWallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'founder wallet not found',
+        code: 'FOUNDER_WALLET_NOT _FOUND',
+      })
+    }
 
     // Check creator's wallet balance
     if (creatorWallet.balance < amount) {
@@ -982,7 +1040,7 @@ const transferCommunityFee = async (req, res, next) => {
 
         // Create community access record with 30-day expiry
         const accessExpiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-        
+
         const communityAccess = new CommunityAccess({
           user_id: creatorId,
           community_id: communityId,
@@ -1070,7 +1128,8 @@ const transferCommunityFee = async (req, res, next) => {
         nextSteps: {
           message: 'You can now upload videos to this community for 30 days',
           communityId: communityId,
-          renewalInfo: 'Your subscription will need to be renewed after 30 days',
+          renewalInfo:
+            'Your subscription will need to be renewed after 30 days',
         },
       })
     } catch (transactionError) {
@@ -1088,7 +1147,7 @@ const transferCommunityFee = async (req, res, next) => {
 
 const getWalletDetails = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
     const userValidation = validateObjectId(userId, 'User ID')
     if (!userValidation.isValid) {
@@ -1098,8 +1157,13 @@ const getWalletDetails = async (req, res, next) => {
       })
     }
 
-    const wallet = await getOrCreateWallet(userId, 'user')
-
+    const wallet = await Wallet.find({ user_id: userId })
+    if (!wallet) {
+      return res.status(404).json({
+        error: 'wallet not found',
+        code: 'WALLET_NOT_FOUND',
+      })
+    }
     const recentTransfers = await WalletTransfer.find({
       $or: [{ sender_id: userId }, { receiver_id: userId }],
     })
@@ -1167,8 +1231,14 @@ const getWalletDetails = async (req, res, next) => {
 
 const getWalletTransactionHistory = async (req, res, next) => {
   try {
-    const userId = req.user.id
-    const { page = 1, limit = 20, type, category,timePeriod='7d' } = req.query
+    const userId = req.user.id.toString()
+    const {
+      page = 1,
+      limit = 20,
+      type,
+      category,
+      timePeriod = '7d',
+    } = req.query
 
     const userValidation = validateObjectId(userId, 'User ID')
     if (!userValidation.isValid) {
@@ -1225,36 +1295,36 @@ const getWalletTransactionHistory = async (req, res, next) => {
       filter.transaction_category = category
     }
 
-    const now = new Date();
-    let startDate;
+    const now = new Date()
+    let startDate
 
-switch (timePeriod) {
-  case '7d':
-    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    break;
-  case '15d':
-    startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-    break;
-  case '30d':
-    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    break;
-  case '3m':
-    startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
-    break;
-  case '6m':
-    startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
-    break;
-  case '1y':
-    startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
-    break;
-  default:
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid time period',
-      code: 'INVALID_TIME_PERIOD',
-    });
- }
-  filter.createdAt = { $gte: startDate };
+    switch (timePeriod) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case '15d':
+        startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
+        break
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      case '3m':
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 3))
+        break
+      case '6m':
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 6))
+        break
+      case '1y':
+        startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1))
+        break
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid time period',
+          code: 'INVALID_TIME_PERIOD',
+        })
+    }
+    filter.createdAt = { $gte: startDate }
 
     const transactions = await WalletTransaction.find(filter)
       .sort({ createdAt: -1 })
@@ -1298,8 +1368,8 @@ switch (timePeriod) {
 
 const getGiftHistory = async (req, res, next) => {
   try {
-    const userId = req.user.id
-    const { page = 1, limit = 20, type = 'all',timePeriod='7d' } = req.query
+    const userId = req.user.id.toString()
+    const { page = 1, limit = 20, type = 'all', timePeriod = '7d' } = req.query
 
     const userValidation = validateObjectId(userId, 'User ID')
     if (!userValidation.isValid) {
@@ -1350,36 +1420,36 @@ const getGiftHistory = async (req, res, next) => {
       })
     }
 
-    const now = new Date();
-    let startDate;
+    const now = new Date()
+    let startDate
 
-switch (timePeriod) {
-  case '7d':
-    startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    break;
-  case '15d':
-    startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-    break;
-  case '30d':
-    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    break;
-  case '3m':
-    startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
-    break;
-  case '6m':
-    startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
-    break;
-  case '1y':
-    startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
-    break;
-  default:
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid time period',
-      code: 'INVALID_TIME_PERIOD',
-    });
- }
-  filter.createdAt = { $gte: startDate };
+    switch (timePeriod) {
+      case '7d':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case '15d':
+        startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
+        break
+      case '30d':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      case '3m':
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 3))
+        break
+      case '6m':
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 6))
+        break
+      case '1y':
+        startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1))
+        break
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid time period',
+          code: 'INVALID_TIME_PERIOD',
+        })
+    }
+    filter.createdAt = { $gte: startDate }
 
     const gifts = await WalletTransfer.find(filter)
       .populate('sender_id', 'username profilePicture')
