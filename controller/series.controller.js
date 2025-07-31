@@ -252,7 +252,11 @@ const addEpisodeToSeries = async (req, res, next) => {
     }
 
     const series = await Series.findById(id)
-    if (!series) {
+    if (
+      !series ||
+      (series.visibility === 'hidden' &&
+        series.hidden_reason === 'series_deleted')
+    ) {
       return res.status(404).json({ error: 'Series not found' })
     }
 
@@ -321,7 +325,11 @@ const removeEpisodeFromSeries = async (req, res, next) => {
     const userId = req.user.id
 
     const series = await Series.findById(seriesId)
-    if (!series) {
+    if (
+      !series ||
+      (series.visibility === 'hidden' &&
+        series.hidden_reason === 'series_deleted')
+    ) {
       return res.status(404).json({ error: 'Series not found' })
     }
 

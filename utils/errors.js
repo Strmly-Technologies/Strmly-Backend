@@ -47,6 +47,13 @@ class NotificationQueueError extends Error {
   }
 }
 
+class GooglePaymentsError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'google_payments_error'
+  }
+}
+
 class FireBaseNotificationError extends Error {
   constructor(message) {
     super(message)
@@ -62,4 +69,5 @@ module.exports = {
   RedisConnectionError,
   NotificationQueueError,
   FireBaseNotificationError,
+  GooglePaymentsError,
 }

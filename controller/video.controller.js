@@ -68,7 +68,7 @@ const uploadVideoToCommunity = async (req, res, next) => {
 
 const uploadVideo = async (req, res, next) => {
   try {
-    const videoFile = req.files?.videoFile?.[0]
+    const videoFile = req.file
     const userId = req.user.id.toString()
     const {
       name,
@@ -225,7 +225,7 @@ const uploadVideo = async (req, res, next) => {
 const uploadVideoChunks = (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const videoFile = req.files?.videoFile?.[0]
+    const videoFile = req.file
 
     const { fileId, chunkIndex, totalChunks } = req.body
     if (!userId) {

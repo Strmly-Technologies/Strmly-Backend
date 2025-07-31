@@ -2,7 +2,12 @@ const Draft = require('../models/Draft')
 const User = require('../models/User')
 const LongVideo = require('../models/LongVideo')
 const Community = require('../models/Community')
-const { handleError, uploadVideoToS3, uploadImageToS3, generateVideoThumbnail } = require('../utils/utils')
+const {
+  handleError,
+  uploadVideoToS3,
+  uploadImageToS3,
+  generateVideoThumbnail,
+} = require('../utils/utils')
 const { checkCommunityUploadPermission } = require('./community.controller')
 const videoCompressor = require('../utils/video_compressor')
 
@@ -10,21 +15,21 @@ const videoCompressor = require('../utils/video_compressor')
 const createOrUpdateDraft = async (req, res, next) => {
   try {
     const userId = req.user.id
-    const { 
+    const {
       draftId,
-      name, 
-      description, 
-      genre, 
-      type, 
-      language, 
+      name,
+      description,
+      genre,
+      type,
+      language,
       age_restriction,
       communityId,
       seriesId,
       start_time,
       display_till_time,
-      contentType = 'video'
+      contentType = 'video',
     } = req.body
- 
+
     let draft
 
     if (draftId) {
@@ -38,7 +43,7 @@ const createOrUpdateDraft = async (req, res, next) => {
       draft = new Draft({
         user_id: userId,
         content_type: contentType,
-        status: 'draft'
+        status: 'draft',
       })
     }
 
@@ -54,7 +59,9 @@ const createOrUpdateDraft = async (req, res, next) => {
       ...(communityId && { community_id: communityId }),
       ...(seriesId && { series_id: seriesId }),
       ...(start_time !== undefined && { start_time: Number(start_time) }),
-      ...(display_till_time !== undefined && { display_till_time: Number(display_till_time) })
+      ...(display_till_time !== undefined && {
+        display_till_time: Number(display_till_time),
+      }),
     }
 
     draft.draft_data = draftData
@@ -63,20 +70,22 @@ const createOrUpdateDraft = async (req, res, next) => {
     // Add to user's drafts if new
     if (!draftId) {
       await User.findByIdAndUpdate(userId, {
-        $addToSet: { drafts: draft._id }
+        $addToSet: { drafts: draft._id },
       })
     }
 
     res.status(200).json({
-      message: draftId ? 'Draft updated successfully' : 'Draft created successfully',
+      message: draftId
+        ? 'Draft updated successfully'
+        : 'Draft created successfully',
       draft: {
         id: draft._id,
         content_type: draft.content_type,
         status: draft.status,
         draft_data: draft.draft_data,
         last_modified: draft.last_modified,
-        expires_at: draft.expires_at
-      }
+        expires_at: draft.expires_at,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -88,14 +97,14 @@ const uploadVideoToDraft = async (req, res, next) => {
   try {
     const userId = req.user.id
     const { id } = req.params
-    const videoFile = req.files?.videoFile?.[0]
+    const videoFile = req.file
 
     if (!videoFile) {
       return res.status(400).json({ error: 'Video file is required' })
     }
 
     const draft = await Draft.findOne({ _id: id, user_id: userId })
-    
+
     if (!draft) {
       return res.status(404).json({ error: 'Draft not found' })
     }
@@ -103,14 +112,17 @@ const uploadVideoToDraft = async (req, res, next) => {
     if (draft.isExpired()) {
       await draft.deleteOne()
       await User.findByIdAndUpdate(userId, {
-        $pull: { drafts: draft._id }
+        $pull: { drafts: draft._id },
       })
-      return res.status(410).json({ error: 'Draft has expired and was removed' })
+      return res
+        .status(410)
+        .json({ error: 'Draft has expired and was removed' })
     }
 
     if (draft.video_data?.has_video) {
-      return res.status(400).json({ 
-        error: 'Draft already has a video. Delete the existing video first or create a new draft.' 
+      return res.status(400).json({
+        error:
+          'Draft already has a video. Delete the existing video first or create a new draft.',
       })
     }
 
@@ -146,7 +158,7 @@ const uploadVideoToDraft = async (req, res, next) => {
         draft.status = 'failed'
         draft.error_message = videoUploadResult.message
         await draft.save()
-        
+
         return res.status(500).json({
           error: videoUploadResult.message,
           details: videoUploadResult.error || 'Failed to upload video to S3',
@@ -166,7 +178,7 @@ const uploadVideoToDraft = async (req, res, next) => {
         draft.status = 'failed'
         draft.error_message = 'Failed to upload thumbnail'
         await draft.save()
-        
+
         return res.status(500).json({ message: 'Failed to upload thumbnail' })
       }
 
@@ -191,23 +203,24 @@ const uploadVideoToDraft = async (req, res, next) => {
           id: draft._id,
           status: draft.status,
           expires_at: draft.expires_at,
-          days_until_expiry: Math.ceil((draft.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
+          days_until_expiry: Math.ceil(
+            (draft.expires_at - new Date()) / (1000 * 60 * 60 * 24)
+          ),
           video_info: {
             original_filename: draft.video_data.original_filename,
             file_size: draft.video_data.file_size,
             uploaded_at: draft.video_data.video_uploaded_at,
-          }
+          },
         },
-        warning: 'Draft with video will expire in 7 days. Complete upload to save permanently.'
+        warning:
+          'Draft with video will expire in 7 days. Complete upload to save permanently.',
       })
-
     } catch (uploadError) {
       draft.status = 'failed'
       draft.error_message = uploadError.message
       await draft.save()
       throw uploadError
     }
-
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -220,13 +233,15 @@ const removeVideoFromDraft = async (req, res, next) => {
     const { id } = req.params
 
     const draft = await Draft.findOne({ _id: id, user_id: userId })
-    
+
     if (!draft) {
       return res.status(404).json({ error: 'Draft not found' })
     }
 
     if (!draft.video_data?.has_video) {
-      return res.status(400).json({ error: 'Draft does not have a video to remove' })
+      return res
+        .status(400)
+        .json({ error: 'Draft does not have a video to remove' })
     }
 
     // Note: In production, you might want to delete the S3 files here
@@ -253,8 +268,8 @@ const removeVideoFromDraft = async (req, res, next) => {
         id: draft._id,
         status: draft.status,
         expires_at: draft.expires_at,
-        has_video: false
-      }
+        has_video: false,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -269,11 +284,11 @@ const getUserDrafts = async (req, res, next) => {
     const skip = (page - 1) * limit
 
     const query = { user_id: userId }
-    
+
     if (status) {
       query.status = status
     }
-    
+
     if (contentType) {
       query.content_type = contentType
     }
@@ -304,17 +319,21 @@ const getUserDrafts = async (req, res, next) => {
           genre: draft.draft_data.genre,
           last_modified: draft.last_modified,
           expires_at: draft.expires_at,
-          days_until_expiry: Math.ceil((draft.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
+          days_until_expiry: Math.ceil(
+            (draft.expires_at - new Date()) / (1000 * 60 * 60 * 24)
+          ),
           community: draft.draft_data.community_id,
           series: draft.draft_data.series_id,
           error_message: draft.error_message,
           has_video: draft.video_data?.has_video || false,
-          video_info: draft.video_data?.has_video ? {
-            original_filename: draft.video_data.original_filename,
-            file_size: draft.video_data.file_size,
-            uploaded_at: draft.video_data.video_uploaded_at,
-            thumbnail_url: draft.video_data.thumbnail_url,
-          } : null
+          video_info: draft.video_data?.has_video
+            ? {
+                original_filename: draft.video_data.original_filename,
+                file_size: draft.video_data.file_size,
+                uploaded_at: draft.video_data.video_uploaded_at,
+                thumbnail_url: draft.video_data.thumbnail_url,
+              }
+            : null,
         })
       }
     }
@@ -323,7 +342,7 @@ const getUserDrafts = async (req, res, next) => {
     if (expiredDraftIds.length > 0) {
       await Draft.deleteMany({ _id: { $in: expiredDraftIds } })
       await User.findByIdAndUpdate(userId, {
-        $pull: { drafts: { $in: expiredDraftIds } }
+        $pull: { drafts: { $in: expiredDraftIds } },
       })
     }
 
@@ -335,14 +354,15 @@ const getUserDrafts = async (req, res, next) => {
         limit: parseInt(limit),
         totalDrafts: totalDrafts - expiredDraftIds.length,
         totalPages: Math.ceil((totalDrafts - expiredDraftIds.length) / limit),
-        hasMore: skip + validDrafts.length < (totalDrafts - expiredDraftIds.length)
+        hasMore:
+          skip + validDrafts.length < totalDrafts - expiredDraftIds.length,
       },
       stats: {
         totalDrafts: validDrafts.length,
-        draftsWithVideo: validDrafts.filter(d => d.has_video).length,
-        draftsWithoutVideo: validDrafts.filter(d => !d.has_video).length,
-        expiredRemoved: expiredDraftIds.length
-      }
+        draftsWithVideo: validDrafts.filter((d) => d.has_video).length,
+        draftsWithoutVideo: validDrafts.filter((d) => !d.has_video).length,
+        expiredRemoved: expiredDraftIds.length,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -366,9 +386,11 @@ const getDraftById = async (req, res, next) => {
     if (draft.isExpired()) {
       await draft.deleteOne()
       await User.findByIdAndUpdate(userId, {
-        $pull: { drafts: draft._id }
+        $pull: { drafts: draft._id },
       })
-      return res.status(410).json({ error: 'Draft has expired and was removed' })
+      return res
+        .status(410)
+        .json({ error: 'Draft has expired and was removed' })
     }
 
     res.status(200).json({
@@ -382,8 +404,8 @@ const getDraftById = async (req, res, next) => {
         expires_at: draft.expires_at,
         error_message: draft.error_message,
         created_at: draft.createdAt,
-        updated_at: draft.updatedAt
-      }
+        updated_at: draft.updatedAt,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -395,10 +417,10 @@ const completeDraftUpload = async (req, res, next) => {
   try {
     const userId = req.user.id
     const { id } = req.params
-    const videoFile = req.files?.videoFile?.[0]
+    const videoFile = req.file
 
     const draft = await Draft.findOne({ _id: id, user_id: userId })
-    
+
     if (!draft) {
       return res.status(404).json({ error: 'Draft not found' })
     }
@@ -406,14 +428,18 @@ const completeDraftUpload = async (req, res, next) => {
     if (draft.isExpired()) {
       await draft.deleteOne()
       await User.findByIdAndUpdate(userId, {
-        $pull: { drafts: draft._id }
+        $pull: { drafts: draft._id },
       })
-      return res.status(410).json({ error: 'Draft has expired and was removed' })
+      return res
+        .status(410)
+        .json({ error: 'Draft has expired and was removed' })
     }
 
     // Check if draft already has video or if new video is provided
     if (!draft.video_data?.has_video && !videoFile) {
-      return res.status(400).json({ error: 'Video file is required to complete upload' })
+      return res
+        .status(400)
+        .json({ error: 'Video file is required to complete upload' })
     }
 
     // Update draft status
@@ -432,7 +458,7 @@ const completeDraftUpload = async (req, res, next) => {
           draft.status = 'failed'
           draft.error_message = permissionCheck.error
           await draft.save()
-          
+
           return res.status(403).json({
             error: permissionCheck.error,
             requiredFee: permissionCheck.requiredFee,
@@ -448,12 +474,12 @@ const completeDraftUpload = async (req, res, next) => {
         videoUploadResult = {
           success: true,
           url: draft.video_data.video_url,
-          key: draft.video_data.video_s3_key
+          key: draft.video_data.video_s3_key,
         }
         thumbnailUploadResult = {
           success: true,
           url: draft.video_data.thumbnail_url,
-          key: draft.video_data.thumbnail_s3_key
+          key: draft.video_data.thumbnail_s3_key,
         }
       } else {
         // Process new video file
@@ -478,7 +504,7 @@ const completeDraftUpload = async (req, res, next) => {
           draft.status = 'failed'
           draft.error_message = videoUploadResult.message
           await draft.save()
-          
+
           return res.status(500).json({
             error: videoUploadResult.message,
             details: videoUploadResult.error || 'Failed to upload video to S3',
@@ -498,14 +524,17 @@ const completeDraftUpload = async (req, res, next) => {
           draft.status = 'failed'
           draft.error_message = 'Failed to upload thumbnail'
           await draft.save()
-          
+
           return res.status(500).json({ message: 'Failed to upload thumbnail' })
         }
       }
 
       // Create the actual video record
       const longVideo = new LongVideo({
-        name: draft.draft_data.name || draft.video_data?.original_filename || 'Untitled Video',
+        name:
+          draft.draft_data.name ||
+          draft.video_data?.original_filename ||
+          'Untitled Video',
         description: draft.draft_data.description || 'No description provided',
         videoUrl: videoUploadResult.url,
         thumbnailUrl: thumbnailUploadResult.url,
@@ -526,7 +555,7 @@ const completeDraftUpload = async (req, res, next) => {
       // Update community if specified
       if (draft.draft_data.community_id) {
         await Community.findByIdAndUpdate(draft.draft_data.community_id, {
-          $push: { long_videos: longVideo._id }
+          $push: { long_videos: longVideo._id },
         })
       }
 
@@ -535,7 +564,7 @@ const completeDraftUpload = async (req, res, next) => {
       await draft.save()
 
       await User.findByIdAndUpdate(userId, {
-        $pull: { drafts: draft._id }
+        $pull: { drafts: draft._id },
       })
 
       // Clean up draft after successful completion
@@ -560,16 +589,14 @@ const completeDraftUpload = async (req, res, next) => {
           age_restriction: longVideo.age_restriction,
           start_time: longVideo.start_time,
           display_till_time: longVideo.display_till_time,
-        }
+        },
       })
-
     } catch (uploadError) {
       draft.status = 'failed'
       draft.error_message = uploadError.message
       await draft.save()
       throw uploadError
     }
-
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -582,14 +609,14 @@ const deleteDraft = async (req, res, next) => {
     const { id } = req.params
 
     const draft = await Draft.findOne({ _id: id, user_id: userId })
-    
+
     if (!draft) {
       return res.status(404).json({ error: 'Draft not found' })
     }
 
     // Remove from user's drafts array
     await User.findByIdAndUpdate(userId, {
-      $pull: { drafts: draft._id }
+      $pull: { drafts: draft._id },
     })
 
     // Delete the draft
@@ -597,7 +624,7 @@ const deleteDraft = async (req, res, next) => {
 
     res.status(200).json({
       message: 'Draft deleted successfully',
-      deletedDraftId: id
+      deletedDraftId: id,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -614,9 +641,9 @@ const getDraftUploadStats = async (req, res, next) => {
       {
         $group: {
           _id: { $toLower: '$status' },
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ])
 
     const result = {
@@ -624,18 +651,17 @@ const getDraftUploadStats = async (req, res, next) => {
       processing: 0,
       completed: 0,
       failed: 0,
-      draft: 0
+      draft: 0,
     }
-    
-    stats.forEach(stat => {
+
+    stats.forEach((stat) => {
       result[stat._id] = stat.count
     })
-    
+
     return res.status(200).json({
       message: 'Draft upload stats retrieved successfully',
-      stats: result
+      stats: result,
     })
-
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -645,11 +671,11 @@ const getDraftUploadStats = async (req, res, next) => {
 const cleanupExpiredDrafts = async (req, res, next) => {
   try {
     const expiredDrafts = await Draft.find({
-      expires_at: { $lt: new Date() }
+      expires_at: { $lt: new Date() },
     })
 
-    const expiredDraftIds = expiredDrafts.map(draft => draft._id)
-    const userIds = [...new Set(expiredDrafts.map(draft => draft.user_id))]
+    const expiredDraftIds = expiredDrafts.map((draft) => draft._id)
+    const userIds = [...new Set(expiredDrafts.map((draft) => draft.user_id))]
 
     // Remove expired drafts
     await Draft.deleteMany({ _id: { $in: expiredDraftIds } })
@@ -662,7 +688,7 @@ const cleanupExpiredDrafts = async (req, res, next) => {
 
     res.status(200).json({
       message: 'Expired drafts cleaned up successfully',
-      removedCount: expiredDraftIds.length
+      removedCount: expiredDraftIds.length,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -678,5 +704,5 @@ module.exports = {
   getDraftUploadStats,
   cleanupExpiredDrafts,
   uploadVideoToDraft,
-  removeVideoFromDraft
+  removeVideoFromDraft,
 }

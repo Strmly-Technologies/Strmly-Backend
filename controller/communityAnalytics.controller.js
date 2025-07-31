@@ -9,13 +9,15 @@ const getCommunityAnalytics = async (req, res, next) => {
     const { id: communityId } = req.params
     const userId = req.user.id
 
-    const community = await Community.findById(communityId)
-      .populate('founder', 'username profile_photo')
+    const community = await Community.findById(communityId).populate(
+      'founder',
+      'username profile_photo'
+    )
 
     if (!community) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Community not found' 
+        message: 'Community not found',
       })
     }
 
@@ -23,7 +25,7 @@ const getCommunityAnalytics = async (req, res, next) => {
     if (community.founder._id.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: 'Only community founder can view analytics'
+        message: 'Only community founder can view analytics',
       })
     }
 
@@ -36,32 +38,32 @@ const getCommunityAnalytics = async (req, res, next) => {
     // Combine queries into a single aggregation pipeline
     const [longVideoStats, seriesStats] = await Promise.all([
       LongVideo.aggregate([
-        { 
-          $match: { 
+        {
+          $match: {
             community: communityId,
-            visibility: { $ne: 'hidden' }
-          } 
+            visibility: { $ne: 'hidden' },
+          },
         },
         {
           $facet: {
-            totalLongVideos: [{ $count: "count" }],
+            totalLongVideos: [{ $count: 'count' }],
             stats: [
               {
                 $group: {
                   _id: null,
                   totalLikes: { $sum: '$likes' },
                   totalViews: { $sum: '$views' },
-                  totalShares: { $sum: '$shares' }
-                }
-              }
-            ]
-          }
-        }
+                  totalShares: { $sum: '$shares' },
+                },
+              },
+            ],
+          },
+        },
       ]),
       Series.aggregate([
         { $match: { community: communityId } },
-        { $count: "totalSeries" }
-      ])
+        { $count: 'totalSeries' },
+      ]),
     ])
 
     const totalLongVideos = longVideoStats[0]?.totalLongVideos[0]?.count || 0
@@ -69,10 +71,12 @@ const getCommunityAnalytics = async (req, res, next) => {
     const totalViews = longVideoStats[0]?.stats[0]?.totalViews || 0
     const totalShares = longVideoStats[0]?.stats[0]?.totalShares || 0
     const totalSeries = seriesStats[0]?.totalSeries || 0
-    const videoStats = videosLikesAgg[0] || { 
-      totalLikes: 0, 
-      totalViews: 0, 
-      totalShares: 0 
+    const videoStats = {
+      totalLikes,
+      totalShares,
+      totalViews,
+      totalLongVideos,
+      totalSeries,
     }
 
     // Get total money earned from community fees
@@ -81,23 +85,23 @@ const getCommunityAnalytics = async (req, res, next) => {
         $match: {
           content_id: communityId,
           transfer_type: 'community_fee',
-          status: 'completed'
-        }
+          status: 'completed',
+        },
       },
       {
         $group: {
           _id: null,
           totalEarned: { $sum: '$creator_amount' },
           totalFeeCollected: { $sum: '$total_amount' },
-          totalTransactions: { $sum: 1 }
-        }
-      }
+          totalTransactions: { $sum: 1 },
+        },
+      },
     ])
 
-    const feeEarnings = communityFeeEarnings[0] || { 
-      totalEarned: 0, 
+    const feeEarnings = communityFeeEarnings[0] || {
+      totalEarned: 0,
       totalFeeCollected: 0,
-      totalTransactions: 0 
+      totalTransactions: 0,
     }
 
     // Get content earnings from videos/series in this community
@@ -107,58 +111,58 @@ const getCommunityAnalytics = async (req, res, next) => {
           from: 'longvideos',
           localField: 'content_id',
           foreignField: '_id',
-          as: 'video'
-        }
+          as: 'video',
+        },
       },
       {
         $lookup: {
           from: 'series',
           localField: 'content_id',
           foreignField: '_id',
-          as: 'series'
-        }
+          as: 'series',
+        },
       },
       {
         $match: {
           $or: [
             { 'video.community': communityId },
-            { 'series.community': communityId }
+            { 'series.community': communityId },
           ],
           transfer_type: { $in: ['series_purchase', 'video_purchase'] },
-          status: 'completed'
-        }
+          status: 'completed',
+        },
       },
       {
         $group: {
           _id: null,
           totalContentEarnings: { $sum: '$creator_amount' },
           totalContentRevenue: { $sum: '$total_amount' },
-          totalContentSales: { $sum: 1 }
-        }
-      }
+          totalContentSales: { $sum: 1 },
+        },
+      },
     ])
 
-    const contentStats = contentEarnings[0] || { 
-      totalContentEarnings: 0, 
+    const contentStats = contentEarnings[0] || {
+      totalContentEarnings: 0,
       totalContentRevenue: 0,
-      totalContentSales: 0 
+      totalContentSales: 0,
     }
 
     // Get monthly growth data
     const monthlyGrowth = await getMonthlyGrowthData(communityId)
 
     // Get top performing content
-    const topVideos = await LongVideo.find({ 
+    const topVideos = await LongVideo.find({
       community: communityId,
-      visibility: { $ne: 'hidden' }
+      visibility: { $ne: 'hidden' },
     })
       .populate('created_by', 'username')
       .sort({ likes: -1, views: -1 })
       .limit(5)
       .select('name likes views shares created_by')
 
-    const topSeries = await Series.find({ 
-      community: communityId 
+    const topSeries = await Series.find({
+      community: communityId,
     })
       .populate('created_by', 'username')
       .sort({ total_earned: -1 })
@@ -172,49 +176,56 @@ const getCommunityAnalytics = async (req, res, next) => {
         id: community._id,
         name: community.name,
         founder: community.founder,
-        createdAt: community.createdAt
+        createdAt: community.createdAt,
       },
       analytics: {
         followers: {
           total: totalFollowers,
-          growth: monthlyGrowth.followersGrowth
+          growth: monthlyGrowth.followersGrowth,
         },
         creators: {
           total: totalCreators,
           limit: community.creator_limit,
-          utilizationPercentage: Math.round((totalCreators / community.creator_limit) * 100)
+          utilizationPercentage: Math.round(
+            (totalCreators / community.creator_limit) * 100
+          ),
         },
         content: {
           totalVideos: totalLongVideos,
           totalSeries: totalSeries,
-          totalContent: totalLongVideos + totalSeries
+          totalContent: totalLongVideos + totalSeries,
         },
         engagement: {
           totalLikes: videoStats.totalLikes,
           totalViews: videoStats.totalViews,
           totalShares: videoStats.totalShares,
-          averageLikesPerVideo: totalLongVideos > 0 ? Math.round(videoStats.totalLikes / totalLongVideos) : 0
+          averageLikesPerVideo:
+            totalLongVideos > 0
+              ? Math.round(videoStats.totalLikes / totalLongVideos)
+              : 0,
         },
         earnings: {
           communityFees: {
             totalEarned: feeEarnings.totalEarned,
             totalCollected: feeEarnings.totalFeeCollected,
-            totalTransactions: feeEarnings.totalTransactions
+            totalTransactions: feeEarnings.totalTransactions,
           },
           contentSales: {
             totalEarnings: contentStats.totalContentEarnings,
             totalRevenue: contentStats.totalContentRevenue,
-            totalSales: contentStats.totalContentSales
+            totalSales: contentStats.totalContentSales,
           },
-          totalEarnings: feeEarnings.totalEarned + contentStats.totalContentEarnings,
-          totalRevenue: feeEarnings.totalFeeCollected + contentStats.totalContentRevenue
+          totalEarnings:
+            feeEarnings.totalEarned + contentStats.totalContentEarnings,
+          totalRevenue:
+            feeEarnings.totalFeeCollected + contentStats.totalContentRevenue,
         },
         growth: monthlyGrowth,
         topPerforming: {
           videos: topVideos,
-          series: topSeries
-        }
-      }
+          series: topSeries,
+        },
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -224,8 +235,16 @@ const getCommunityAnalytics = async (req, res, next) => {
 const getMonthlyGrowthData = async (communityId) => {
   try {
     const currentDate = new Date()
-    const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
-    const thisMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    const lastMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 1,
+      1
+    )
+    const thisMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    )
 
     // Get followers growth
     const community = await Community.findById(communityId)
@@ -235,23 +254,23 @@ const getMonthlyGrowthData = async (communityId) => {
     const thisMonthVideos = await LongVideo.countDocuments({
       community: communityId,
       createdAt: { $gte: thisMonth },
-      visibility: { $ne: 'hidden' }
+      visibility: { $ne: 'hidden' },
     })
 
     const lastMonthVideos = await LongVideo.countDocuments({
       community: communityId,
       createdAt: { $gte: lastMonth, $lt: thisMonth },
-      visibility: { $ne: 'hidden' }
+      visibility: { $ne: 'hidden' },
     })
 
     const thisMonthSeries = await Series.countDocuments({
       community: communityId,
-      createdAt: { $gte: thisMonth }
+      createdAt: { $gte: thisMonth },
     })
 
     const lastMonthSeries = await Series.countDocuments({
       community: communityId,
-      createdAt: { $gte: lastMonth, $lt: thisMonth }
+      createdAt: { $gte: lastMonth, $lt: thisMonth },
     })
 
     // Get earnings growth
@@ -261,15 +280,15 @@ const getMonthlyGrowthData = async (communityId) => {
           content_id: communityId,
           transfer_type: 'community_fee',
           status: 'completed',
-          createdAt: { $gte: thisMonth }
-        }
+          createdAt: { $gte: thisMonth },
+        },
       },
       {
         $group: {
           _id: null,
-          total: { $sum: '$creator_amount' }
-        }
-      }
+          total: { $sum: '$creator_amount' },
+        },
+      },
     ])
 
     const lastMonthEarnings = await WalletTransfer.aggregate([
@@ -278,15 +297,15 @@ const getMonthlyGrowthData = async (communityId) => {
           content_id: communityId,
           transfer_type: 'community_fee',
           status: 'completed',
-          createdAt: { $gte: lastMonth, $lt: thisMonth }
-        }
+          createdAt: { $gte: lastMonth, $lt: thisMonth },
+        },
       },
       {
         $group: {
           _id: null,
-          total: { $sum: '$creator_amount' }
-        }
-      }
+          total: { $sum: '$creator_amount' },
+        },
+      },
     ])
 
     const thisMonthTotal = thisMonthEarnings[0]?.total || 0
@@ -296,32 +315,40 @@ const getMonthlyGrowthData = async (communityId) => {
       followersGrowth: {
         current: currentFollowers,
         thisMonth: thisMonthVideos + thisMonthSeries,
-        lastMonth: lastMonthVideos + lastMonthSeries
+        lastMonth: lastMonthVideos + lastMonthSeries,
       },
       contentGrowth: {
         thisMonth: {
           videos: thisMonthVideos,
           series: thisMonthSeries,
-          total: thisMonthVideos + thisMonthSeries
+          total: thisMonthVideos + thisMonthSeries,
         },
         lastMonth: {
           videos: lastMonthVideos,
           series: lastMonthSeries,
-          total: lastMonthVideos + lastMonthSeries
-        }
+          total: lastMonthVideos + lastMonthSeries,
+        },
       },
       earningsGrowth: {
         thisMonth: thisMonthTotal,
         lastMonth: lastMonthTotal,
-        growthPercentage: lastMonthTotal > 0 ? Math.round(((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100) : 0
-      }
+        growthPercentage:
+          lastMonthTotal > 0
+            ? Math.round(
+                ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100
+              )
+            : 0,
+      },
     }
   } catch (error) {
     console.error('Error calculating monthly growth:', error)
     return {
       followersGrowth: { current: 0, thisMonth: 0, lastMonth: 0 },
-      contentGrowth: { thisMonth: { videos: 0, series: 0, total: 0 }, lastMonth: { videos: 0, series: 0, total: 0 } },
-      earningsGrowth: { thisMonth: 0, lastMonth: 0, growthPercentage: 0 }
+      contentGrowth: {
+        thisMonth: { videos: 0, series: 0, total: 0 },
+        lastMonth: { videos: 0, series: 0, total: 0 },
+      },
+      earningsGrowth: { thisMonth: 0, lastMonth: 0, growthPercentage: 0 },
     }
   }
 }
@@ -334,16 +361,16 @@ const getCommunityEngagementStats = async (req, res, next) => {
 
     const community = await Community.findById(communityId)
     if (!community) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Community not found' 
+        message: 'Community not found',
       })
     }
 
     if (community.founder.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: 'Only community founder can view engagement stats'
+        message: 'Only community founder can view engagement stats',
       })
     }
 
@@ -370,8 +397,8 @@ const getCommunityEngagementStats = async (req, res, next) => {
         $match: {
           community: communityId,
           createdAt: { $gte: startDate },
-          visibility: { $ne: 'hidden' }
-        }
+          visibility: { $ne: 'hidden' },
+        },
       },
       {
         $group: {
@@ -382,9 +409,9 @@ const getCommunityEngagementStats = async (req, res, next) => {
           totalShares: { $sum: '$shares' },
           averageLikes: { $avg: '$likes' },
           averageViews: { $avg: '$views' },
-          averageShares: { $avg: '$shares' }
-        }
-      }
+          averageShares: { $avg: '$shares' },
+        },
+      },
     ])
 
     const stats = engagementStats[0] || {
@@ -394,7 +421,7 @@ const getCommunityEngagementStats = async (req, res, next) => {
       totalShares: 0,
       averageLikes: 0,
       averageViews: 0,
-      averageShares: 0
+      averageShares: 0,
     }
 
     res.status(200).json({
@@ -403,12 +430,15 @@ const getCommunityEngagementStats = async (req, res, next) => {
       timeframe,
       period: {
         startDate,
-        endDate: now
+        endDate: now,
       },
       engagement: {
         ...stats,
-        engagementRate: stats.totalViews > 0 ? Math.round((stats.totalLikes / stats.totalViews) * 100) : 0
-      }
+        engagementRate:
+          stats.totalViews > 0
+            ? Math.round((stats.totalLikes / stats.totalViews) * 100)
+            : 0,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -422,16 +452,16 @@ const getCommunityRevenueBreakdown = async (req, res, next) => {
 
     const community = await Community.findById(communityId)
     if (!community) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Community not found' 
+        message: 'Community not found',
       })
     }
 
     if (community.founder.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: 'Only community founder can view revenue breakdown'
+        message: 'Only community founder can view revenue breakdown',
       })
     }
 
@@ -441,27 +471,27 @@ const getCommunityRevenueBreakdown = async (req, res, next) => {
         $match: {
           content_id: communityId,
           transfer_type: 'community_fee',
-          status: 'completed'
-        }
+          status: 'completed',
+        },
       },
       {
         $group: {
           _id: {
             month: { $month: '$createdAt' },
-            year: { $year: '$createdAt' }
+            year: { $year: '$createdAt' },
           },
           totalAmount: { $sum: '$total_amount' },
           creatorAmount: { $sum: '$creator_amount' },
           platformAmount: { $sum: '$platform_amount' },
-          transactionCount: { $sum: 1 }
-        }
+          transactionCount: { $sum: 1 },
+        },
       },
       {
-        $sort: { '_id.year': -1, '_id.month': -1 }
+        $sort: { '_id.year': -1, '_id.month': -1 },
       },
       {
-        $limit: 12
-      }
+        $limit: 12,
+      },
     ])
 
     res.status(200).json({
@@ -471,17 +501,21 @@ const getCommunityRevenueBreakdown = async (req, res, next) => {
         id: community._id,
         name: community.name,
         feeType: community.community_fee_type,
-        feeAmount: community.community_fee_amount
+        feeAmount: community.community_fee_amount,
       },
       revenue: {
         monthlyBreakdown: feeRevenue,
         summary: {
           totalCollected: community.total_fee_collected,
           totalUploads: community.total_uploads,
-          averagePerUpload: community.total_uploads > 0 ? 
-            Math.round(community.total_fee_collected / community.total_uploads) : 0
-        }
-      }
+          averagePerUpload:
+            community.total_uploads > 0
+              ? Math.round(
+                  community.total_fee_collected / community.total_uploads
+                )
+              : 0,
+        },
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -491,5 +525,5 @@ const getCommunityRevenueBreakdown = async (req, res, next) => {
 module.exports = {
   getCommunityAnalytics,
   getCommunityEngagementStats,
-  getCommunityRevenueBreakdown
+  getCommunityRevenueBreakdown,
 }

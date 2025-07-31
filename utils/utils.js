@@ -12,6 +12,7 @@ const {
   S3UploadError,
   NotificationQueueError,
   FireBaseNotificationError,
+  GooglePaymentsError,
 } = require('./errors')
 
 const dynamicVideoUpload = (req, res, next) => {
@@ -418,6 +419,14 @@ const handleError = (err, req, res) => {
     })
   }
 
+  if (err instanceof GooglePaymentsError) {
+    console.error('google payments error', err)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'GOOGLE_PAYMENTS_ERROR',
+    })
+  }
   // Default error response
   res.status(err.statusCode || 500).json({
     success: false,
