@@ -35,13 +35,27 @@ const CreatorPassSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  // Keep these for backward compatibility but make them optional
   razorpay_order_id: {
     type: String,
-    required: true,
+    required: false,
+    default: null,
   },
   razorpay_payment_id: {
     type: String,
-    required: true,
+    required: false,
+    default: null,
+  },
+  // New field for wallet transfer reference
+  wallet_transfer_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "WalletTransfer",
+    required: false,
+  },
+  purchase_method: {
+    type: String,
+    enum: ["razorpay", "wallet"],
+    default: "wallet",
   },
   auto_renewal: {
     type: Boolean,
@@ -62,6 +76,10 @@ const CreatorPassSchema = new mongoose.Schema({
     original_price: {
       type: Number,
     },
+    wallet_transfer_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransfer",
+    },
   },
 }, {
   timestamps: true,
@@ -70,5 +88,6 @@ const CreatorPassSchema = new mongoose.Schema({
 // Index for efficient queries
 CreatorPassSchema.index({ user_id: 1, creator_id: 1, status: 1 });
 CreatorPassSchema.index({ end_date: 1 });
+CreatorPassSchema.index({ wallet_transfer_id: 1 });
 
 module.exports = mongoose.model("CreatorPass", CreatorPassSchema);

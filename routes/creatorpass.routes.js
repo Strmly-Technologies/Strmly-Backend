@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
+  purchaseCreatorPassWithWallet,
   createCreatorPassOrder,
   verifyCreatorPassPayment,
   getCreatorPassStatus,
@@ -13,6 +14,10 @@ const {
 } = require("../controller/creatorpass.controller");
 const { authenticateToken } = require("../middleware/auth");
 
+// New wallet-based purchase route
+router.post("/purchase-with-wallet", authenticateToken, purchaseCreatorPassWithWallet);
+
+// Deprecated Razorpay routes (kept for backward compatibility)
 // Create creator pass order
 router.post("/create-order", authenticateToken, createCreatorPassOrder);
 

@@ -9,7 +9,6 @@ const { handleError } = require('../utils/utils')
 const MIN_WITHDRAWAL_AMOUNT = 100
 const MAX_WITHDRAWAL_AMOUNT = 100000
 const MAX_NOTES_LENGTH = 200
-const RAZORPAY_FEE_PERCENTAGE = 0.5
 
 const validateAmount = (amount) => {
   if (!amount || typeof amount !== 'number') {
@@ -116,8 +115,7 @@ const createWithdrawalRequest = async (req, res, next) => {
     }
 
     const platformFee = 0
-    const razorpayFee = Math.ceil((amount * RAZORPAY_FEE_PERCENTAGE) / 100)
-    const finalAmount = amount - platformFee - razorpayFee
+    const finalAmount = amount - platformFee
 
     const referenceId = generateReferenceId(creatorId)
 
@@ -136,7 +134,6 @@ const createWithdrawalRequest = async (req, res, next) => {
           wallet_balance_before: wallet.balance,
           wallet_balance_after: wallet.balance - amount,
           platform_fee: platformFee,
-          razorpay_fee: razorpayFee,
           final_amount: finalAmount,
           reference_id: referenceId,
           internal_notes: notes || '',
@@ -228,7 +225,6 @@ const createWithdrawalRequest = async (req, res, next) => {
           amount: finalWithdrawal.amount,
           finalAmount: finalWithdrawal.final_amount,
           platformFee: finalWithdrawal.platform_fee,
-          razorpayFee: finalWithdrawal.razorpay_fee,
           status: finalWithdrawal.status,
           requestedAt: finalWithdrawal.requested_at,
           processedAt: finalWithdrawal.processed_at,
@@ -333,8 +329,7 @@ const createUPIWithdrawalRequest = async (req, res, next) => {
     }
 
     const platformFee = 0
-    const razorpayFee = Math.ceil((amount * RAZORPAY_FEE_PERCENTAGE) / 100)
-    const finalAmount = amount - platformFee - razorpayFee
+    const finalAmount = amount - platformFee 
 
     const referenceId = generateReferenceId(creatorId)
 
@@ -353,7 +348,6 @@ const createUPIWithdrawalRequest = async (req, res, next) => {
           wallet_balance_before: wallet.balance,
           wallet_balance_after: wallet.balance - amount,
           platform_fee: platformFee,
-          razorpay_fee: razorpayFee,
           final_amount: finalAmount,
           reference_id: referenceId,
           internal_notes: notes || '',
@@ -443,7 +437,6 @@ const createUPIWithdrawalRequest = async (req, res, next) => {
           amount: finalWithdrawal.amount,
           finalAmount: finalWithdrawal.final_amount,
           platformFee: finalWithdrawal.platform_fee,
-          razorpayFee: finalWithdrawal.razorpay_fee,
           status: finalWithdrawal.status,
           requestedAt: finalWithdrawal.requested_at,
           processedAt: finalWithdrawal.processed_at,
@@ -569,7 +562,6 @@ const getWithdrawalHistory = async (req, res, next) => {
         amount: wd.amount,
         finalAmount: wd.final_amount,
         platformFee: wd.platform_fee,
-        razorpayFee: wd.razorpay_fee,
         status: wd.status,
         requestedAt: wd.requested_at,
         processedAt: wd.processed_at,

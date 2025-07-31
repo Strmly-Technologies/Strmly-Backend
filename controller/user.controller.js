@@ -128,7 +128,7 @@ const GetUserProfile = async (req, res, next) => {
 const UpdateUserProfile = async (req, res, next) => {
   try {
     const userId = req.user._id
-    const { username, bio, date_of_birth, interests, uniqueId } = req.body
+    const { username, bio, date_of_birth, interests, uniqueId,content_interets } = req.body
     const profilePhotoFile = req.file
 
     const updateData = {}
@@ -136,6 +136,7 @@ const UpdateUserProfile = async (req, res, next) => {
     if (bio !== undefined) updateData.bio = bio
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth
     if (uniqueId) updateData.uniqueId = uniqueId
+    if (content_interets) updateData.content_interets = content_interets
 
     // Parse interests from JSON string
     if (interests) {

@@ -150,8 +150,7 @@ const LikeVideo = async (req, res, next) => {
         videoId,
         userName,
         videoName,
-        userProfilePhoto,
-        user.FCM_token
+        userProfilePhoto
       )
       await video.save()
       await user.save()
@@ -295,8 +294,7 @@ const CommentOnVideo = async (req, res, next) => {
       videoName,
       userProfilePhoto,
       commentId,
-      commentText,
-      user.FCM_token
+      commentText
     )
     res.status(200).json({
       message: 'Comment added successfully',
@@ -416,9 +414,7 @@ const upvoteComment = async (req, res, next) => {
     const userId = req.user.id
 
     const video = await LongVideo.findById(videoId)
-    const user = await User.findById(userId).select(
-      'username profile_photo FCM_token'
-    )
+    const user = await User.findById(userId).select('username profile_photo')
     if (!video) {
       return res.status(404).json({ error: 'Video not found' })
     }
@@ -458,8 +454,7 @@ const upvoteComment = async (req, res, next) => {
         userName,
         videoName,
         userProfilePhoto,
-        commentId,
-        user.FCM_token
+        commentId
       )
     }
     res.status(200).json({
@@ -772,9 +767,6 @@ const GiftComment = async (req, res, next) => {
       await session.endSession()
       //send comment gift notification
       const gifter = User.findById(gifterId).select('username profile_photo')
-      const user = await User.findById(comment.user.toString()).select(
-        'FCM_token'
-      )
       await addCommentGiftNotificationToQueue(
         comment.user.toString(),
         gifterId,
@@ -783,8 +775,7 @@ const GiftComment = async (req, res, next) => {
         video.name,
         gifter.profile_photo,
         commentId,
-        amount,
-        user.FCM_token
+        amount
       )
       res.status(200).json({
         success: true,
@@ -862,8 +853,7 @@ const reshareVideo = async (req, res, next) => {
       videoId,
       user.username,
       video.name,
-      user.profile_photo,
-      user.FCM_token
+      user.profile_photo
     )
     return res.status(200).json({
       message: `video:${videoId} reshared by user:${userId} successfully`,
@@ -1005,9 +995,6 @@ const ReplyToComment = async (req, res, next) => {
 
     //send reply notification
     const user = await User.findById(userId).select('username profile_photo')
-    const commentAuthor = await User.findById(comment.user.toString()).select(
-      'FCM_token'
-    )
     await addCommentReplyNotificationToQueue(
       comment.user.toString(),
       userId,
@@ -1017,8 +1004,7 @@ const ReplyToComment = async (req, res, next) => {
       user.profile_photo,
       commentId,
       newReply._id.toString(),
-      reply,
-      commentAuthor.FCM_token
+      reply
     )
 
     res.status(200).json({
@@ -1065,9 +1051,7 @@ const UpvoteReply = async (req, res, next) => {
     await reply.save()
     if (!alreadyUpvoted) {
       //send reply upvote notification
-      const user = await User.findById(userId).select(
-        'username profile_photo FCM_token'
-      )
+      const user = await User.findById(userId).select('username profile_photo')
       await addCommentUpvoteNotificationToQueue(
         reply.user.toString(),
         userId,
@@ -1075,8 +1059,7 @@ const UpvoteReply = async (req, res, next) => {
         user.username,
         video.name,
         user.profile_photo,
-        reply._id.toString(),
-        user.FCM_token
+        reply._id.toString()
       )
     }
 

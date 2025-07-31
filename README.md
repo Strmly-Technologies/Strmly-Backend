@@ -295,56 +295,56 @@ backend/
 |                         |        |                                                       | 404         | `{ message: "Withdrawal not found" }`                                                                                                                                                                                                                                                                                                                                                                   |                                     |
 |                         |        |                                                       | 500         | `{ message: "Server error" }`                                                                                                                                                                                                                                                                                                                                                                           |                                     |
 
-### Webhook Routes (`/api/v1/webhooks`)
+## Creator Pass API
 
-| Route       | Method | Request Body          | Status Code | Response Schema                                                                         | Description              |
-| ----------- | ------ | --------------------- | ----------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| `/razorpay` | POST   | Razorpay webhook data | 200         | `{ received: "true", processed: "boolean", message: "Webhook processed successfully" }` | Handle Razorpay webhooks |
-|             |        |                       | 400         | `{ message: "Invalid webhook data" }`                                                   |                          |
-|             |        |                       | 401         | `{ message: "Unauthorized webhook" }`                                                   |                          |
-|             |        |                       | 500         | `{ message: "Server error" }`                                                           |                          |
+| Endpoint | Method | Description | Request Body | Success Response |
+|----------|--------|-------------|--------------|------------------|
+| `/creator-pass/purchase-with-wallet` | POST   | Purchase Creator Pass with wallet balance | `{ creatorId: "string" }` | `{ success: true, creatorPass: {...}, wallet: {...} }` | Purchase Creator Pass using wallet balance |
+| `/creator-pass/create-order` | POST   | ⚠️ **DEPRECATED** - Create Razorpay order for Creator Pass | N/A | Deprecated endpoint | Use wallet-based purchase instead |
+| `/creator-pass/verify-payment` | POST   | ⚠️ **DEPRECATED** - Verify Razorpay payment | N/A | Deprecated endpoint | Use wallet-based purchase instead |
 
-### Caution Routes (`/api/v1/caution`)
+## Webhook API
 
-| Route                     | Method | Request Body               | Status Code | Response Schema                                                                             | Description                             |
-| ------------------------- | ------ | -------------------------- | ----------- | ------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `/video/long/:videoId`    | DELETE | -                          | 200         | `{ message: "Long video deleted successfully" }`                                            | Delete long video (Protected)           |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 403         | `{ message: "Not authorized to delete this video" }`                                        |                                         |
-|                           |        |                            | 404         | `{ message: "Video not found" }`                                                            |                                         |
-|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
-| `/video/short/:videoId`   | DELETE | -                          | 200         | `{ message: "Short video deleted successfully" }`                                           | Delete short video (Protected)          |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 403         | `{ message: "Not authorized to delete this video" }`                                        |                                         |
-|                           |        |                            | 404         | `{ message: "Video not found" }`                                                            |                                         |
-|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
-| `/videos/bulk`            | DELETE | `{ videoIds }`             | 200         | `{ message: "Videos deleted successfully", deletedCount: "number", failedCount: "number" }` | Bulk delete videos (Protected)          |
-|                           |        |                            | 400         | `{ message: "Invalid video IDs or empty array" }`                                           |                                         |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
-| `/profile`                | DELETE | -                          | 200         | `{ message: "User profile deleted successfully" }`                                          | Delete user profile (Protected)         |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
-| `/community/:communityId` | DELETE | -                          | 200         | `{ message: "Community deleted successfully" }`                                             | Delete community (Protected)            |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 403         | `{ message: "Not authorized to delete this community" }`                                    |                                         |
-|                           |        |                            | 404         | `{ message: "Community not found" }`                                                        |                                         |
-|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
-| `/series/:seriesId`       | DELETE | -                          | 200         | `{ message: "Series deleted successfully" }`                                                | Delete series (Protected)               |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 403         | `{ message: "Not authorized to delete this series" }`                                       |                                         |
-|                           |        |                            | 404         | `{ message: "Series not found" }`                                                           |                                         |
-|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
-| `/community/remove-video` | PATCH  | `{ communityId, videoId }` | 200         | `{ message: "Video removed from community successfully" }`                                  | Remove video from community (Protected) |
-|                           |        |                            | 400         | `{ message: "Invalid community or video ID" }`                                              |                                         |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 403         | `{ message: "Not authorized to modify this community" }`                                    |                                         |
-|                           |        |                            | 404         | `{ message: "Community or video not found" }`                                               |                                         |
-|                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
-| `/community/unfollow`     | PATCH  | `{ communityId }`          | 200         | `{ message: "Successfully unfollowed community" }`                                          | Unfollow community (Protected)          |
-|                           |        |                            | 400         | `{ message: "Invalid community ID" }`                                                       |                                         |
-|                           |        |                            | 401         | `{ message: "Unauthorized" }`                                                               |                                         |
-|                           |        |                            | 404         | `{ message: "Community not found or not following" }`                                       |                                         |
+| `/razorpay` | POST   | Razorpay webhook data | 200         | `{ received: "true", processed: "boolean", message: "Webhook processed successfully" }` | Handle Razorpay webhooks (for wallet loading only) |
+
+## Error Handling
+
+The API returns consistent error responses:
+
+```json
+{
+  "message": "Error description",
+  "error": "Detailed error information (in development)"
+}
+```
+
+## Status Codes
+
+- `200` - Success
+- `201` - Created
+- `400` - Bad Request
+- `401` - Unauthorized
+- `403` - Forbidden
+- `404` - Not Found
+- `500` - Internal Server Error
+
+## Health Check
+
+A health check endpoint is available at:
+
+```
+GET /health
+```
+
+Response: `"Server is healthy"`
+
+## Development
+
+For development, the server uses nodemon for automatic restarts:
+
+```bash
+npm run dev
+```
 |                           |        |                            | 500         | `{ message: "Server error" }`                                                               |                                         |
 | `/community/remove-user`  | PATCH  | `{ communityId, userId }`  | 200         | `{ message: "User removed from community successfully" }`                                   | Remove user from community (Protected)  |
 |                           |        |                            | 400         | `{ message: "Invalid community or user ID" }`                                               |                                         |
