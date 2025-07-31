@@ -50,7 +50,7 @@ const validateObjectId = (id, fieldName = 'ID') => {
   return { isValid: true }
 }
 
-const getOrCreateWallet = async (userId, walletType = 'user') => {
+/* const getOrCreateWallet = async (userId, walletType = 'user') => {
   let wallet = await Wallet.findOne({ user_id: userId })
 
   if (!wallet) {
@@ -65,7 +65,7 @@ const getOrCreateWallet = async (userId, walletType = 'user') => {
   }
 
   return wallet
-}
+} */
 
 const statusOfLike = async (req, res, next) => {
   const { videoId } = req.body
@@ -615,9 +615,22 @@ const GiftComment = async (req, res, next) => {
     }
 
     // Get wallets
-    const gifterWallet = await getOrCreateWallet(gifterId, 'user')
-    const receiverWallet = await getOrCreateWallet(commentAuthorId, 'user')
-
+    const gifterWallet = await Wallet.find({ user_id: gifterId })
+    if (!gifterWallet) {
+      return res.status(400).json({
+        success: false,
+        error: 'gifter wallet not found',
+        code: 'GIFTER_WALLET_NOT_FOUND',
+      })
+    }
+    const receiverWallet = await Wallet.find({ user_id: commentAuthorId })
+    if (!receiverWallet) {
+      return res.status(400).json({
+        success: false,
+        error: 'receiver wallet not found',
+        code: 'RECEIVER_WALLET_NOT_FOUND',
+      })
+    }
     // Check gifter's wallet balance
     if (gifterWallet.balance < amount) {
       return res.status(400).json({

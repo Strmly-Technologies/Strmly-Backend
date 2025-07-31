@@ -2,15 +2,39 @@ const mongoose = require('mongoose')
 
 const paymentSchema = new mongoose.Schema(
   {
+    platform: {
+      type: String,
+      enum: ['razorpay', 'google_play'],
+      required: true,
+    },
     razorpay_order_id: {
       type: String,
       unique: true,
+      sparse: true,
     },
     razorpay_payment_id: {
       type: String,
       unique: true,
+      sparse: true,
     },
     razorpay_signature: {
+      type: String,
+      sparse: true,
+    },
+    google_order_id: {
+      //google sets it
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    google_purchase_token: {
+      //google sets it
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    google_product_id: {
+      //frontend sets it
       type: String,
     },
     amount: {

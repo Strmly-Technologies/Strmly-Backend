@@ -35,7 +35,6 @@ const CreatorPassSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  // Keep these for backward compatibility but make them optional
   razorpay_order_id: {
     type: String,
     required: false,
@@ -76,7 +75,10 @@ const CreatorPassSchema = new mongoose.Schema({
     original_price: {
       type: Number,
     },
-    // Removed wallet_transfer_id to avoid duplication with the main schema
+    wallet_transfer_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalletTransfer",
+    },
   },
 }, {
   timestamps: true,

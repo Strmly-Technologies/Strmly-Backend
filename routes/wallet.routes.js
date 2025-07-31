@@ -7,6 +7,7 @@ const {
   transferCommunityFee,
   getWalletTransactionHistory,
   getGiftHistory,
+  getOrCreateWallet,
 } = require('../controller/wallet.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -21,6 +22,14 @@ const {
 
 // Get wallet details and recent transfers
 router.get('/', authenticateToken, generalRateLimiter, getWalletDetails)
+
+//get or create user wallet
+router.post(
+  '/get-wallet',
+  authenticateToken,
+  paymentRateLimiter,
+  getOrCreateWallet
+)
 
 // Load money from bank to wallet
 router.post(
