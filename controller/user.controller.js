@@ -128,7 +128,7 @@ const GetUserProfile = async (req, res, next) => {
 const UpdateUserProfile = async (req, res, next) => {
   try {
     const userId = req.user._id
-    const { username, bio, date_of_birth, interests, uniqueId,content_interets } = req.body
+    const { username, bio, date_of_birth, interests, uniqueId, content_interests } = req.body
     const profilePhotoFile = req.file
 
     const updateData = {}
