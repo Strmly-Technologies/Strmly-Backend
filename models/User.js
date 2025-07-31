@@ -71,7 +71,7 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
-    content_interets:{
+    content_interests:{
       type: String,
     },
     bio: {
