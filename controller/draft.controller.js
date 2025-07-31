@@ -24,7 +24,7 @@ const createOrUpdateDraft = async (req, res, next) => {
       display_till_time,
       contentType = 'video'
     } = req.body
-
+ 
     let draft
 
     if (draftId) {
@@ -83,6 +83,184 @@ const createOrUpdateDraft = async (req, res, next) => {
   }
 }
 
+// Upload video to an existing draft
+const uploadVideoToDraft = async (req, res, next) => {
+  try {
+    const userId = req.user.id
+    const { id } = req.params
+    const videoFile = req.files?.videoFile?.[0]
+
+    if (!videoFile) {
+      return res.status(400).json({ error: 'Video file is required' })
+    }
+
+    const draft = await Draft.findOne({ _id: id, user_id: userId })
+    
+    if (!draft) {
+      return res.status(404).json({ error: 'Draft not found' })
+    }
+
+    if (draft.isExpired()) {
+      await draft.deleteOne()
+      await User.findByIdAndUpdate(userId, {
+        $pull: { drafts: draft._id }
+      })
+      return res.status(410).json({ error: 'Draft has expired and was removed' })
+    }
+
+    if (draft.video_data?.has_video) {
+      return res.status(400).json({ 
+        error: 'Draft already has a video. Delete the existing video first or create a new draft.' 
+      })
+    }
+
+    // Update draft status
+    draft.status = 'uploading'
+    await draft.save()
+
+    try {
+      const user = await User.findById(userId).select('-password')
+      if (!user) {
+        throw new Error('User not found')
+      }
+
+      // Compress video
+      draft.status = 'processing'
+      await draft.save()
+
+      const {
+        compressedVideoBuffer,
+        outputPath,
+        fileOriginalName,
+        fileMimeType,
+      } = await videoCompressor(videoFile)
+
+      // Upload to S3 with draft prefix
+      const videoUploadResult = await uploadVideoToS3(
+        compressedVideoBuffer,
+        `draft_${fileOriginalName}`,
+        fileMimeType
+      )
+
+      if (!videoUploadResult.success) {
+        draft.status = 'failed'
+        draft.error_message = videoUploadResult.message
+        await draft.save()
+        
+        return res.status(500).json({
+          error: videoUploadResult.message,
+          details: videoUploadResult.error || 'Failed to upload video to S3',
+        })
+      }
+
+      // Generate and upload thumbnail
+      const thumbnailBuffer = await generateVideoThumbnail(outputPath)
+      const thumbnailUploadResult = await uploadImageToS3(
+        `draft_${fileOriginalName}_thumbnail`,
+        'image/png',
+        thumbnailBuffer,
+        'draft_thumbnails'
+      )
+
+      if (!thumbnailUploadResult.success) {
+        draft.status = 'failed'
+        draft.error_message = 'Failed to upload thumbnail'
+        await draft.save()
+        
+        return res.status(500).json({ message: 'Failed to upload thumbnail' })
+      }
+
+      // Update draft with video information
+      draft.video_data = {
+        has_video: true,
+        video_url: videoUploadResult.url,
+        video_s3_key: videoUploadResult.key,
+        thumbnail_url: thumbnailUploadResult.url,
+        thumbnail_s3_key: thumbnailUploadResult.key,
+        original_filename: videoFile.originalname,
+        file_size: videoFile.size,
+        video_uploaded_at: new Date(),
+      }
+
+      draft.status = 'draft'
+      await draft.updateExpiryForVideo() // Set 7-day expiry
+
+      res.status(200).json({
+        message: 'Video uploaded to draft successfully',
+        draft: {
+          id: draft._id,
+          status: draft.status,
+          expires_at: draft.expires_at,
+          days_until_expiry: Math.ceil((draft.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
+          video_info: {
+            original_filename: draft.video_data.original_filename,
+            file_size: draft.video_data.file_size,
+            uploaded_at: draft.video_data.video_uploaded_at,
+          }
+        },
+        warning: 'Draft with video will expire in 7 days. Complete upload to save permanently.'
+      })
+
+    } catch (uploadError) {
+      draft.status = 'failed'
+      draft.error_message = uploadError.message
+      await draft.save()
+      throw uploadError
+    }
+
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+// Remove video from draft
+const removeVideoFromDraft = async (req, res, next) => {
+  try {
+    const userId = req.user.id
+    const { id } = req.params
+
+    const draft = await Draft.findOne({ _id: id, user_id: userId })
+    
+    if (!draft) {
+      return res.status(404).json({ error: 'Draft not found' })
+    }
+
+    if (!draft.video_data?.has_video) {
+      return res.status(400).json({ error: 'Draft does not have a video to remove' })
+    }
+
+    // Note: In production, you might want to delete the S3 files here
+    // For now, we'll just clear the video data and reset expiry to 30 days
+    draft.video_data = {
+      has_video: false,
+      video_url: null,
+      video_s3_key: null,
+      thumbnail_url: null,
+      thumbnail_s3_key: null,
+      original_filename: null,
+      file_size: null,
+      video_uploaded_at: null,
+    }
+
+    // Reset expiry to 30 days for metadata-only draft
+    draft.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    draft.status = 'draft'
+    await draft.save()
+
+    res.status(200).json({
+      message: 'Video removed from draft successfully',
+      draft: {
+        id: draft._id,
+        status: draft.status,
+        expires_at: draft.expires_at,
+        has_video: false
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 // Get all user drafts
 const getUserDrafts = async (req, res, next) => {
   try {
@@ -126,9 +304,17 @@ const getUserDrafts = async (req, res, next) => {
           genre: draft.draft_data.genre,
           last_modified: draft.last_modified,
           expires_at: draft.expires_at,
+          days_until_expiry: Math.ceil((draft.expires_at - new Date()) / (1000 * 60 * 60 * 24)),
           community: draft.draft_data.community_id,
           series: draft.draft_data.series_id,
-          error_message: draft.error_message
+          error_message: draft.error_message,
+          has_video: draft.video_data?.has_video || false,
+          video_info: draft.video_data?.has_video ? {
+            original_filename: draft.video_data.original_filename,
+            file_size: draft.video_data.file_size,
+            uploaded_at: draft.video_data.video_uploaded_at,
+            thumbnail_url: draft.video_data.thumbnail_url,
+          } : null
         })
       }
     }
@@ -153,6 +339,8 @@ const getUserDrafts = async (req, res, next) => {
       },
       stats: {
         totalDrafts: validDrafts.length,
+        draftsWithVideo: validDrafts.filter(d => d.has_video).length,
+        draftsWithoutVideo: validDrafts.filter(d => !d.has_video).length,
         expiredRemoved: expiredDraftIds.length
       }
     })
@@ -223,7 +411,8 @@ const completeDraftUpload = async (req, res, next) => {
       return res.status(410).json({ error: 'Draft has expired and was removed' })
     }
 
-    if (!videoFile) {
+    // Check if draft already has video or if new video is provided
+    if (!draft.video_data?.has_video && !videoFile) {
       return res.status(400).json({ error: 'Video file is required to complete upload' })
     }
 
@@ -252,55 +441,71 @@ const completeDraftUpload = async (req, res, next) => {
         }
       }
 
-      // Compress video
-      draft.status = 'processing'
-      await draft.save()
+      let videoUploadResult, thumbnailUploadResult
 
-      const {
-        compressedVideoBuffer,
-        outputPath,
-        fileOriginalName,
-        fileMimeType,
-      } = await videoCompressor(videoFile)
-
-      // Upload to S3
-      const videoUploadResult = await uploadVideoToS3(
-        compressedVideoBuffer,
-        fileOriginalName,
-        fileMimeType
-      )
-
-      if (!videoUploadResult.success) {
-        draft.status = 'failed'
-        draft.error_message = videoUploadResult.message
+      if (draft.video_data?.has_video) {
+        // Use existing video from draft
+        videoUploadResult = {
+          success: true,
+          url: draft.video_data.video_url,
+          key: draft.video_data.video_s3_key
+        }
+        thumbnailUploadResult = {
+          success: true,
+          url: draft.video_data.thumbnail_url,
+          key: draft.video_data.thumbnail_s3_key
+        }
+      } else {
+        // Process new video file
+        draft.status = 'processing'
         await draft.save()
-        
-        return res.status(500).json({
-          error: videoUploadResult.message,
-          details: videoUploadResult.error || 'Failed to upload video to S3',
-        })
-      }
 
-      // Generate and upload thumbnail
-      const thumbnailBuffer = await generateVideoThumbnail(outputPath)
-      const thumbnailUploadResult = await uploadImageToS3(
-        `${fileOriginalName}_thumbnail`,
-        'image/png',
-        thumbnailBuffer,
-        'video_thumbnails'
-      )
+        const {
+          compressedVideoBuffer,
+          outputPath,
+          fileOriginalName,
+          fileMimeType,
+        } = await videoCompressor(videoFile)
 
-      if (!thumbnailUploadResult.success) {
-        draft.status = 'failed'
-        draft.error_message = 'Failed to upload thumbnail'
-        await draft.save()
-        
-        return res.status(500).json({ message: 'Failed to upload thumbnail' })
+        // Upload to S3
+        videoUploadResult = await uploadVideoToS3(
+          compressedVideoBuffer,
+          fileOriginalName,
+          fileMimeType
+        )
+
+        if (!videoUploadResult.success) {
+          draft.status = 'failed'
+          draft.error_message = videoUploadResult.message
+          await draft.save()
+          
+          return res.status(500).json({
+            error: videoUploadResult.message,
+            details: videoUploadResult.error || 'Failed to upload video to S3',
+          })
+        }
+
+        // Generate and upload thumbnail
+        const thumbnailBuffer = await generateVideoThumbnail(outputPath)
+        thumbnailUploadResult = await uploadImageToS3(
+          `${fileOriginalName}_thumbnail`,
+          'image/png',
+          thumbnailBuffer,
+          'video_thumbnails'
+        )
+
+        if (!thumbnailUploadResult.success) {
+          draft.status = 'failed'
+          draft.error_message = 'Failed to upload thumbnail'
+          await draft.save()
+          
+          return res.status(500).json({ message: 'Failed to upload thumbnail' })
+        }
       }
 
       // Create the actual video record
       const longVideo = new LongVideo({
-        name: draft.draft_data.name || videoFile.originalname || 'Untitled Video',
+        name: draft.draft_data.name || draft.video_data?.original_filename || 'Untitled Video',
         description: draft.draft_data.description || 'No description provided',
         videoUrl: videoUploadResult.url,
         thumbnailUrl: thumbnailUploadResult.url,
@@ -471,5 +676,7 @@ module.exports = {
   completeDraftUpload,
   deleteDraft,
   getDraftUploadStats,
-  cleanupExpiredDrafts
+  cleanupExpiredDrafts,
+  uploadVideoToDraft,
+  removeVideoFromDraft
 }

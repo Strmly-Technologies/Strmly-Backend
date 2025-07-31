@@ -75,6 +75,41 @@ const draftSchema = new mongoose.Schema(
         ref: 'Series',
       },
     },
+    // Video file information
+    video_data: {
+      has_video: {
+        type: Boolean,
+        default: false,
+      },
+      video_url: {
+        type: String,
+        default: null,
+      },
+      video_s3_key: {
+        type: String,
+        default: null,
+      },
+      thumbnail_url: {
+        type: String,
+        default: null,
+      },
+      thumbnail_s3_key: {
+        type: String,
+        default: null,
+      },
+      original_filename: {
+        type: String,
+        default: null,
+      },
+      file_size: {
+        type: Number,
+        default: null,
+      },
+      video_uploaded_at: {
+        type: Date,
+        default: null,
+      },
+    },
     error_message: {
       type: String,
       default: null,
@@ -86,8 +121,9 @@ const draftSchema = new mongoose.Schema(
     expires_at: {
       type: Date,
       default: function() {
-        // Drafts expire after 30 days
-        return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        // If draft has video, expire in 7 days, otherwise 30 days
+        const days = this.video_data?.has_video ? 7 : 30;
+        return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
       },
       index: { expireAfterSeconds: 0 }
     },
@@ -98,7 +134,8 @@ const draftSchema = new mongoose.Schema(
       { user_id: 1, status: 1 },
       { user_id: 1, content_type: 1 },
       { status: 1 },
-      { expires_at: 1 }
+      { expires_at: 1 },
+      { 'video_data.has_video': 1 }
     ]
   }
 )
@@ -118,6 +155,20 @@ draftSchema.methods.isExpired = function() {
 draftSchema.methods.extendExpiry = function(days = 30) {
   this.expires_at = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   return this.save();
+};
+
+// Method to update expiry when video is added
+draftSchema.methods.updateExpiryForVideo = function() {
+  this.expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  this.video_data.video_uploaded_at = new Date();
+  return this.save();
+};
+
+// Method to check if video has expired (7 days for video drafts)
+draftSchema.methods.isVideoExpired = function() {
+  if (!this.video_data?.has_video) return false;
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  return this.video_data.video_uploaded_at < sevenDaysAgo;
 };
 
 const Draft = mongoose.model('Draft', draftSchema)
