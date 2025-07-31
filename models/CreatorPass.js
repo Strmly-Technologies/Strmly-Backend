@@ -76,10 +76,7 @@ const CreatorPassSchema = new mongoose.Schema({
     original_price: {
       type: Number,
     },
-    wallet_transfer_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "WalletTransfer",
-    },
+    // Removed wallet_transfer_id to avoid duplication with the main schema
   },
 }, {
   timestamps: true,
