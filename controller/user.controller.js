@@ -136,7 +136,7 @@ const UpdateUserProfile = async (req, res, next) => {
     if (bio !== undefined) updateData.bio = bio
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth
     if (uniqueId) updateData.uniqueId = uniqueId
-    if (content_interets) updateData.content_interets = content_interets
+    if (content_interests) updateData.content_interests = content_interests
 
     // Parse interests from JSON string
     if (interests) {
