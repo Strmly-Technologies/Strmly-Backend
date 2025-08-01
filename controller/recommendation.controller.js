@@ -8,7 +8,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     const userId = req.user.id
     const { page = 1, batchSize = 5 } = req.query
 
-    const user = await User.findById(userId).select('interests viewed_videos')
+    const user = await User.findById(userId).select('interests viewed_videos following')
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
@@ -16,6 +16,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
     const userInterests = user.interests || []
     const viewedVideoIds = user.viewed_videos || []
+    const followingIds = user.following || []
 
     let recommendedVideos = []
     
@@ -53,9 +54,11 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       recommendedVideos.push(...randomVideos)
     }
 
-    // Get reshared videos 
+    // Get reshared videos - Only from users that the current user follows
     const resharedVideoSkip = (page - 1) * 2
-    const resharedVideos = await Reshare.find({})
+    const resharedVideos = await Reshare.find({
+      user: { $in: followingIds }  // Only get reshares from followed users
+    })
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
       .limit(2)

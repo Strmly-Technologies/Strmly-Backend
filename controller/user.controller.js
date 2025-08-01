@@ -58,8 +58,10 @@ const GetUserFeed = async (req, res, next) => {
         .limit(3)
     }
 
-    // Get reshared videos
-    const resharedVideos = await Reshare.find({})
+    // Get reshared videos - Only from users that the current user follows
+    const resharedVideos = await Reshare.find({
+      user: { $in: followingIds }  // Only get reshares from followed users
+    })
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
       .limit(2)
