@@ -18,14 +18,28 @@ const createSeries = async (req, res, next) => {
       release_date,
       seasons,
       communityId,
+      promisedEpisodesCount,
     } = req.body
 
-    if (!title || !description || !genre || !language || !type) {
+    if (
+      !title ||
+      !description ||
+      !genre ||
+      !language ||
+      !type ||
+      !promisedEpisodesCount
+    ) {
       return res.status(400).json({
-        error: 'Required fields: title, description, genre, language, type',
+        error:
+          'Required fields: title, description, genre, language, type, promisedEpisodesCount',
       })
     }
-
+    if (promisedEpisodesCount < 2) {
+      return res.status(400).json({
+        error:
+          'You must promise atleast 2 episodes to the viewers of your series',
+      })
+    }
     // Validate price based on type
     if (type === 'Paid') {
       if (!price || price <= 0) {
@@ -57,6 +71,7 @@ const createSeries = async (req, res, next) => {
       created_by: userId,
       updated_by: userId,
       community: communityId,
+      promised_episode_count: promisedEpisodesCount,
     })
 
     await series.save()

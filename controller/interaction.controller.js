@@ -150,7 +150,8 @@ const LikeVideo = async (req, res, next) => {
         videoId,
         userName,
         videoName,
-        userProfilePhoto
+        userProfilePhoto,
+        user.FCM_token
       )
       await video.save()
       await user.save()

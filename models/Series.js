@@ -8,6 +8,15 @@ const seriesSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
+    promised_episode_count: {
+      type: Number,
+      required: true,
+      min: 2,
+    },
+    locked_earnings: {
+      type: Number,
+      default: 0,
+    },
     description: {
       type: String,
       required: true,

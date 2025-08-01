@@ -384,7 +384,8 @@ const transferToCreatorForSeries = async (req, res, next) => {
         code: 'SERIES_NOT_FOUND',
       })
     }
-
+    const shouldUnlockFunds =
+      series.episodes.length >= series.promised_episode_count ? true : false
     const creatorId = series.created_by._id.toString()
 
     if (series.type !== 'Paid') {
@@ -539,15 +540,169 @@ const transferToCreatorForSeries = async (req, res, next) => {
     const platformAmount = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))
     const creatorAmount = amount - platformAmount
 
-    const session = await mongoose.startSession()
-
     const buyerBalanceBefore = buyerWallet.balance
     const creatorBalanceBefore = creatorWallet.balance
+    const lockedEarnings = series.locked_earnings
+
+    if (!shouldUnlockFunds) {
+      const session = await mongoose.startSession()
+      try {
+        await session.withTransaction(async () => {
+          const buyerBalanceAfter = buyerBalanceBefore - amount
+          buyerWallet.balance = buyerBalanceAfter
+          buyerWallet.total_spent += amount
+          buyerWallet.last_transaction_at = new Date()
+          await buyerWallet.save({ session })
+          series.locked_earnings += creatorAmount
+          series.earned_till_date += creatorAmount
+          await series.save({ session })
+          const buyerTransaction = new WalletTransaction({
+            wallet_id: buyerWallet._id,
+            user_id: buyerId,
+            transaction_type: 'debit',
+            transaction_category: 'series_purchase',
+            amount: amount,
+            currency: 'INR',
+            description: `Purchased series: ${series.title} (Total: ₹${amount})`,
+            balance_before: buyerBalanceBefore,
+            balance_after: buyerBalanceAfter,
+            content_id: seriesId,
+            content_type: 'series',
+            status: 'completed',
+            metadata: {
+              series_title: series.title,
+              creator_name: series.created_by.username,
+              platform_fee: platformAmount,
+              creator_share: creatorAmount,
+            },
+          })
+
+          await buyerTransaction.save({ session })
+          const platformTransaction = new WalletTransaction({
+            wallet_id: buyerWallet._id,
+            user_id: buyerId,
+            transaction_type: 'debit',
+            transaction_category: 'platform_commission',
+            amount: platformAmount,
+            currency: 'INR',
+            description: `Platform commission (30%) for series: ${series.title}`,
+            balance_before: buyerBalanceBefore,
+            balance_after: buyerBalanceAfter,
+            content_id: seriesId,
+            content_type: 'Series',
+            status: 'completed',
+            metadata: {
+              series_title: series.title,
+              buyer_name: req.user.username,
+              creator_name: series.created_by.username,
+              commission_percentage: PLATFORM_FEE_PERCENTAGE,
+              commission_type: 'platform_fee',
+              total_transaction_amount: amount,
+              creator_share: creatorAmount,
+            },
+          })
+
+          await platformTransaction.save({ session })
+
+          const userAccess = new UserAccess({
+            user_id: buyerId,
+            content_id: seriesId,
+            content_type: 'series',
+            access_type: 'paid',
+            payment_method: 'wallet_transfer',
+            payment_amount: amount,
+            granted_at: new Date(),
+          })
+
+          await userAccess.save({ session })
+
+          await User.findByIdAndUpdate(
+            creatorId,
+            {
+              $inc: {
+                'creator_profile.total_earned': creatorAmount,
+              },
+            },
+            { session }
+          )
+
+          await Series.findByIdAndUpdate(
+            seriesId,
+            {
+              $inc: {
+                total_earned: creatorAmount,
+                total_revenue: amount,
+                platform_commission: platformAmount,
+                total_purchases: 1,
+                'analytics.total_revenue': amount,
+              },
+              $set: {
+                'analytics.last_analytics_update': new Date(),
+              },
+            },
+            { session }
+          )
+        })
+        await session.endSession()
+        return res.status(200).json({
+          success: true,
+          message: `Series purchased successfully for ₹${amount}!`,
+          transfer: {
+            totalAmount: amount,
+            seriesPrice: series.price,
+            creatorAmount: creatorAmount,
+            platformAmount: platformAmount,
+            splitPercentage: `Creator: ${CREATOR_SHARE_PERCENTAGE}%, Platform: ${PLATFORM_FEE_PERCENTAGE}%`,
+            from: req.user.username,
+            to: series.created_by.username,
+            series: series.title,
+            transferType: 'series_purchase',
+          },
+          buyer: {
+            balanceBefore: buyerBalanceBefore,
+            balanceAfter: buyerWallet.balance,
+            currentBalance: buyerWallet.balance,
+          },
+          creator: {
+            lockedBalanceBefore: lockedEarnings,
+            lockedBalanceAfter: series.locked_earnings,
+            earnedAmount: creatorAmount,
+            sharePercentage: CREATOR_SHARE_PERCENTAGE,
+          },
+          platform: {
+            commissionAmount: platformAmount,
+            commissionPercentage: PLATFORM_FEE_PERCENTAGE,
+          },
+          access: {
+            contentId: seriesId,
+            contentType: 'Series',
+            accessType: 'paid',
+            grantedAt: new Date(),
+          },
+          nextSteps: {
+            message: 'You can now watch all episodes of this series',
+            seriesId: seriesId,
+          },
+        })
+      } catch (transactionError) {
+        await session.abortTransaction()
+        throw transactionError
+      } finally {
+        if (session.inTransaction()) {
+          await session.endSession()
+        }
+      }
+    }
+
+    const session = await mongoose.startSession()
 
     try {
       await session.withTransaction(async () => {
         const buyerBalanceAfter = buyerBalanceBefore - amount
-        const creatorBalanceAfter = creatorBalanceBefore + creatorAmount
+        const creatorBalanceAfter =
+          lockedEarnings > 0
+            ? creatorBalanceBefore + creatorAmount + lockedEarnings
+            : creatorBalanceBefore + creatorAmount
 
         const walletTransfer = new WalletTransfer({
           sender_id: buyerId,
@@ -589,10 +744,17 @@ const transferToCreatorForSeries = async (req, res, next) => {
         await buyerWallet.save({ session })
 
         creatorWallet.balance = creatorBalanceAfter
-        creatorWallet.total_received += creatorAmount
+        creatorWallet.total_received =
+          lockedEarnings > 0
+            ? creatorWallet.total_received + creatorAmount + lockedEarnings
+            : creatorWallet.total_received + creatorAmount
         creatorWallet.last_transaction_at = new Date()
         await creatorWallet.save({ session })
-
+        series.earned_till_date += creatorAmount
+        if (lockedEarnings > 0) {
+          series.locked_earnings = 0
+        }
+        await series.save({ session })
         const buyerTransaction = new WalletTransaction({
           wallet_id: buyerWallet._id,
           user_id: buyerId,
