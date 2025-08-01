@@ -339,8 +339,8 @@ const getVideoComments = async (req, res, next) => {
       timestamp: comment.createdAt,
       donations: comment.donations || 0,
       upvotes: comment.upvotes || 0,
-      downvotes: comment.downvotes || 0,
-      likes: comment.likes || 0,
+      downvotes: comment.downvoted_by || 0,
+      likes: comment.liked_by || 0,
       user: {
         id: comment.user._id,
         name: comment.user.username,
@@ -389,7 +389,7 @@ const getCommentReplies = async (req, res, next) => {
       timestamp: reply.createdAt,
       donations: reply.donations || 0,
       upvotes: reply.upvotes || 0,
-      downvotes: reply.downvotes || 0,
+      downvotes: reply.downvoted_by || 0,
       user: {
         id: reply.user._id,
         name: reply.user.username,
@@ -860,6 +860,11 @@ const reshareVideo = async (req, res, next) => {
     }
 
     await Reshare.create({ user: userId, long_video: videoId })
+    
+    // Get video creator's FCM token for notification
+    const videoCreator = await User.findById(video.created_by).select('FCM_token')
+    const fcmToken = videoCreator?.FCM_token || null
+    
     // send video reshare notification
     await addVideoReshareNotificationToQueue(
       video.created_by.toString(),
@@ -867,7 +872,8 @@ const reshareVideo = async (req, res, next) => {
       videoId,
       user.username,
       video.name,
-      user.profile_photo
+      user.profile_photo,
+      fcmToken
     )
     return res.status(200).json({
       message: `video:${videoId} reshared by user:${userId} successfully`,

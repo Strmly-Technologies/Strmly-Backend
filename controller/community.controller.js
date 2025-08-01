@@ -23,6 +23,11 @@ const CreateCommunity = async (req, res, next) => {
       bio: bio || '',
       founder: userId,
       followers: [userId],
+      creators: [userId],
+      creator_join_order: [{
+        user: userId,
+        joined_at: new Date()
+      }],
       community_fee_type: type,
       community_fee_amount: type === 'paid' ? amount || 0 : 0,
       community_fee_description: type === 'paid' ? fee_description || '' : '',
@@ -129,20 +134,61 @@ const FollowCommunity = async (req, res, next) => {
   }
 
   try {
+    const community = await Community.findById(communityId)
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+
+    // Add to followers
     await Community.updateOne(
       { _id: communityId },
       {
-        $addToSet: { followers: userId },
+        $addToSet: { 
+          followers: userId,
+          creators: userId 
+        },
         $set: { 'analytics.last_analytics_update': new Date() },
       }
     )
+
+    // Add user to creator join order if not already present
+    community.addCreatorToJoinOrder(userId)
+    await community.save()
 
     res.status(200).json({ message: 'Successfully followed the community' })
   } catch (error) {
     handleError(error, req, res, next)
   }
 }
-
+const UnfollowCommunity = async (req, res, next) => {
+  const { communityId } = req.body
+  const userId = req.user.id
+  if (!communityId) {
+    return res.status(400).json({ message: 'Community ID is required' })
+  }
+  try {
+    const community = await Community.findById(communityId)
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    if (!community.followers.includes(userId)) {
+      return res
+        .status(400)
+        .json({ message: 'You are not following this community' })
+    }
+    await Community.findByIdAndUpdate(communityId, {
+      $pull: { followers: userId },
+    })
+    await User.findByIdAndUpdate(userId, {
+      $pull: { community: communityId },
+    })
+  return res.status(200).json({
+      message: 'Successfully unfollowed the community',
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
 const AddBioToCommunity = async (req, res, next) => {
   const { communityId, bio } = req.body
   const userId = req.user.id
@@ -282,6 +328,30 @@ const getCommunityById = async (req, res, next) => {
       return res.status(404).json({ message: 'Community not found' })
     }
 
+    const userId = req.user.id
+    if(!userId) {
+      return res.status(200).json(community)
+    }
+    community.isFollowing = community.followers.includes(userId)
+    community.isCreator = community.creators.includes(userId)
+    community.isFounder = community.founder._id.toString() === userId
+    community.fee=community.community_fee_type === 'paid' ? {
+      type: community.community_fee_type,
+      amount: community.community_fee_amount,
+    } : null
+    community.canUpload = await checkCommunityUploadPermission(userId, communityId)
+    if (!community.canUpload.hasPermission) {
+      community.uploadError = community.canUpload.error
+      community.requiredFee = community.canUpload.requiredFee
+      community.communityName = community.canUpload.communityName
+    }
+    if (community.canUpload.access) {
+      community.access = {
+        status: community.canUpload.access.status,
+        expiresAt: community.canUpload.access.expires_at,
+        daysRemaining: community.canUpload.daysRemaining,
+      }
+    }
     return res.status(200).json(community)
   } catch (error) {
     handleError(error, req, res, next)
@@ -656,29 +726,44 @@ const changeCommunityFounder = async (req, res, next) => {
       .status(400)
       .json({ message: 'Community ID and new founder ID are required' })
   }
-  // get the community
+  
   try {
     const community = await Community.findById(communityId)
     if (!community) {
       return res.status(404).json({ message: 'Community not found' })
     }
+    
     // check if user is the founder
     if (community.founder.toString() !== userId.toString()) {
       return res
         .status(403)
         .json({ message: 'Only the current founder can change the founder' })
     }
-    // check if new founder exists
+    
+    // check if new founder exists and is a creator
     const newFounder = await User.findById(newFounderId)
     if (!newFounder) {
       return res.status(404).json({ message: 'New founder not found' })
     }
+
+    if (!community.creators.includes(newFounderId)) {
+      return res.status(400).json({ 
+        message: 'New founder must be a creator in the community' 
+      })
+    }
+    
     // update the community founder
     community.founder = newFounderId
     await community.save()
-    res
-      .status(200)
-      .json({ message: 'Community founder changed successfully', community })
+    
+    res.status(200).json({ 
+      message: 'Community founder changed successfully', 
+      community,
+      newFounder: {
+        id: newFounderId,
+        username: newFounder.username
+      }
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -705,23 +790,61 @@ const makeFirstJoinedCreatorFounder = async (req, res, next) => {
         .status(403)
         .json({ message: 'Only the current founder can change the founder' })
     }
-    // get the first creator who joined
-    const firstCreator = community.creators[1]
-    if (!firstCreator) {
-      return res
-        .status(404)
-        .json({ message: 'Community must have at least 2 creators' })
+    
+    // Get next founder in succession
+    const nextFounderId = community.getNextFounder(userId)
+    if (!nextFounderId) {
+      return res.status(404).json({ 
+        message: 'No other active creators available to become founder' 
+      })
     }
+    
     // update the community founder
-    community.founder = firstCreator
+    community.founder = nextFounderId
     await community.save()
+    
+    const newFounder = await User.findById(nextFounderId).select('username')
+    
     res.status(200).json({
-      message: 'Community founder changed to first creator successfully',
+      message: 'Community founder changed to next creator in succession',
       community,
+      newFounder: {
+        id: nextFounderId,
+        username: newFounder.username
+      }
     })
   } catch (error) {
     handleError(error, req, res, next)
   }
+}
+
+// Add new method to handle founder leaving
+const handleFounderLeaving = async (communityId, currentFounderId) => {
+  const community = await Community.findById(communityId)
+  if (!community) {
+    throw new Error('Community not found')
+  }
+
+  // Get next founder in succession
+  const nextFounderId = community.getNextFounder(currentFounderId)
+  
+  if (!nextFounderId) {
+    // No other creators available, community will be deleted
+    return null
+  }
+
+  // Update founder
+  community.founder = nextFounderId
+  
+  // Remove the leaving founder from creators and join order
+  community.creators = community.creators.filter(
+    creatorId => creatorId.toString() !== currentFounderId.toString()
+  )
+  community.removeCreatorFromJoinOrder(currentFounderId)
+  
+  await community.save()
+  
+  return nextFounderId
 }
 
 module.exports = {
@@ -742,4 +865,5 @@ module.exports = {
   getListOfCreators,
   changeCommunityFounder,
   makeFirstJoinedCreatorFounder,
+  handleFounderLeaving,
 }

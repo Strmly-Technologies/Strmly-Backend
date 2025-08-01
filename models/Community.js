@@ -28,6 +28,19 @@ const communitySchema = new mongoose.Schema(
       ref: 'User',
       default: [],
     },
+    creator_join_order: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        joined_at: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     creator_limit: {
       type: Number,
       default: 10,
@@ -125,7 +138,53 @@ const communitySchema = new mongoose.Schema(
   { timestamps: true }
 )
 
-// Add validation for revenue sharing percentages
+communitySchema.methods.getNextFounder = function (currentFounderId) {
+  // Find current founder's position in the join order
+  const currentFounderIndex = this.creator_join_order.findIndex(
+    (entry) => entry.user.toString() === currentFounderId.toString()
+  )
+
+  if (currentFounderIndex === -1) {
+    // Current founder not found in join order, return first creator
+    return this.creator_join_order.length > 0
+      ? this.creator_join_order[0].user
+      : null
+  }
+
+  for (let i = 1; i < this.creator_join_order.length; i++) {
+    const nextIndex = (currentFounderIndex + i) % this.creator_join_order.length
+    const nextCreator = this.creator_join_order[nextIndex].user
+
+    // Check if this creator is still active in the community
+    if (this.creators.includes(nextCreator)) {
+      return nextCreator
+    }
+  }
+
+  // If no other active creators found, return null
+  return null
+}
+
+communitySchema.methods.addCreatorToJoinOrder = function (userId) {
+  // Check if user is already in join order
+  const existingEntry = this.creator_join_order.find(
+    (entry) => entry.user.toString() === userId.toString()
+  )
+
+  if (!existingEntry) {
+    this.creator_join_order.push({
+      user: userId,
+      joined_at: new Date(),
+    })
+  }
+}
+
+communitySchema.methods.removeCreatorFromJoinOrder = function (userId) {
+  this.creator_join_order = this.creator_join_order.filter(
+    (entry) => entry.user.toString() !== userId.toString()
+  )
+}
+
 communitySchema.pre('save', function (next) {
   if (
     this.revenue_sharing.founder_percentage +
