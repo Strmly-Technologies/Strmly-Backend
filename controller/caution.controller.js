@@ -3,6 +3,7 @@ const LongVideo = require('../models/LongVideo')
 const Community = require('../models/Community')
 const Series = require('../models/Series')
 const { handleError } = require('../utils/utils')
+const { handleFounderLeaving } = require('./community.controller')
 
 const DeleteLongVideo = async (req, res, next) => {
   const { videoId } = req.params
@@ -63,21 +64,62 @@ const DeleteUserProfile = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    await LongVideo.deleteMany({ created_by: userId })
-    await Community.deleteMany({ founder: userId })
+    // Handle communities where user is founder
+    const foundedCommunities = await Community.find({ founder: userId })
+    const communityUpdates = []
+    
+    for (const community of foundedCommunities) {
+      try {
+        const nextFounderId = await handleFounderLeaving(community._id, userId)
+        if (nextFounderId) {
+          communityUpdates.push({
+            communityId: community._id,
+            communityName: community.name,
+            newFounderId: nextFounderId
+          })
+        } else {
+          // No successor found, delete the community
+          await Community.findByIdAndDelete(community._id)
+        }
+      } catch (error) {
+        console.error(`Error handling founder succession for community ${community._id}:`, error)
+        // If succession fails, delete the community
+        await Community.findByIdAndDelete(community._id)
+      }
+    }
+
+    // Remove user from other communities
     await Community.updateMany(
       { followers: userId },
-      { $pull: { followers: userId, creators: userId } }
+      { 
+        $pull: { 
+          followers: userId, 
+          creators: userId,
+          'creator_join_order': { user: userId }
+        } 
+      }
     )
 
+    // Delete user's content
+    await LongVideo.deleteMany({ created_by: userId })
+    await Series.deleteMany({ created_by: userId })
+
+    // Remove user from other users' follow lists
     await User.updateMany(
       { $or: [{ followers: userId }, { following: userId }] },
       { $pull: { followers: userId, following: userId } }
     )
 
+    // Delete the user
     await User.findByIdAndDelete(userId)
 
-    res.status(200).json({ message: 'User profile deleted successfully' })
+    res.status(200).json({ 
+      message: 'User profile deleted successfully',
+      communityUpdates: communityUpdates.length > 0 ? {
+        message: `Founder role transferred in ${communityUpdates.length} communities`,
+        updates: communityUpdates
+      } : null
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -269,13 +311,15 @@ const RemoveUserFromCommunity = async (req, res, next) => {
     if (community.founder.equals(targetUserId)) {
       return res
         .status(400)
-        .json({ message: 'Cannot remove the founder from the community' })
+        .json({ message: 'Cannot remove the founder from the community. Transfer founder role first.' })
     }
 
+    // Remove user from community and join order
     await Community.findByIdAndUpdate(communityId, {
       $pull: {
         followers: targetUserId,
         creators: targetUserId,
+        'creator_join_order': { user: targetUserId }
       },
     })
 
@@ -294,59 +338,61 @@ const RemoveUserFromCommunity = async (req, res, next) => {
   }
 }
 
-const BulkDeleteVideos = async (req, res, next) => {
-  const { videoIds } = req.body
+// Add new method to handle founder leaving community (without deleting profile)
+const removeFounderFromCommunity = async (req, res, next) => {
+  const { communityId } = req.body
   const userId = req.user.id
 
-  if (!videoIds || !Array.isArray(videoIds) || videoIds.length === 0) {
-    return res.status(400).json({ message: 'Array of video IDs is required' })
+  if (!communityId) {
+    return res.status(400).json({ message: 'Community ID is required' })
   }
 
   try {
-    const videos = await LongVideo.find({
-      _id: { $in: videoIds },
-      created_by: userId,
-    })
-
-    if (videos.length === 0) {
-      return res
-        .status(404)
-        .json({ message: 'No videos found that you can delete' })
+    const community = await Community.findById(communityId)
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
     }
 
-    const validVideoIds = videos.map((video) => video._id)
+    if (!community.founder.equals(userId)) {
+      return res.status(403).json({ 
+        message: 'Only the founder can leave their own community' 
+      })
+    }
 
-    await Community.updateMany(
-      { long_videos: { $in: validVideoIds } },
-      { $pull: { long_videos: { $in: validVideoIds } } }
-    )
+    // Handle founder succession
+    const nextFounderId = await handleFounderLeaving(communityId, userId)
+    
+    if (!nextFounderId) {
+      // No successor, delete the community
+      await Community.findByIdAndDelete(communityId)
+      
+      // Remove community from all users
+      await User.updateMany(
+        { community: communityId },
+        { $pull: { community: communityId, my_communities: communityId } }
+      )
+      
+      return res.status(200).json({ 
+        message: 'You left the community. Since no other creators were available, the community was deleted.' 
+      })
+    }
 
-    await User.updateMany(
-      {
-        $or: [
-          { saved_videos: { $in: validVideoIds } },
-          { playlist: { $in: validVideoIds } },
-          { history: { $in: validVideoIds } },
-          { liked_videos: { $in: validVideoIds } },
-          { video_frame: { $in: validVideoIds } },
-        ],
+    // Remove user from their own community lists
+    await User.findByIdAndUpdate(userId, {
+      $pull: {
+        community: communityId,
+        my_communities: communityId,
       },
-      {
-        $pull: {
-          saved_videos: { $in: validVideoIds },
-          playlist: { $in: validVideoIds },
-          history: { $in: validVideoIds },
-          liked_videos: { $in: validVideoIds },
-          video_frame: { $in: validVideoIds },
-        },
+    })
+
+    const newFounder = await User.findById(nextFounderId).select('username')
+
+    res.status(200).json({ 
+      message: 'You left the community successfully. Founder role transferred.',
+      newFounder: {
+        id: nextFounderId,
+        username: newFounder.username
       }
-    )
-
-    await LongVideo.deleteMany({ _id: { $in: validVideoIds } })
-
-    res.status(200).json({
-      message: `${validVideoIds.length} video(s) deleted successfully`,
-      deletedCount: validVideoIds.length,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -362,4 +408,5 @@ module.exports = {
   UnfollowCommunity,
   RemoveUserFromCommunity,
   BulkDeleteVideos,
+  removeFounderFromCommunity,
 }
