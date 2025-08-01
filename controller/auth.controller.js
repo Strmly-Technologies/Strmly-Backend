@@ -12,25 +12,29 @@ const { handleError } = require('../utils/utils')
 const { validateAndSanitize } = require('../middleware/validation')
 const LongVideo = require('../models/LongVideo')
 const RegisterNewUser = async (req, res, next) => {
-  const { email, password } = req.body
+  const { email, password, username } = req.body
 
   if (!email || !password) {
     return res.status(400).json({ message: 'All fields are required' })
   }
 
   try {
-    const existingUser = await User.findOne({ email })
+    const existingUser = await User.findOne({
+      $or: [{ email: email }, { username: username }],
+    })
+
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' })
+      if (existingUser.email === email) {
+        return res
+          .status(400)
+          .json({ message: 'User already exists', code: 'EMAIL_EXISTS' })
+      } else {
+        return res.status(400).json({
+          message: 'User already exists',
+          code: 'USERNAME_EXISTS',
+        })
+      }
     }
-
-    let username = await User.findOne({ username: email.split('@')[0] })
-    if (!username) {
-      username = email.split('@')[0]
-    } else {
-      username = username.username + Math.floor(Math.random() * 100000)
-    }
-
     //generate a verification OTP
     const verificationOTP = generateVerificationOTP()
     const verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
