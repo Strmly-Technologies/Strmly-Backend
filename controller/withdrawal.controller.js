@@ -9,7 +9,7 @@ const { handleError } = require('../utils/utils')
 const MIN_WITHDRAWAL_AMOUNT = 100
 const MAX_WITHDRAWAL_AMOUNT = 100000
 const MAX_NOTES_LENGTH = 200
-
+const PLATFORM_FEE_PERCENTAGE = 30
 const validateAmount = (amount) => {
   if (!amount || typeof amount !== 'number') {
     return {
@@ -114,7 +114,7 @@ const createWithdrawalRequest = async (req, res, next) => {
       })
     }
 
-    const platformFee = 0
+    const platformFee = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))
     const finalAmount = amount - platformFee
 
     const referenceId = generateReferenceId(creatorId)
@@ -328,8 +328,8 @@ const createUPIWithdrawalRequest = async (req, res, next) => {
       })
     }
 
-    const platformFee = 0
-    const finalAmount = amount - platformFee 
+    const platformFee = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))
+    const finalAmount = amount - platformFee
 
     const referenceId = generateReferenceId(creatorId)
 

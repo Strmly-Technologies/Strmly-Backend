@@ -722,6 +722,7 @@ const GiftComment = async (req, res, next) => {
 
         receiverWallet.balance = receiverBalanceAfter
         receiverWallet.total_received += amount
+        receiverWallet.revenue += amount
         receiverWallet.last_transaction_at = new Date()
         await receiverWallet.save({ session })
 
@@ -860,11 +861,13 @@ const reshareVideo = async (req, res, next) => {
     }
 
     await Reshare.create({ user: userId, long_video: videoId })
-    
+
     // Get video creator's FCM token for notification
-    const videoCreator = await User.findById(video.created_by).select('FCM_token')
+    const videoCreator = await User.findById(video.created_by).select(
+      'FCM_token'
+    )
     const fcmToken = videoCreator?.FCM_token || null
-    
+
     // send video reshare notification
     await addVideoReshareNotificationToQueue(
       video.created_by.toString(),

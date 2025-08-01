@@ -6,8 +6,8 @@ const WalletTransaction = require('../models/WalletTransaction')
 const WalletTransfer = require('../models/WalletTransfer')
 const { handleError } = require('../utils/utils')
 const User = require('../models/User')
-const PLATFORM_FEE_PERCENTAGE = 30
-const CREATOR_SHARE_PERCENTAGE = 70
+/* const PLATFORM_FEE_PERCENTAGE = 30
+const CREATOR_SHARE_PERCENTAGE = 70 */
 
 const { checkCreatorPassAccess } = require('./creatorpass.controller')
 
@@ -356,9 +356,6 @@ const purchaseIndividualVideo = async (req, res, next) => {
       })
     }
 
-    const platformAmount = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))
-    const creatorAmount = amount - platformAmount
-
     const session = await mongoose.startSession()
 
     try {
@@ -370,8 +367,8 @@ const purchaseIndividualVideo = async (req, res, next) => {
           sender_wallet_id: buyerWallet._id,
           receiver_wallet_id: creatorWallet._id,
           total_amount: amount,
-          creator_amount: creatorAmount,
-          platform_amount: platformAmount,
+          creator_amount: amount,
+
           currency: 'INR',
           transfer_type: 'video_purchase',
           content_id: id,
@@ -380,9 +377,8 @@ const purchaseIndividualVideo = async (req, res, next) => {
           sender_balance_before: buyerWallet.balance,
           sender_balance_after: buyerWallet.balance - amount,
           receiver_balance_before: creatorWallet.balance,
-          receiver_balance_after: creatorWallet.balance + creatorAmount,
-          platform_fee_percentage: PLATFORM_FEE_PERCENTAGE,
-          creator_share_percentage: CREATOR_SHARE_PERCENTAGE,
+          receiver_balance_after: creatorWallet.balance + amount,
+
           status: 'completed',
           metadata: {
             video_title: video.name,
@@ -396,9 +392,9 @@ const purchaseIndividualVideo = async (req, res, next) => {
         // Update wallets
         buyerWallet.balance -= amount
         buyerWallet.total_spent += amount
-        creatorWallet.balance += creatorAmount
-        creatorWallet.total_received += creatorAmount
-
+        creatorWallet.balance += amount
+        creatorWallet.total_received += amount
+        creatorWallet.revenue += amount
         await buyerWallet.save({ session })
         await creatorWallet.save({ session })
 
@@ -437,10 +433,10 @@ const purchaseIndividualVideo = async (req, res, next) => {
           user_id: creatorId,
           transaction_type: 'credit',
           transaction_category: 'creator_earning',
-          amount: creatorAmount,
+          amount: amount,
           currency: 'INR',
           description: `Earned from video: ${video.name}`,
-          balance_before: creatorWallet.balance - creatorAmount,
+          balance_before: creatorWallet.balance - amount,
           balance_after: creatorWallet.balance,
           content_id: id,
           content_type: 'video',
@@ -460,8 +456,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
           videoId: id,
           videoTitle: video.name,
           amount: amount,
-          creatorAmount: creatorAmount,
-          platformAmount: platformAmount,
+          creatorAmount: amount,
         },
         access: {
           accessType: 'paid',
