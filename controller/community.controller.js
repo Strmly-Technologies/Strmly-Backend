@@ -142,7 +142,35 @@ const FollowCommunity = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
-
+const UnfollowCommunity = async (req, res, next) => {
+  const { communityId } = req.body
+  const userId = req.user.id
+  if (!communityId) {
+    return res.status(400).json({ message: 'Community ID is required' })
+  }
+  try {
+    const community = await Community.findById(communityId)
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    if (!community.followers.includes(userId)) {
+      return res
+        .status(400)
+        .json({ message: 'You are not following this community' })
+    }
+    await Community.findByIdAndUpdate(communityId, {
+      $pull: { followers: userId },
+    })
+    await User.findByIdAndUpdate(userId, {
+      $pull: { community: communityId },
+    })
+  return res.status(200).json({
+      message: 'Successfully unfollowed the community',
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
 const AddBioToCommunity = async (req, res, next) => {
   const { communityId, bio } = req.body
   const userId = req.user.id
@@ -282,6 +310,30 @@ const getCommunityById = async (req, res, next) => {
       return res.status(404).json({ message: 'Community not found' })
     }
 
+    const userId = req.user.id
+    if(!userId) {
+      return res.status(200).json(community)
+    }
+    community.isFollowing = community.followers.includes(userId)
+    community.isCreator = community.creators.includes(userId)
+    community.isFounder = community.founder._id.toString() === userId
+    community.fee=community.community_fee_type === 'paid' ? {
+      type: community.community_fee_type,
+      amount: community.community_fee_amount,
+    } : null
+    community.canUpload = await checkCommunityUploadPermission(userId, communityId)
+    if (!community.canUpload.hasPermission) {
+      community.uploadError = community.canUpload.error
+      community.requiredFee = community.canUpload.requiredFee
+      community.communityName = community.canUpload.communityName
+    }
+    if (community.canUpload.access) {
+      community.access = {
+        status: community.canUpload.access.status,
+        expiresAt: community.canUpload.access.expires_at,
+        daysRemaining: community.canUpload.daysRemaining,
+      }
+    }
     return res.status(200).json(community)
   } catch (error) {
     handleError(error, req, res, next)
