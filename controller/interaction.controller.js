@@ -69,7 +69,7 @@ const validateObjectId = (id, fieldName = 'ID') => {
 
 const statusOfLike = async (req, res, next) => {
   const { videoId } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
   if (!videoId) {
     return res.status(400).json({ message: 'Video ID is required' })
   }
@@ -86,6 +86,103 @@ const statusOfLike = async (req, res, next) => {
       message: 'Like status retrieved successfully',
       isLiked,
       likes: video.likes,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const statusOfReshare = async (req, res, next) => {
+  const { videoId } = req.body
+  const userId = req.user.id.toString()
+  if (!videoId) {
+    return res.status(400).json({ message: 'Video ID is required' })
+  }
+  try {
+    const video = await LongVideo.findById(videoId).select('_id')
+
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' })
+    }
+    const reshares = await Reshare.find({ user: userId })
+      .populate({
+        path: 'long_video',
+        select: 'name description _id',
+      })
+      .populate({
+        path: 'user',
+        select: 'username profile_photo _id',
+      })
+    const isReshared = reshares.some(
+      (reshare) => reshare.long_video._id.toString() === videoId
+    )
+    reshares.res.status(200).json({
+      message: 'reshare status retrieved successfully',
+      isReshared,
+      video_reshares: reshares,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const statusOfUserFollowing = async (req, res, next) => {
+  const { followingId } = req.body
+  const userId = req.user.id.toString()
+  if (!followingId) {
+    return res.status(400).json({ message: 'Following ID is required' })
+  }
+  try {
+    const followingUser = await User.findById(followingId).select('_id')
+
+    if (!followingUser) {
+      return res.status(404).json({ message: 'Following user not found' })
+    }
+
+    const user = await User.findById(userId).select('_id following').populate({
+      path: 'following',
+      select: 'username profile_photo _id',
+    })
+    const isFollowing = user.following.some(
+      (followingUser) => followingUser._id.toString() === followingId
+    )
+
+    res.status(200).json({
+      message: 'following status retrieved successfully',
+      isFollowing,
+      user_following: user.following,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+const statusOfUserFollower = async (req, res, next) => {
+  const { followerId } = req.body
+  const userId = req.user.id.toString()
+
+  if (!followerId) {
+    return res.status(400).json({ message: 'Follower ID is required' })
+  }
+
+  try {
+    const followerUser = await User.findById(followerId).select('_id')
+    if (!followerUser) {
+      return res.status(404).json({ message: 'Follower user not found' })
+    }
+
+    const user = await User.findById(userId).select('_id followers').populate({
+      path: 'followers',
+      select: 'username profile_photo _id',
+    })
+
+    const isFollower = user.followers.some(
+      (follower) => follower._id.toString() === followerId
+    )
+
+    res.status(200).json({
+      message: 'Follower status retrieved successfully',
+      isFollower,
+      user_followers: user.followers,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -1286,4 +1383,7 @@ module.exports = {
   saveVideo,
   getTotalSharesByVideoId,
   deleteComment,
+  statusOfReshare,
+  statusOfUserFollowing,
+  statusOfUserFollower,
 }

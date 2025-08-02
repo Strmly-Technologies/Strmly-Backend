@@ -38,6 +38,10 @@ const GetUserFeed = async (req, res, next) => {
     })
       .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo')
+      .populate(
+        'series',
+        'title description price genre episodes seasons total_episodes'
+      )
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit - 2))

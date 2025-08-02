@@ -94,11 +94,15 @@ const getSeriesById = async (req, res, next) => {
       .populate('community', 'name')
       .populate({
         path: 'episodes',
+        select:
+          'name description thumbnailUrl season_number episode_number created_by videoUrl',
         populate: {
           path: 'created_by',
           select: 'username email',
         },
-        options: { sort: { season_number: 1, episode_number: 1 } },
+        options: {
+          sort: { season_number: 1, episode_number: 1 },
+        },
       })
 
     if (!series) {
@@ -121,8 +125,20 @@ const getUserSeries = async (req, res, next) => {
   }
   try {
     const series = await Series.find({ created_by: userId })
-      .populate('created_by', 'username email')
-      .populate('community', 'name')
+      .populate('created_by', 'username email profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate({
+        path: 'episodes',
+        select:
+          'name description thumbnailUrl season_number episode_number created_by videoUrl',
+        populate: {
+          path: 'created_by',
+          select: 'username email',
+        },
+        options: {
+          sort: { season_number: 1, episode_number: 1 },
+        },
+      })
 
     if (!series || series.length === 0) {
       return res.status(404).json({ error: 'No series found for this user' })
@@ -413,8 +429,21 @@ const searchSeries = async (req, res, next) => {
     }
 
     const series = await Series.find(searchCriteria)
-      .populate('created_by', 'username email')
-      .populate('community', 'name')
+      .populate('created_by', 'username email profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate({
+        path: 'episodes',
+        select:
+          'name description thumbnailUrl season_number episode_number created_by videoUrl',
+        populate: {
+          path: 'created_by',
+          select: 'username email',
+        },
+        options: {
+          sort: { season_number: 1, episode_number: 1 },
+        },
+      })
+
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 })
@@ -441,8 +470,21 @@ const getAllSeries = async (req, res, next) => {
     const skip = (page - 1) * limit
 
     const series = await Series.find()
-      .populate('created_by', 'username email')
-      .populate('community', 'name')
+      .populate('created_by', 'username email profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate({
+        path: 'episodes',
+        select:
+          'name description thumbnailUrl season_number episode_number created_by videoUrl',
+        populate: {
+          path: 'created_by',
+          select: 'username email',
+        },
+        options: {
+          sort: { season_number: 1, episode_number: 1 },
+        },
+      })
+
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 })
