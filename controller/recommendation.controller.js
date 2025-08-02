@@ -22,14 +22,32 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     
     if (userInterests.length > 0) {
       const interestedVideos = await LongVideo.find({
-        genre: { $in: userInterests },
-        _id: { $nin: viewedVideoIds },
-        visibility: { $ne: 'hidden' }
-      })
+          genre: { $in: userInterests },
+          _id: { $nin: viewedVideoIds },
+          visibility: { $ne: 'hidden' }
+        })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
+        .populate({
+          path: 'series',
+          populate: {
+            path: 'episodes',
+            select: 'name episode_number season_number thumbnailUrl views likes',
+            options: { sort: { season_number: 1, episode_number: 1 } },
+          },
+        })
         .sort({ views: -1, likes: -1 })
         .limit(Math.ceil(batchSize * 0.7))
+
+
+        // add if user is following the creator
+        interestedVideos.forEach(video => {
+          if (video.created_by && followingIds.includes(video.created_by._id.toString())) {
+            video.is_following_creator = true
+          } else {
+            video.is_following_creator = false
+          }
+        })
 
       recommendedVideos.push(...interestedVideos)
     }
@@ -48,9 +66,24 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
+        .populate({
+          path: 'series',
+          populate: {
+            path: 'episodes',
+            select: 'name episode_number season_number thumbnailUrl views likes',
+            options: { sort: { season_number: 1, episode_number: 1 } },
+          },
+        })
         .sort({ views: -1, likes: -1 })
         .limit(Math.floor(batchSize * 0.3) + 1)
 
+        randomVideos.forEach(video => {
+          if (video.created_by && followingIds.includes(video.created_by._id.toString())) {
+            video.is_following_creator = true
+          } else {
+            video.is_following_creator = false
+          }
+        })
       recommendedVideos.push(...randomVideos)
     }
 
@@ -70,20 +103,11 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           { path: 'community', select: 'name profile_photo' },
         ],
       })
-
     // Shuffle the combined array for better variety
     recommendedVideos = shuffleArray(recommendedVideos)
     
     // we limit to requested batch size
     recommendedVideos = recommendedVideos.slice(0, batchSize)
-
-    // Mark videos as viewed - ONLY the ones that are actually sent to user
-    if (recommendedVideos.length > 0) {
-      const videoIds = recommendedVideos.map(video => video._id)
-      await User.findByIdAndUpdate(userId, {
-        $addToSet: { viewed_videos: { $each: videoIds } }
-      })
-    }
 
     res.status(200).json({
       message: 'Personalized recommendations retrieved successfully',

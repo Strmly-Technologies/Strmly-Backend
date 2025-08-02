@@ -26,6 +26,8 @@ const {
   getUserPurchasedAccess,
   toggleCommentMonetization,
   saveUserFCMToken,
+  GetStatusOfReshare,
+  AddVideoToUserViewHistory,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -118,6 +120,8 @@ router.post('/unfollow', authenticateToken, unfollowUser)
 // Get user history
 router.get('/history', authenticateToken, getUserHistory)
 
+router.post('/reshare/status', authenticateToken,GetStatusOfReshare)
+
 // Get user liked videos in a community
 router.get(
   '/liked-videos-community',
@@ -127,5 +131,8 @@ router.get(
 
 // Update social media links
 router.put('/social-media-links', authenticateToken, updateSocialMediaLinks)
+
+// Add video to user view history
+router.post('/history',authenticateToken, AddVideoToUserViewHistory)
 
 module.exports = router

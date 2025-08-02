@@ -8,7 +8,6 @@ const {
   RemoveVideoFromCommunity,
   UnfollowCommunity,
   RemoveUserFromCommunity,
-  BulkDeleteVideos,
 } = require('../controller/caution.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -16,7 +15,6 @@ const { authenticateToken } = require('../middleware/auth')
 router.delete('/video/long/:videoId', authenticateToken, DeleteLongVideo)
 
 // API to bulk delete videos
-router.delete('/videos/bulk', authenticateToken, BulkDeleteVideos)
 
 // API to delete user profile
 router.delete('/profile', authenticateToken, DeleteUserProfile)
