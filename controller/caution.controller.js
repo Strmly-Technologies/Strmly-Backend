@@ -430,6 +430,5 @@ module.exports = {
   RemoveVideoFromCommunity,
   UnfollowCommunity,
   RemoveUserFromCommunity,
-  BulkDeleteVideos,
   removeFounderFromCommunity,
 }
