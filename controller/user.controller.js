@@ -60,7 +60,7 @@ const GetUserFeed = async (req, res, next) => {
 
     // Get reshared videos - Only from users that the current user follows
     const resharedVideos = await Reshare.find({
-      user: { $in: followingIds }  // Only get reshares from followed users
+      user: { $in: followingIds }, // Only get reshares from followed users
     })
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
@@ -130,7 +130,14 @@ const GetUserProfile = async (req, res, next) => {
 const UpdateUserProfile = async (req, res, next) => {
   try {
     const userId = req.user._id
-    const { username, bio, date_of_birth, interests, uniqueId, content_interests } = req.body
+    const {
+      username,
+      bio,
+      date_of_birth,
+      interests,
+      uniqueId,
+      content_interests,
+    } = req.body
     const profilePhotoFile = req.file
 
     const updateData = {}
@@ -238,7 +245,7 @@ const UpdateUserProfile = async (req, res, next) => {
 
 const GetUserCommunities = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
     const { type = 'all' } = req.query
 
     let communities
@@ -256,22 +263,40 @@ const GetUserCommunities = async (req, res, next) => {
         },
       })
       communities = user.community
-    } else {
-      const createdCommunities = await Community.find({ founder: userId })
-        .populate('followers', 'username profile_photo')
-        .populate('creators', 'username profile_photo')
-
+    } else if (type === 'following') {
       const user = await User.findById(userId).populate({
-        path: 'community',
+        path: 'following_communities',
         populate: {
           path: 'founder',
           select: 'username profile_photo',
         },
       })
+      communities = user.following_communities
+    } else {
+      const createdCommunities = await Community.find({ founder: userId })
+        .populate('followers', 'username profile_photo')
+        .populate('creators', 'username profile_photo')
+
+      const user = await User.findById(userId)
+        .populate({
+          path: 'community',
+          populate: {
+            path: 'founder',
+            select: 'username profile_photo',
+          },
+        })
+        .populate({
+          path: 'following_communities',
+          populate: {
+            path: 'founder',
+            select: 'username profile_photo',
+          },
+        })
 
       communities = {
         created: createdCommunities,
         joined: user.community,
+        following: user.following_communities,
       }
     }
 
@@ -1694,13 +1719,25 @@ const getUserPurchasedAccess = async (req, res, next) => {
       individualPurchases.map(async (purchase) => {
         let asset_data
         if (purchase.content_type === 'video') {
-          asset_data = await LongVideo.findById(purchase.content_id).select(
-            'name description thumbnailUrl'
-          )
+          asset_data = await LongVideo.findById(purchase.content_id)
+            .select('name description thumbnailUrl _id created_by')
+            .populate({
+              path: 'created_by',
+              select: 'username profile_photo _id',
+            })
         } else {
-          asset_data = await Series.findById(purchase.content_id).select(
-            'title description total_episodes bannerUrl posterUrl'
-          )
+          asset_data = await Series.findById(purchase.content_id)
+            .select(
+              'title description total_episodes bannerUrl posterUrl _id created_by episodes'
+            )
+            .populate({
+              path: 'created_by',
+              select: 'username profile_photo _id',
+            })
+            .populate({
+              path: 'episodes',
+              select: 'name description _id thumbnailUrl',
+            })
         }
 
         return {

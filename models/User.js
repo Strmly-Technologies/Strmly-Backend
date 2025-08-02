@@ -52,6 +52,13 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
     community: {
+      //user joined communities
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'Community',
+      default: [],
+    },
+    following_communities: {
+      //user following communities
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Community',
       default: [],
@@ -62,6 +69,7 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
     my_communities: {
+      //user created Communities
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Community',
       default: [],
@@ -71,7 +79,7 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
-    content_interests:{
+    content_interests: {
       type: String,
     },
     bio: {
