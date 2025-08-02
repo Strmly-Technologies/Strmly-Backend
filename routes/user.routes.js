@@ -27,6 +27,7 @@ const {
   toggleCommentMonetization,
   saveUserFCMToken,
   GetStatusOfReshare,
+  AddVideoToUserViewHistory,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -130,5 +131,8 @@ router.get(
 
 // Update social media links
 router.put('/social-media-links', authenticateToken, updateSocialMediaLinks)
+
+// Add video to user view history
+router.post('/history',authenticateToken, AddVideoToUserViewHistory)
 
 module.exports = router

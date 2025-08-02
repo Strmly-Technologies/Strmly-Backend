@@ -77,15 +77,6 @@ const GetUserFeed = async (req, res, next) => {
           { path: 'community', select: 'name profile_photo' },
         ],
       })
-
-    // Mark feed videos as viewed
-    if (feedVideos.length > 0) {
-      const feedVideoIds = feedVideos.map((video) => video._id)
-      await User.findByIdAndUpdate(userId, {
-        $addToSet: { viewed_videos: { $each: feedVideoIds } },
-      })
-    }
-
     console.log('Recommended videos from interests:', recommendedVideos)
 
     res.status(200).json({
@@ -1860,6 +1851,32 @@ const GetStatusOfReshare=async(req,res,next)=>{
   }
 }
 
+const AddVideoToUserViewHistory=async(req,res,next)=>{
+  try {
+    const userId=req.user.id
+    const { videoId } = req.body
+    if (!videoId) {
+      return res.status(400).json({ message: 'Video ID is required' })
+    }
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    // Check if video is already in history
+    if (user.viewed_videos.includes(videoId)) {
+      return res.status(200).json({ message: 'Video already in history' })
+    }
+    // Add video to viewed_videos
+    user.viewed_videos.push(videoId)
+    await user.save()
+    return res.status(200).json({
+      message: 'Video added to user view history successfully',
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
 
   getUserProfileDetails,
@@ -1888,4 +1905,5 @@ module.exports = {
   toggleCommentMonetization,
   saveUserFCMToken,
   GetStatusOfReshare,
+  AddVideoToUserViewHistory,
 }

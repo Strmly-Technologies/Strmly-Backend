@@ -109,14 +109,6 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     // we limit to requested batch size
     recommendedVideos = recommendedVideos.slice(0, batchSize)
 
-    // Mark videos as viewed - ONLY the ones that are actually sent to user
-    if (recommendedVideos.length > 0) {
-      const videoIds = recommendedVideos.map(video => video._id)
-      await User.findByIdAndUpdate(userId, {
-        $addToSet: { viewed_videos: { $each: videoIds } }
-      })
-    }
-
     res.status(200).json({
       message: 'Personalized recommendations retrieved successfully',
       recommendations: recommendedVideos,
