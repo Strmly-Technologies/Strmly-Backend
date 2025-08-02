@@ -686,9 +686,12 @@ const getTrendingVideos = async (req, res, next) => {
     const skip = (page - 1) * limit
 
     let videos = await LongVideo.find({})
-      .populate('created_by', 'username email')
-      .populate('community', 'name')
-      .populate('series', 'title')
+      .populate('created_by', 'username email profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate(
+        'series',
+        'title description total_episodes bannerUrl posterUrl _id created_by episodes'
+      )
       .sort({ views: -1, likes: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
