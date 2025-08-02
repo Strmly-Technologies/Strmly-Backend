@@ -45,6 +45,7 @@ const walletTransferSchema = new mongoose.Schema(
       enum: [
         'series_purchase',
         'video_purchase',
+        'video_gift',
         'tip',
         'gift',
         'comment_gift',

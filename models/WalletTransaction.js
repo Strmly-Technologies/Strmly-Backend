@@ -24,6 +24,7 @@ const walletTransactionSchema = new mongoose.Schema(
         'wallet_load',
         'series_purchase',
         'video_purchase',
+        'video_gift',
         'creator_pass_purchase',
         'creator_earning',
         'platform_commission',

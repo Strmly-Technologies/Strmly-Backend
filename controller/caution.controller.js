@@ -67,7 +67,7 @@ const DeleteUserProfile = async (req, res, next) => {
     // Handle communities where user is founder
     const foundedCommunities = await Community.find({ founder: userId })
     const communityUpdates = []
-    
+
     for (const community of foundedCommunities) {
       try {
         const nextFounderId = await handleFounderLeaving(community._id, userId)
@@ -75,14 +75,17 @@ const DeleteUserProfile = async (req, res, next) => {
           communityUpdates.push({
             communityId: community._id,
             communityName: community.name,
-            newFounderId: nextFounderId
+            newFounderId: nextFounderId,
           })
         } else {
           // No successor found, delete the community
           await Community.findByIdAndDelete(community._id)
         }
       } catch (error) {
-        console.error(`Error handling founder succession for community ${community._id}:`, error)
+        console.error(
+          `Error handling founder succession for community ${community._id}:`,
+          error
+        )
         // If succession fails, delete the community
         await Community.findByIdAndDelete(community._id)
       }
@@ -91,12 +94,12 @@ const DeleteUserProfile = async (req, res, next) => {
     // Remove user from other communities
     await Community.updateMany(
       { followers: userId },
-      { 
-        $pull: { 
-          followers: userId, 
+      {
+        $pull: {
+          followers: userId,
           creators: userId,
-          'creator_join_order': { user: userId }
-        } 
+          creator_join_order: { user: userId },
+        },
       }
     )
 
@@ -113,12 +116,15 @@ const DeleteUserProfile = async (req, res, next) => {
     // Delete the user
     await User.findByIdAndDelete(userId)
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'User profile deleted successfully',
-      communityUpdates: communityUpdates.length > 0 ? {
-        message: `Founder role transferred in ${communityUpdates.length} communities`,
-        updates: communityUpdates
-      } : null
+      communityUpdates:
+        communityUpdates.length > 0
+          ? {
+              message: `Founder role transferred in ${communityUpdates.length} communities`,
+              updates: communityUpdates,
+            }
+          : null,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -263,7 +269,10 @@ const UnfollowCommunity = async (req, res, next) => {
   }
 
   try {
-    const community = await Community.findById(communityId)
+    const community = await Community.findById(communityId).populate(
+      'founder',
+      'username profile_photo'
+    )
     if (!community) {
       return res.status(404).json({ message: 'Community not found' })
     }
@@ -280,7 +289,19 @@ const UnfollowCommunity = async (req, res, next) => {
 
     await User.findByIdAndUpdate(userId, { $pull: { community: communityId } })
 
-    res.status(200).json({ message: 'Successfully unfollowed the community' })
+    res.status(200).json({
+      message: 'Successfully unfollowed the community',
+      isFollowingCommunity: false,
+      community: {
+        name: community.name,
+        profilePhoto: community.profile_photo,
+        founder: {
+          id: community.founder._id.toString(),
+          username: community.founder.username,
+          profilePhoto: community.founder.profile_photo,
+        },
+      },
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -309,9 +330,10 @@ const RemoveUserFromCommunity = async (req, res, next) => {
     }
 
     if (community.founder.equals(targetUserId)) {
-      return res
-        .status(400)
-        .json({ message: 'Cannot remove the founder from the community. Transfer founder role first.' })
+      return res.status(400).json({
+        message:
+          'Cannot remove the founder from the community. Transfer founder role first.',
+      })
     }
 
     // Remove user from community and join order
@@ -319,7 +341,7 @@ const RemoveUserFromCommunity = async (req, res, next) => {
       $pull: {
         followers: targetUserId,
         creators: targetUserId,
-        'creator_join_order': { user: targetUserId }
+        creator_join_order: { user: targetUserId },
       },
     })
 
@@ -354,26 +376,27 @@ const removeFounderFromCommunity = async (req, res, next) => {
     }
 
     if (!community.founder.equals(userId)) {
-      return res.status(403).json({ 
-        message: 'Only the founder can leave their own community' 
+      return res.status(403).json({
+        message: 'Only the founder can leave their own community',
       })
     }
 
     // Handle founder succession
     const nextFounderId = await handleFounderLeaving(communityId, userId)
-    
+
     if (!nextFounderId) {
       // No successor, delete the community
       await Community.findByIdAndDelete(communityId)
-      
+
       // Remove community from all users
       await User.updateMany(
         { community: communityId },
         { $pull: { community: communityId, my_communities: communityId } }
       )
-      
-      return res.status(200).json({ 
-        message: 'You left the community. Since no other creators were available, the community was deleted.' 
+
+      return res.status(200).json({
+        message:
+          'You left the community. Since no other creators were available, the community was deleted.',
       })
     }
 
@@ -387,12 +410,12 @@ const removeFounderFromCommunity = async (req, res, next) => {
 
     const newFounder = await User.findById(nextFounderId).select('username')
 
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'You left the community successfully. Founder role transferred.',
       newFounder: {
         id: nextFounderId,
-        username: newFounder.username
-      }
+        username: newFounder.username,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)

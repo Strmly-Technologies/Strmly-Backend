@@ -141,7 +141,10 @@ const FollowCommunity = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    const community = await Community.findById(communityId)
+    const community = await Community.findById(communityId).populate(
+      'founder',
+      'username profile_photo'
+    )
     if (!community) {
       return res.status(404).json({ message: 'Community not found' })
     }
@@ -172,7 +175,19 @@ const FollowCommunity = async (req, res, next) => {
     community.addCreatorToJoinOrder(userId)
     await community.save()
 
-    res.status(200).json({ message: 'Successfully followed the community' })
+    res.status(200).json({
+      message: 'Successfully followed the community',
+      isFollowingCommunity: true,
+      community: {
+        name: community.name,
+        profilePhoto: community.profile_photo,
+        founder: {
+          id: community.founder._id.toString(),
+          username: community.founder.username,
+          profilePhoto: community.founder.profile_photo,
+        },
+      },
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }

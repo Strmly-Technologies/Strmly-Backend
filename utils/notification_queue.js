@@ -210,6 +210,34 @@ const addCommentGiftNotificationToQueue = async (
   }
 }
 
+const addVideoGiftNotificationToQueue = async (
+  userId,
+  giftedUserId,
+  videoId,
+  giftedUserName,
+  videoName,
+  giftedUserProfilePhoto,
+  amount,
+  fcmToken
+) => {
+  try {
+    await notificationQueue.add('sendNotification', {
+      fcmToken,
+      to: userId,
+      from: giftedUserId,
+      group: 'revenue',
+      type: 'video gift',
+      display: `${giftedUserName} gifted Rs.${amount} to your video "${videoName}"`,
+      videoId: videoId,
+      avatar: giftedUserProfilePhoto,
+      timeStamp: new Date(),
+      read: false,
+      URL: `/api/v1/videos/${videoId}`,
+    })
+  } catch (err) {
+    throw new NotificationQueueError(err.message)
+  }
+}
 const addCommentReplyNotificationToQueue = async (
   userId,
   repliedUserId,
@@ -252,4 +280,5 @@ module.exports = {
   addCommentGiftNotificationToQueue,
   addVideoReshareNotificationToQueue,
   addCommentReplyNotificationToQueue,
+  addVideoGiftNotificationToQueue,
 }

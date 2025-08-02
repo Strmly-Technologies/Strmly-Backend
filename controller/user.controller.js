@@ -1070,6 +1070,7 @@ const followUser = async (req, res, next) => {
 
     res.status(200).json({
       message: 'User followed successfully',
+      isFollowing: true,
       user: {
         id: followUser._id,
         username: followUser.username,
@@ -1120,6 +1121,7 @@ const unfollowUser = async (req, res, next) => {
     await unfollowUser.save()
     res.status(200).json({
       message: 'User unfollowed successfully',
+      isFollowing: false,
       user: {
         id: unfollowUser._id,
         username: unfollowUser.username,

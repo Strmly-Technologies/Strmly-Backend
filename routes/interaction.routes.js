@@ -20,6 +20,7 @@ const {
   statusOfUserFollowing,
   statusOfReshare,
   statusOfUserFollower,
+  GiftVideo,
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -101,6 +102,9 @@ router.delete(
 
 // API to gift a comment
 router.post('/gift-comment', authenticateToken, paymentRateLimiter, GiftComment)
+
+// API to gift a video
+router.post('/gift-video', authenticateToken, paymentRateLimiter, GiftVideo)
 
 // API to reshare a video
 router.post('/reshare', authenticateToken, generalRateLimiter, reshareVideo)

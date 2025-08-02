@@ -18,11 +18,11 @@ const commentSchema = new mongoose.Schema(
     likes: { type: Number, default: 0 },
     upvotes: { type: Number, default: 0 },
     downvotes: { type: Number, default: 0 },
-    donations: { type: Number, default: 0 },
+    gifts: { type: Number, default: 0 },
     upvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     downvoted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    donated_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    gifted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     replies: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
   },
   { timestamps: true }

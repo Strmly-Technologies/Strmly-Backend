@@ -150,6 +150,7 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
     comment_monetization_enabled: { type: Boolean, default: false },
+    video_monetization_enabled: { type: Boolean, default: false },
     creator_profile: {
       bank_details: {
         account_number: String,
