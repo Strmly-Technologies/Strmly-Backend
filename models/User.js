@@ -82,6 +82,14 @@ const userSchema = new mongoose.Schema(
     content_interests: {
       type: String,
     },
+    watch_time: {
+      type: Number,
+      default: 0,
+    },
+    advertisement_earnings: {
+      type: Number,
+      default: 0,
+    },
     bio: {
       type: String,
       default: '',

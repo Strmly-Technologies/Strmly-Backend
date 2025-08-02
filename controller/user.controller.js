@@ -1592,32 +1592,49 @@ const getUserDashboardAnalytics = async (req, res, next) => {
 
       response.interactions = interactions
     }
+    if (!group || group.includes('watch_time')) {
+      const user = await User.findById(userId).select('watch_time')
+      response.watch_time = user.watch_time
+    }
     //user earnings
     if (!group || group.includes('earnings')) {
-      const userVideos = await LongVideo.find({ creator: userId }).select(
-        'name views likes shares'
+      const user = await User.findById(userId)
+      const earnings = {}
+      earnings.creator_pass = user.creator_profile?.total_earned || 0
+      earnings.advertisement_earnings = user.advertisement_earnings
+      let communityEarnings = 0
+      const userCommunities = await Community.find({ founder: userId }).select(
+        'total_fee_collected'
       )
-
-      const totalViews = userVideos.reduce((sum, video) => sum + video.views, 0)
-      const totalLikes = userVideos.reduce((sum, video) => sum + video.likes, 0)
-      const totalShares = userVideos.reduce(
-        (sum, video) => sum + video.shares,
-        0
+      userCommunities.forEach((community) => {
+        communityEarnings += community.total_fee_collected
+      })
+      earnings.community_fee_earnings = communityEarnings
+      let giftingEarnings = 0
+      let videoPurchaseEarnings = 0
+      let seriesPurchaseEarnings = 0
+      const userComments = await Comment.find({ user: userId }).select('gifts')
+      const userVideos = await LongVideo.find({ created_by: userId }).select(
+        'gifts earned_till_date'
       )
-
-      const viewsEarnings = totalViews * 0.001
-      const engagementBonus = (totalLikes + totalShares) * 0.01
-      const totalEarnings = viewsEarnings + engagementBonus
-
-      const earnings = {
-        totalEarnings: parseFloat(totalEarnings.toFixed(2)),
-        viewsEarnings: parseFloat(viewsEarnings.toFixed(2)),
-        engagementBonus: parseFloat(engagementBonus.toFixed(2)),
-        totalViews,
-        totalLikes,
-        totalShares,
-        totalVideos: userVideos.length,
-      }
+      const userSeries = await Series.find({
+        created_by: userId,
+      }).select('total_earned')
+      userSeries.forEach((series) => {
+        seriesPurchaseEarnings += series.total_earned
+      })
+      userComments.forEach((comment) => {
+        giftingEarnings += comment.gifts
+      })
+      earnings.comment_gifting_earnings = giftingEarnings
+      giftingEarnings = 0
+      userVideos.forEach((video) => {
+        giftingEarnings += video.gifts
+        videoPurchaseEarnings += video.earned_till_date
+      })
+      earnings.video_gifting_earnings = giftingEarnings
+      earnings.video_purchase_earnings = videoPurchaseEarnings
+      earnings.series_purchase_earnings = seriesPurchaseEarnings
       response.earnings = earnings
     }
     //user history
