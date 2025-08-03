@@ -4,7 +4,7 @@ const { handleError } = require('../utils/utils')
 
 const createSeries = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const {
       title,
       description,
@@ -119,7 +119,7 @@ const getSeriesById = async (req, res, next) => {
 }
 
 const getUserSeries = async (req, res, next) => {
-  const userId = req.user.id
+  const userId = req.user.id.toString()
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required' })
   }
@@ -155,7 +155,7 @@ const getUserSeries = async (req, res, next) => {
 const updateSeries = async (req, res, next) => {
   try {
     const { id } = req.params
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const {
       title,
       description,
@@ -353,7 +353,7 @@ const addEpisodeToSeries = async (req, res, next) => {
 const removeEpisodeFromSeries = async (req, res, next) => {
   try {
     const { seriesId, episodeId } = req.params
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
     const series = await Series.findById(seriesId)
     if (
