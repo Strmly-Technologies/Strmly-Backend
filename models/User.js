@@ -128,10 +128,18 @@ const userSchema = new mongoose.Schema(
     date_of_birth: {
       type: Date,
     },
-    interests: {
-      type: [String],
-      default: [],
-    },
+      interests: {
+        type: [String],
+        default: [],
+      },
+      interest1:{
+        type:[String],
+        default: [],
+      },
+      interest2:{
+        type:[String],
+        default: [],
+      },
     viewed_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'LongVideo',

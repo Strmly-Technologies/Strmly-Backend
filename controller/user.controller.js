@@ -77,15 +77,6 @@ const GetUserFeed = async (req, res, next) => {
           { path: 'community', select: 'name profile_photo' },
         ],
       })
-
-    // Mark feed videos as viewed
-    if (feedVideos.length > 0) {
-      const feedVideoIds = feedVideos.map((video) => video._id)
-      await User.findByIdAndUpdate(userId, {
-        $addToSet: { viewed_videos: { $each: feedVideoIds } },
-      })
-    }
-
     console.log('Recommended videos from interests:', recommendedVideos)
 
     res.status(200).json({
@@ -721,7 +712,7 @@ const GetUserNotifications = async (req, res, next) => {
 const UpdateUserInterests = async (req, res, next) => {
   try {
     const userId = req.user._id
-    const { interests } = req.body
+    const { interests, type } = req.body
 
     if (!Array.isArray(interests) || interests.length === 0) {
       return res
@@ -729,24 +720,34 @@ const UpdateUserInterests = async (req, res, next) => {
         .json({ message: 'Interests must be a non-empty array' })
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { interests },
-      { new: true, runValidators: true }
-    ).select('-password')
-
-    if (!updatedUser) {
+    const user = await User.findById(userId)
+    if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
 
+    if (type === "interest1") {
+      user.interest1 = interests
+    } else if (type === "interest2") {
+      user.interest2 = interests
+    } else {
+      user.interests = interests
+    }
+
+    await user.save()
+
     res.status(200).json({
       message: 'User interests updated successfully',
-      user: updatedUser,
+      user: {
+        interests: user.interests,
+        interest1: user.interest1,
+        interest2: user.interest2,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
   }
 }
+
 
 const GetUserFollowers = async (req, res, next) => {
   try {
@@ -860,6 +861,7 @@ const GetUserProfileById = async (req, res, next) => {
     const userId = req.params.id
     const redis = getRedisClient()
     const cacheKey = `user_profile_public:${userId}`
+    const userid=req.user.id;
 
     if (redis) {
       const cachedProfile = await redis.get(cacheKey)
@@ -882,6 +884,7 @@ const GetUserProfileById = async (req, res, next) => {
     const totalFollowers = userDetails.followers?.length || 0
     const totalFollowing = userDetails.following?.length || 0
     const totalCommunities = userDetails.my_communities?.length || 0
+    const isBeingFollowed= userDetails.followers?.includes(userid) || false;
 
     const result = {
       message: 'User profile details retrieved successfully',
@@ -891,6 +894,7 @@ const GetUserProfileById = async (req, res, next) => {
         totalFollowers,
         totalFollowing,
         totalCommunities,
+        isBeingFollowed,
         social_media_links: userDetails.social_media_links || {},
       },
       cached: false,
@@ -1837,7 +1841,61 @@ const saveUserFCMToken = async (req, res, next) => {
   }
 }
 
+const GetStatusOfReshare=async(req,res,next)=>{
+  try {
+    const userId=req.user.id
+    const { videoId } = req.body
+    if (!videoId) {
+      return res.status(400).json({ message: 'Video ID is required' })
+    }
+    const reshare= await Reshare.findOne({
+      user: userId,
+      long_video: videoId,
+    })
+    if (!reshare) {
+      return res.status(404).json({ message: 'Reshare not found' })
+    }
+    const response={};
+    response.reshareStatus = reshare? true : false;
+    return res.status(200).json({
+      message: 'Reshare status retrieved successfully',
+      data: response,
+    })
+    
+  } catch (error) {
+   handleError(error, req, res, next)
+    
+  }
+}
+
+const AddVideoToUserViewHistory=async(req,res,next)=>{
+  try {
+    const userId=req.user.id
+    const { videoId } = req.body
+    if (!videoId) {
+      return res.status(400).json({ message: 'Video ID is required' })
+    }
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    // Check if video is already in history
+    if (user.viewed_videos.includes(videoId)) {
+      return res.status(200).json({ message: 'Video already in history' })
+    }
+    // Add video to viewed_videos
+    user.viewed_videos.push(videoId)
+    await user.save()
+    return res.status(200).json({
+      message: 'Video added to user view history successfully',
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
+
   getUserProfileDetails,
   GetUserFeed,
   GetUserProfile,
@@ -1863,4 +1921,6 @@ module.exports = {
   getUserPurchasedAccess,
   toggleCommentMonetization,
   saveUserFCMToken,
+  GetStatusOfReshare,
+  AddVideoToUserViewHistory,
 }
