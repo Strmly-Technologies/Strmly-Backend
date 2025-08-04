@@ -1730,7 +1730,7 @@ const getUserPurchasedAccess = async (req, res, next) => {
         let asset_data
         if (purchase.content_type === 'video') {
           asset_data = await LongVideo.findById(purchase.content_id)
-            .select('name description thumbnailUrl _id created_by')
+            .select('name description thumbnailUrl _id created_by videoUrl')
             .populate({
               path: 'created_by',
               select: 'username profile_photo _id',
@@ -1738,7 +1738,7 @@ const getUserPurchasedAccess = async (req, res, next) => {
         } else {
           asset_data = await Series.findById(purchase.content_id)
             .select(
-              'title description total_episodes bannerUrl posterUrl _id created_by episodes'
+              'title description total_episodes bannerUrl posterUrl _id created_by episodes '
             )
             .populate({
               path: 'created_by',
@@ -1746,7 +1746,7 @@ const getUserPurchasedAccess = async (req, res, next) => {
             })
             .populate({
               path: 'episodes',
-              select: 'name description _id thumbnailUrl',
+              select: 'name description _id thumbnailUrl videoUrl created_by',
             })
         }
 
