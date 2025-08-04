@@ -1338,10 +1338,18 @@ const getWalletTransactionHistory = async (req, res, next) => {
       const validCategories = [
         'wallet_load',
         'series_purchase',
+        'video_purchase',
+        'video_gift',
+        'creator_pass_purchase',
         'creator_earning',
         'platform_commission',
         'withdrawal_request',
         'refund',
+        'comment_gift',
+        'gift_received',
+        'community_fee',
+        'community_subscription',
+        'community_fee_received',
       ]
       if (!validCategories.includes(category)) {
         return res.status(400).json({

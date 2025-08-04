@@ -1220,47 +1220,53 @@ const GiftVideo = async (req, res, next) => {
   }
 }
 const reshareVideo = async (req, res, next) => {
-  const { videoId } = req.body;
-  const userId = req.user.id.toString();
+  const { videoId } = req.body
+  const userId = req.user.id.toString()
 
   try {
     if (!videoId) {
-      return res.status(400).json({ message: 'Video ID is required' });
+      return res.status(400).json({ message: 'Video ID is required' })
     }
 
-    const user = await User.findById(userId).select('username profile_photo');
+    const user = await User.findById(userId).select('username profile_photo')
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found' })
     }
 
-    const video = await LongVideo.findById(videoId).select('name created_by');
+    const video = await LongVideo.findById(videoId).select('name created_by')
     if (!video) {
-      return res.status(404).json({ message: 'Video not found' });
+      return res.status(404).json({ message: 'Video not found' })
     }
 
     const existingReshare = await Reshare.findOne({
       user: userId,
       long_video: videoId,
-    });
+    })
 
     if (existingReshare) {
-      await Reshare.deleteOne({ _id: existingReshare._id });
-
-      const totalReshares = await Reshare.countDocuments({ long_video: videoId });
+      await Reshare.deleteOne({ _id: existingReshare._id })
+      video.shares -= 1
+      await video.save()
+      const totalReshares = await Reshare.countDocuments({
+        long_video: videoId,
+      })
 
       return res.status(200).json({
         message: `video:${videoId} un-reshared by user:${userId} successfully`,
         totalReshares,
-      });
+      })
     }
 
-    await Reshare.create({ user: userId, long_video: videoId });
+    await Reshare.create({ user: userId, long_video: videoId })
 
-    const totalReshares = await Reshare.countDocuments({ long_video: videoId });
-
+    const totalReshares = await Reshare.countDocuments({ long_video: videoId })
+    video.shares += 1
+    await video.save()
     // Fetch FCM token of the creator
-    const videoCreator = await User.findById(video.created_by).select('FCM_token');
-    const fcmToken = videoCreator?.FCM_token || null;
+    const videoCreator = await User.findById(video.created_by).select(
+      'FCM_token'
+    )
+    const fcmToken = videoCreator?.FCM_token || null
 
     // Queue reshare notification
     await addVideoReshareNotificationToQueue(
@@ -1271,17 +1277,16 @@ const reshareVideo = async (req, res, next) => {
       video.name,
       user.profile_photo,
       fcmToken
-    );
+    )
 
     return res.status(200).json({
       message: `video:${videoId} reshared by user:${userId} successfully`,
       totalReshares,
-    });
+    })
   } catch (error) {
-    handleError(error, req, res, next);
+    handleError(error, req, res, next)
   }
-};
-
+}
 
 const saveVideo = async (req, res, next) => {
   try {

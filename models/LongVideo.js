@@ -26,6 +26,10 @@ const longVideoSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    fingerprint: {
+      type: String,
+      default: '',
+    },
 
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

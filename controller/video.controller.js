@@ -10,10 +10,11 @@ const {
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
+const addVideoToQueue = require('../utils/video_fingerprint_queue')
 const path = require('path')
 const os = require('os')
 const videoCompressor = require('../utils/video_compressor')
-const generateVideoABSSegments = require('../utils/ABS')
+const { generateVideoABSSegments } = require('../utils/ABS')
 const fs = require('fs')
 
 const uploadVideoToCommunity = async (req, res, next) => {
@@ -210,6 +211,7 @@ const uploadVideo = async (req, res, next) => {
       $addToSet: { creators: userId },
     })
 
+    await addVideoToQueue(savedVideo._id, videoUploadResult.url)
     res.status(200).json({
       message: 'Video uploaded successfully',
 

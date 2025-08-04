@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-catch */
 //Adaptive Bitrate Streaming for videos
 const fs = require('fs')
 const path = require('path')
@@ -286,4 +287,4 @@ const generateVideoABSSegments = async (videoFile, videoId) => {
   }
 }
 
-module.exports = generateVideoABSSegments
+module.exports = { generateVideoABSSegments, saveFileBuffer }

@@ -33,6 +33,12 @@ class S3UploadError extends Error {
   }
 }
 
+class S3RetrievalError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'S3_retrieval_error'
+  }
+}
 class RedisConnectionError extends Error {
   constructor(message) {
     super(message)
@@ -44,6 +50,13 @@ class NotificationQueueError extends Error {
   constructor(message) {
     super(message)
     this.name = 'notification_queue_error'
+  }
+}
+
+class VideoQueueError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'video_queue_error'
   }
 }
 
@@ -70,4 +83,6 @@ module.exports = {
   NotificationQueueError,
   FireBaseNotificationError,
   GooglePaymentsError,
+  S3RetrievalError,
+  VideoQueueError,
 }
