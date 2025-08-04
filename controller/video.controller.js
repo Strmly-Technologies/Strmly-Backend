@@ -703,12 +703,13 @@ const deleteVideo = async (req, res, next) => {
 
 const getTrendingVideos = async (req, res, next) => {
   try {
+    const userId = req.user.id.toString()
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
     let videos = await LongVideo.find({})
       .populate('created_by', 'username email profile_photo')
-      .populate('community', 'name profile_photo')
+      .populate('community', 'name profile_photo _id followers')
       .populate(
         'series',
         'title description total_episodes bannerUrl posterUrl _id created_by episodes'
@@ -716,7 +717,19 @@ const getTrendingVideos = async (req, res, next) => {
       .sort({ views: -1, likes: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-
+    videos = videos.map((video) => {
+      const community = video.community
+      if (community && community.followers) {
+        const isFollowing = community.followers.some((followerId) =>
+          followerId.equals(userId)
+        )
+        video.community = {
+          ...community.toObject(),
+          isFollowing,
+        }
+      }
+      return video
+    })
     let total = await LongVideo.countDocuments()
 
     res.status(200).json({

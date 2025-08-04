@@ -10,7 +10,7 @@ const Comment = require('../models/Comment')
 const Series = require('../models/Series')
 const GetUserFeed = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * (limit - 2)
     const resharedVideoSkip = (page - 1) * 2
@@ -25,7 +25,7 @@ const GetUserFeed = async (req, res, next) => {
     const viewedVideoIds = user.viewed_videos || []
 
     // Get feed videos from following and communities (excluding already viewed)
-    const feedVideos = await LongVideo.find({
+    let feedVideos = await LongVideo.find({
       $and: [
         {
           $or: [
@@ -37,7 +37,7 @@ const GetUserFeed = async (req, res, next) => {
       ],
     })
       .populate('created_by', 'username profile_photo')
-      .populate('community', 'name profile_photo')
+      .populate('community', 'name profile_photo _id followers')
       .populate(
         'series',
         'title description price genre episodes seasons total_episodes'
@@ -45,6 +45,20 @@ const GetUserFeed = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit - 2))
+
+    feedVideos = feedVideos.map((video) => {
+      const community = video.community
+      if (community && community.followers) {
+        const isFollowing = community.followers.some((followerId) =>
+          followerId.equals(userId)
+        )
+        video.community = {
+          ...community.toObject(),
+          isFollowing,
+        }
+      }
+      return video
+    })
 
     // Get personalized recommendations based on interests
     let recommendedVideos = []
@@ -57,13 +71,25 @@ const GetUserFeed = async (req, res, next) => {
         created_by: { $nin: followingIds }, // Exclude videos from followed users
       })
         .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate('community', 'name profile_photo followers _id')
         .sort({ views: -1, likes: -1 })
         .limit(3)
     }
-
+    recommendedVideos = recommendedVideos.map((video) => {
+      const community = video.community
+      if (community && community.followers) {
+        const isFollowing = community.followers.some((followerId) =>
+          followerId.equals(userId)
+        )
+        video.community = {
+          ...community.toObject(),
+          isFollowing,
+        }
+      }
+      return video
+    })
     // Get reshared videos - Only from users that the current user follows
-    const resharedVideos = await Reshare.find({
+    let resharedVideos = await Reshare.find({
       user: { $in: followingIds }, // Only get reshares from followed users
     })
       .sort({ createdAt: -1 })
@@ -74,9 +100,22 @@ const GetUserFeed = async (req, res, next) => {
         path: 'long_video',
         populate: [
           { path: 'created_by', select: 'username profile_photo' },
-          { path: 'community', select: 'name profile_photo' },
+          { path: 'community', select: 'name profile_photo followers _id' },
         ],
       })
+    resharedVideos = resharedVideos.map((video) => {
+      const community = video.community
+      if (community && community.followers) {
+        const isFollowing = community.followers.some((followerId) =>
+          followerId.equals(userId)
+        )
+        video.community = {
+          ...community.toObject(),
+          isFollowing,
+        }
+      }
+      return video
+    })
     console.log('Recommended videos from interests:', recommendedVideos)
 
     res.status(200).json({
