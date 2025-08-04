@@ -19,11 +19,13 @@ const testRoutes= require('./routes/test.routes')
 const walletRoutes = require('./routes/wallet.routes')
 const withdrawalRoutes = require('./routes/withdrawal.routes')
 const webhookRoutes = require('./routes/webhook.routes')
+const adminRoutes = require('./routes/admin.routes')
 
 const cors = require('cors')
 const validateEnv = require('./config/validateEnv')
 const { testS3Connection } = require('./utils/connection_testing')
 const { connectRedis } = require('./config/redis')
+const path = require('path')
 const { RedisConnectionError } = require('./utils/errors')
 const { initializeWebSocket } = require('./utils/websocket')
 require('./utils/notification_worker') // Start the notification worker
@@ -47,39 +49,30 @@ app.use('/api/v1/webhooks', express.raw({ type: 'application/json' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
+// Serve admin static files
+app.use('/admin', express.static(path.join(__dirname, 'admin')))
+
 const PORT = process.env.PORT || 3001
 
-const routes = [
-  { path: '/api/v1/auth', handler: authRoutes },
-  { path: '/api/v1/videos', handler: videoRoutes },
-  { path: '/api/v1/series', handler: seriesRoutes },
-  { path: '/api/v1/user', handler: userRoutes },
-   {path:'/api/v1/drafts',handler: draftRoutes},
-  { path: '/api/v1/community', handler: communityRoutes },
-  { path: '/api/v1/interaction', handler: interactionRoutes },
-  { path: '/api/v1/caution', handler: cautionRoutes },
-  { path: '/api/v1/search', handler: searchRoutes },
-  { path: '/api/v1/wallet', handler: walletRoutes },
-  { path: '/api/v1/withdrawals', handler: withdrawalRoutes },
-  { path: '/api/v1/webhooks', handler: webhookRoutes },
-  {path: '/api/v1/test', handler: testRoutes }, 
-  { path: '/api/v1/deactivate', handler: deactivateRoutes} ,
-  { path: '/api/v1/analytics/series', handler: seriesAnalyticsRoutes },
-  { path: '/api/v1/analytics/community', handler: communityAnalyticsRoutes },
-  { path: '/api/v1/recommendations', handler: recommendationRoutes}
-
-
-]
-
-try {
-  routes.forEach(({ path, handler }) => {
-    app.use(path, handler)
-    console.log(`✓ ${path} routes loaded`)
-  })
-} catch (error) {
-  console.error('Error loading routes:', error.message)
-  process.exit(1)
-}
+// Mount routes
+app.use('/api/v1/auth', authRoutes)
+app.use('/api/v1/videos', videoRoutes)
+app.use('/api/v1/series', seriesRoutes)
+app.use('/api/v1/drafts', draftRoutes)
+app.use('/api/v1/user', userRoutes)
+app.use('/api/v1/community', communityRoutes)
+app.use('/api/v1/interactions', interactionRoutes)
+app.use('/api/v1/caution', cautionRoutes)
+app.use('/api/v1/search', searchRoutes)
+app.use('/api/v1/deactivate', deactivateRoutes)
+app.use('/api/v1/series-analytics', seriesAnalyticsRoutes)
+app.use('/api/v1/community-analytics', communityAnalyticsRoutes)
+app.use('/api/v1/recommendations', recommendationRoutes)
+app.use('/api/v1/test', testRoutes)
+app.use('/api/v1/wallet', walletRoutes)
+app.use('/api/v1/withdrawal', withdrawalRoutes)
+app.use('/api/v1/webhooks', webhookRoutes)
+app.use('/api/v1/admin', adminRoutes)
 
 app.get('/health', (req, res) => {
   res.send('Server is healthy')

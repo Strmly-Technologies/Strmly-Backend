@@ -306,7 +306,7 @@ const GetUserCommunities = async (req, res, next) => {
 
 const GetUserVideos = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id
     const { type = 'uploaded', page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
