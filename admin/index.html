@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STRMLY Admin Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Form -->
+    <div id="loginContainer" class="login-container">
+        <form id="loginForm" class="login-form">
+            <h2>Admin Login</h2>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="login-btn">Login</button>
+            <div id="loginError" class="error-message"></div>
+        </form>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboardContainer" class="dashboard-container">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <h1>STRMLY Admin Dashboard</h1>
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="number" id="totalUsers">-</div>
+                <div class="label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="totalTransactions">-</div>
+                <div class="label">Total Transactions</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="totalRevenue">-</div>
+                <div class="label">Total Revenue (₹)</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="totalVideos">-</div>
+                <div class="label">Total Videos</div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showSection('users')">Users</button>
+            <button class="nav-tab" onclick="showSection('users-by-date')">Users by Date</button>
+            <button class="nav-tab" onclick="showSection('transactions')">Transactions</button>
+            <button class="nav-tab" onclick="showSection('payments')">Payments</button>
+            <button class="nav-tab" onclick="showSection('creator-passes')">Creator Passes</button>
+        </div>
+
+        <!-- Users Section -->
+        <div id="users" class="content-section active">
+            <div class="section-header">
+                <h3>Platform Users</h3>
+                <div class="search-container">
+                    <input type="text" class="search-input" placeholder="Search users..." id="usersSearch">
+                    <button class="search-btn" onclick="searchUsers()">Search</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <div id="usersContent" class="loading">Loading users...</div>
+            </div>
+        </div>
+
+        <!-- Users by Date Section -->
+        <div id="users-by-date" class="content-section">
+            <div class="section-header">
+                <h3>Users Signed Up by Date</h3>
+                <div class="search-container">
+                    <input type="date" class="search-input" id="userSignupDate" placeholder="Select date">
+                    <button class="search-btn" onclick="searchUsersByDate()">Search by Date</button>
+                    <button class="search-btn" onclick="loadUsersByDate()" style="margin-left: 10px;">Show All</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <div id="usersByDateContent" class="loading">Select a date to view users...</div>
+            </div>
+        </div>
+
+        <!-- Transactions Section -->
+        <div id="transactions" class="content-section">
+            <div class="section-header">
+                <h3>Wallet Transactions</h3>
+                <div class="search-container">
+                    <input type="date" class="search-input" id="transactionDate">
+                    <button class="search-btn" onclick="searchTransactionsByDate()">Search by Date</button>
+                    <button class="search-btn" onclick="loadTransactions()" style="margin-left: 10px;">Show All</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <div id="transactionsContent" class="loading">Loading transactions...</div>
+            </div>
+        </div>
+
+        <!-- Payments Section -->
+        <div id="payments" class="content-section">
+            <div class="section-header">
+                <h3>Payment Records</h3>
+                <div class="search-container">
+                    <input type="date" class="search-input" id="paymentDate">
+                    <button class="search-btn" onclick="searchPaymentsByDate()">Search by Date</button>
+                    <button class="search-btn" onclick="loadPayments()" style="margin-left: 10px;">Show All</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <div id="paymentsContent" class="loading">Loading payments...</div>
+            </div>
+        </div>
+
+        <!-- Creator Passes Section -->
+        <div id="creator-passes" class="content-section">
+            <div class="section-header">
+                <h3>Creator Pass Subscriptions</h3>
+                <div class="search-container">
+                    <input type="text" class="search-input" placeholder="Search creator passes..." id="creatorPassSearch">
+                    <button class="search-btn" onclick="searchCreatorPasses()">Search</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <div id="creatorPassesContent" class="loading">Loading creator passes...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
