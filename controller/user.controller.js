@@ -306,7 +306,7 @@ const GetUserCommunities = async (req, res, next) => {
 
 const GetUserVideos = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
     const { type = 'uploaded', page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
@@ -368,6 +368,23 @@ const GetUserVideos = async (req, res, next) => {
         },
       })
       videos = user.playlist
+    } else if (type === 'reshares') {
+      const reshares = await Reshare.find({
+        user: userId,
+      })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('user', 'username profile_photo')
+        .populate({
+          path: 'long_video',
+          populate: [
+            { path: 'created_by', select: 'username profile_photo' },
+            { path: 'community', select: 'name profile_photo' },
+            { path: 'series', select: 'title description posterUrl' },
+          ],
+        })
+      videos = reshares
     } else {
       videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
@@ -725,9 +742,9 @@ const UpdateUserInterests = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    if (type === "interest1") {
+    if (type === 'interest1') {
       user.interest1 = interests
-    } else if (type === "interest2") {
+    } else if (type === 'interest2') {
       user.interest2 = interests
     } else {
       user.interests = interests
@@ -747,7 +764,6 @@ const UpdateUserInterests = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
-
 
 const GetUserFollowers = async (req, res, next) => {
   try {
@@ -861,7 +877,7 @@ const GetUserProfileById = async (req, res, next) => {
     const userId = req.params.id
     const redis = getRedisClient()
     const cacheKey = `user_profile_public:${userId}`
-    const userid=req.user.id;
+    const userid = req.user.id
 
     if (redis) {
       const cachedProfile = await redis.get(cacheKey)
@@ -884,7 +900,7 @@ const GetUserProfileById = async (req, res, next) => {
     const totalFollowers = userDetails.followers?.length || 0
     const totalFollowing = userDetails.following?.length || 0
     const totalCommunities = userDetails.my_communities?.length || 0
-    const isBeingFollowed= userDetails.followers?.includes(userid) || false;
+    const isBeingFollowed = userDetails.followers?.includes(userid) || false
 
     const result = {
       message: 'User profile details retrieved successfully',
@@ -1841,36 +1857,34 @@ const saveUserFCMToken = async (req, res, next) => {
   }
 }
 
-const GetStatusOfReshare=async(req,res,next)=>{
+const GetStatusOfReshare = async (req, res, next) => {
   try {
-    const userId=req.user.id
+    const userId = req.user.id
     const { videoId } = req.body
     if (!videoId) {
       return res.status(400).json({ message: 'Video ID is required' })
     }
-    const reshare= await Reshare.findOne({
+    const reshare = await Reshare.findOne({
       user: userId,
       long_video: videoId,
     })
     if (!reshare) {
       return res.status(404).json({ message: 'Reshare not found' })
     }
-    const response={};
-    response.reshareStatus = reshare? true : false;
+    const response = {}
+    response.reshareStatus = reshare ? true : false
     return res.status(200).json({
       message: 'Reshare status retrieved successfully',
       data: response,
     })
-    
   } catch (error) {
-   handleError(error, req, res, next)
-    
+    handleError(error, req, res, next)
   }
 }
 
-const AddVideoToUserViewHistory=async(req,res,next)=>{
+const AddVideoToUserViewHistory = async (req, res, next) => {
   try {
-    const userId=req.user.id
+    const userId = req.user.id
     const { videoId } = req.body
     if (!videoId) {
       return res.status(400).json({ message: 'Video ID is required' })
@@ -1895,7 +1909,6 @@ const AddVideoToUserViewHistory=async(req,res,next)=>{
 }
 
 module.exports = {
-
   getUserProfileDetails,
   GetUserFeed,
   GetUserProfile,

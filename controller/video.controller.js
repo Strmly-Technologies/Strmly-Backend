@@ -82,6 +82,8 @@ const uploadVideo = async (req, res, next) => {
       start_time,
       display_till_time,
       is_standalone,
+      episodeNumber,
+      amount,
     } = req.body
 
     if (!userId) {
@@ -96,6 +98,24 @@ const uploadVideo = async (req, res, next) => {
     if (!is_standalone) {
       console.error('is_standalone field not found')
       return res.status(400).json({ error: 'is_standalone field required' })
+    }
+
+    if (is_standalone === 'false' && (!episodeNumber || !seriesId)) {
+      console.error(
+        'episodeNumber and seriesId required for non-standalone videos'
+      )
+      return res.status(400).json({
+        error: 'episodeNumber and seriesId required for non-standalone videos',
+      })
+    }
+    if ((type === 'Paid') & (!amount || amount <= 0)) {
+      console.error(
+        'Amount has to be included and should be greater than 0 for paid videos'
+      )
+      return res.status(400).json({
+        error:
+          'Amount has to be included and should be greater than 0 for paid videos',
+      })
     }
 
     // Check upload permission using the proper function
@@ -172,6 +192,7 @@ const uploadVideo = async (req, res, next) => {
       genre: genre || 'Action',
       type: type || 'Free',
       series: seriesId || null,
+      episode_number: episodeNumber || null,
       age_restriction:
         age_restriction === 'true' || age_restriction === true || false,
       Videolanguage: language || 'English',

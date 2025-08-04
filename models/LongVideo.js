@@ -92,6 +92,10 @@ const longVideoSchema = new mongoose.Schema(
       required: true,
       enum: ['Free', 'Paid'],
     },
+    amount: {
+      type: Number,
+      default: 0,
+    },
     Videolanguage: {
       type: String,
       required: false,
@@ -171,6 +175,11 @@ longVideoSchema.pre('save', function (next) {
     this.episode_number = null
     this.season_number = 1
   }
+
+  if (this.type === 'Paid' && this.amount <= 0) {
+    return next(new Error('Amount has to be greater than 0 for paid videos'))
+  }
+
   next()
 })
 
