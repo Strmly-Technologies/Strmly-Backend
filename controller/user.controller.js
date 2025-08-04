@@ -10,7 +10,7 @@ const Comment = require('../models/Comment')
 const Series = require('../models/Series')
 const GetUserFeed = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * (limit - 2)
     const resharedVideoSkip = (page - 1) * 2
@@ -25,7 +25,7 @@ const GetUserFeed = async (req, res, next) => {
     const viewedVideoIds = user.viewed_videos || []
 
     // Get feed videos from following and communities (excluding already viewed)
-    const feedVideos = await LongVideo.find({
+    let feedVideos = await LongVideo.find({
       $and: [
         {
           $or: [
@@ -37,7 +37,7 @@ const GetUserFeed = async (req, res, next) => {
       ],
     })
       .populate('created_by', 'username profile_photo')
-      .populate('community', 'name profile_photo')
+      .populate('community', 'name profile_photo _id followers')
       .populate(
         'series',
         'title description price genre episodes seasons total_episodes'
@@ -45,6 +45,20 @@ const GetUserFeed = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit - 2))
+
+    feedVideos = feedVideos.map((video) => {
+      const community = video.community
+      if (community && community.followers) {
+        const isFollowing = community.followers.some((followerId) =>
+          followerId.equals(userId)
+        )
+        video.community = {
+          ...community.toObject(),
+          isFollowing,
+        }
+      }
+      return video
+    })
 
     // Get personalized recommendations based on interests
     let recommendedVideos = []
@@ -57,13 +71,25 @@ const GetUserFeed = async (req, res, next) => {
         created_by: { $nin: followingIds }, // Exclude videos from followed users
       })
         .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate('community', 'name profile_photo followers _id')
         .sort({ views: -1, likes: -1 })
         .limit(3)
     }
-
+    recommendedVideos = recommendedVideos.map((video) => {
+      const community = video.community
+      if (community && community.followers) {
+        const isFollowing = community.followers.some((followerId) =>
+          followerId.equals(userId)
+        )
+        video.community = {
+          ...community.toObject(),
+          isFollowing,
+        }
+      }
+      return video
+    })
     // Get reshared videos - Only from users that the current user follows
-    const resharedVideos = await Reshare.find({
+    let resharedVideos = await Reshare.find({
       user: { $in: followingIds }, // Only get reshares from followed users
     })
       .sort({ createdAt: -1 })
@@ -74,9 +100,22 @@ const GetUserFeed = async (req, res, next) => {
         path: 'long_video',
         populate: [
           { path: 'created_by', select: 'username profile_photo' },
-          { path: 'community', select: 'name profile_photo' },
+          { path: 'community', select: 'name profile_photo followers _id' },
         ],
       })
+    resharedVideos = resharedVideos.map((video) => {
+      const community = video.community
+      if (community && community.followers) {
+        const isFollowing = community.followers.some((followerId) =>
+          followerId.equals(userId)
+        )
+        video.community = {
+          ...community.toObject(),
+          isFollowing,
+        }
+      }
+      return video
+    })
     console.log('Recommended videos from interests:', recommendedVideos)
 
     res.status(200).json({
@@ -306,7 +345,7 @@ const GetUserCommunities = async (req, res, next) => {
 
 const GetUserVideos = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const { type = 'uploaded', page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
@@ -368,6 +407,23 @@ const GetUserVideos = async (req, res, next) => {
         },
       })
       videos = user.playlist
+    } else if (type === 'reshares') {
+      const reshares = await Reshare.find({
+        user: userId,
+      })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('user', 'username profile_photo')
+        .populate({
+          path: 'long_video',
+          populate: [
+            { path: 'created_by', select: 'username profile_photo' },
+            { path: 'community', select: 'name profile_photo' },
+            { path: 'series', select: 'title description posterUrl' },
+          ],
+        })
+      videos = reshares
     } else {
       videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
@@ -725,9 +781,9 @@ const UpdateUserInterests = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    if (type === "interest1") {
+    if (type === 'interest1') {
       user.interest1 = interests
-    } else if (type === "interest2") {
+    } else if (type === 'interest2') {
       user.interest2 = interests
     } else {
       user.interests = interests
@@ -747,7 +803,6 @@ const UpdateUserInterests = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
-
 
 const GetUserFollowers = async (req, res, next) => {
   try {
@@ -861,7 +916,7 @@ const GetUserProfileById = async (req, res, next) => {
     const userId = req.params.id
     const redis = getRedisClient()
     const cacheKey = `user_profile_public:${userId}`
-    const userid=req.user.id;
+    const userid = req.user.id
 
     if (redis) {
       const cachedProfile = await redis.get(cacheKey)
@@ -884,7 +939,7 @@ const GetUserProfileById = async (req, res, next) => {
     const totalFollowers = userDetails.followers?.length || 0
     const totalFollowing = userDetails.following?.length || 0
     const totalCommunities = userDetails.my_communities?.length || 0
-    const isBeingFollowed= userDetails.followers?.includes(userid) || false;
+    const isBeingFollowed = userDetails.followers?.includes(userid) || false
 
     const result = {
       message: 'User profile details retrieved successfully',
@@ -1747,7 +1802,7 @@ const getUserPurchasedAccess = async (req, res, next) => {
         let asset_data
         if (purchase.content_type === 'video') {
           asset_data = await LongVideo.findById(purchase.content_id)
-            .select('name description thumbnailUrl _id created_by')
+            .select('name description thumbnailUrl _id created_by videoUrl')
             .populate({
               path: 'created_by',
               select: 'username profile_photo _id',
@@ -1755,7 +1810,7 @@ const getUserPurchasedAccess = async (req, res, next) => {
         } else {
           asset_data = await Series.findById(purchase.content_id)
             .select(
-              'title description total_episodes bannerUrl posterUrl _id created_by episodes'
+              'title description total_episodes bannerUrl posterUrl _id created_by episodes '
             )
             .populate({
               path: 'created_by',
@@ -1763,7 +1818,7 @@ const getUserPurchasedAccess = async (req, res, next) => {
             })
             .populate({
               path: 'episodes',
-              select: 'name description _id thumbnailUrl',
+              select: 'name description _id thumbnailUrl videoUrl created_by',
             })
         }
 
@@ -1841,36 +1896,34 @@ const saveUserFCMToken = async (req, res, next) => {
   }
 }
 
-const GetStatusOfReshare=async(req,res,next)=>{
+const GetStatusOfReshare = async (req, res, next) => {
   try {
-    const userId=req.user.id
+    const userId = req.user.id
     const { videoId } = req.body
     if (!videoId) {
       return res.status(400).json({ message: 'Video ID is required' })
     }
-    const reshare= await Reshare.findOne({
+    const reshare = await Reshare.findOne({
       user: userId,
       long_video: videoId,
     })
     if (!reshare) {
       return res.status(404).json({ message: 'Reshare not found' })
     }
-    const response={};
-    response.reshareStatus = reshare? true : false;
+    const response = {}
+    response.reshareStatus = reshare ? true : false
     return res.status(200).json({
       message: 'Reshare status retrieved successfully',
       data: response,
     })
-    
   } catch (error) {
-   handleError(error, req, res, next)
-    
+    handleError(error, req, res, next)
   }
 }
 
-const AddVideoToUserViewHistory=async(req,res,next)=>{
+const AddVideoToUserViewHistory = async (req, res, next) => {
   try {
-    const userId=req.user.id
+    const userId = req.user.id
     const { videoId } = req.body
     if (!videoId) {
       return res.status(400).json({ message: 'Video ID is required' })
@@ -1895,7 +1948,6 @@ const AddVideoToUserViewHistory=async(req,res,next)=>{
 }
 
 module.exports = {
-
   getUserProfileDetails,
   GetUserFeed,
   GetUserProfile,

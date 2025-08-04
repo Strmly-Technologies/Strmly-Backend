@@ -131,6 +131,25 @@ const DeleteUserProfile = async (req, res, next) => {
   }
 }
 
+// const sendEmailForDeletion=async(req,res,next)=>{
+//   const userId = req.user.id
+//   try {
+//     const user = await User.findById(userId)
+//     if (!user) {
+//       return res.status(404).json({ message: 'User not found' })
+//     }
+
+//     const emailResult=await sendEmailForDeletion(
+//       user.email,
+//       user.username,
+//     )
+
+
+
+//     res.status(200).json({ message: 'Deletion email sent successfully' })
+//   }
+// }
+
 const DeleteCommunity = async (req, res, next) => {
   const { communityId } = req.params
   const userId = req.user.id

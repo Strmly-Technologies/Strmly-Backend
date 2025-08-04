@@ -273,7 +273,7 @@ const deleteSeries = async (req, res, next) => {
 const addEpisodeToSeries = async (req, res, next) => {
   try {
     const { id } = req.params
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const { videoId, episodeNumber, seasonNumber = 1 } = req.body
 
     if (!videoId || !episodeNumber) {
