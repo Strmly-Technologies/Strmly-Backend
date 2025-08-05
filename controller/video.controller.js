@@ -720,9 +720,17 @@ const getTrendingVideos = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
+    const user = await User.findById(userId).select('following')
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const followingIds = (user.following || []).map((id) => id.toString())
+
     let videos = await LongVideo.find({})
       .populate('created_by', 'username email profile_photo')
-      .populate('community', 'name profile_photo _id followers')
+      .populate('community', 'name profile_photo followers')
       .populate(
         'series',
         'title description total_episodes bannerUrl posterUrl _id created_by episodes'
@@ -737,16 +745,25 @@ const getTrendingVideos = async (req, res, next) => {
       video = video.toObject()
       const community = video.community
       if (community && community.followers) {
-        const isFollowing = community.followers.some((followerId) =>
-          followerId.equals(userId)
+        const isFollowing = community.followers.some(
+          (followerId) => followerId.toString() === userId
         )
         video.community = {
           ...community.toObject(),
-          isFollowing,
+          is_following_community: isFollowing,
         }
       }
-      video.is_reshared = userReshares.includes(video._id)
-
+      video.is_reshared = userReshares.some(
+        (reshare) => reshare.long_video.toString() === video._id.toString()
+      )
+      if (
+        video.created_by &&
+        followingIds.includes(video.created_by._id.toString())
+      ) {
+        video.is_following_creator = true
+      } else {
+        video.is_following_creator = false
+      }
       return video
     })
     let total = await LongVideo.countDocuments()

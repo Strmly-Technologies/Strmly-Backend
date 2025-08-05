@@ -5,7 +5,7 @@ const { handleError } = require('../utils/utils')
 
 const getPersonalizedVideoRecommendations = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const { page = 1, batchSize = 5 } = req.query
 
     const user = await User.findById(userId).select(
@@ -18,7 +18,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
     const userInterests = user.interests || []
     const viewedVideoIds = user.viewed_videos || []
-    const followingIds = user.following || []
+    const followingIds = (user.following || []).map((id) => id.toString())
 
     let recommendedVideos = []
 
@@ -29,15 +29,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         visibility: { $ne: 'hidden' },
       })
         .populate('created_by', 'username profile_photo')
-        .populate({
-          path: 'community',
-          select: 'name profile_photo founder',
-          populate: {
-            path: 'founder',
-            select: 'username profile_photo',
-          },
-        })
-
+        .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
           populate: {
@@ -60,6 +52,10 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         } else {
           video.is_following_creator = false
         }
+        const isFollowing = video.community.followers.some(
+          (followerId) => followerId.toString() === userId
+        )
+        video.is_following_community = isFollowing
       })
 
       recommendedVideos.push(...interestedVideos)
@@ -86,7 +82,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         visibility: { $ne: 'hidden' },
       })
         .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
           populate: {
@@ -108,6 +104,10 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         } else {
           video.is_following_creator = false
         }
+        const isFollowing = video.community.followers.some(
+          (followerId) => followerId.toString() === userId
+        )
+        video.is_following_community = isFollowing
       })
       recommendedVideos.push(...randomVideos)
     }
@@ -125,9 +125,24 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         path: 'long_video',
         populate: [
           { path: 'created_by', select: 'username profile_photo' },
-          { path: 'community', select: 'name profile_photo' },
+          { path: 'community', select: 'name profile_photo followers' },
         ],
       })
+    resharedVideos.forEach((reshare) => {
+      if (
+        reshare.long_video.created_by &&
+        followingIds.includes(reshare.long_video.created_by._id.toString())
+      ) {
+        reshare.long_video.is_following_creator = true
+      } else {
+        reshare.long_video.is_following_creator = false
+      }
+      const isFollowing = reshare.long_video.community.followers.some(
+        (followerId) => followerId.toString() === userId
+      )
+      reshare.long_video.is_following_community = isFollowing
+    })
+
     // Shuffle the combined array for better variety
     recommendedVideos = shuffleArray(recommendedVideos)
 
