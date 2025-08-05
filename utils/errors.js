@@ -73,6 +73,7 @@ class FireBaseNotificationError extends Error {
     this.name = 'firebase_notification_error'
   }
 }
+
 module.exports = {
   FileSaveError,
   FFProbeError,

@@ -100,7 +100,7 @@ const statusOfReshare = async (req, res, next) => {
     return res.status(400).json({ message: 'Video ID is required' })
   }
   try {
-    const video = await LongVideo.findById(videoId).select('_id')
+    const video = await LongVideo.findById(videoId)
 
     if (!video) {
       return res.status(404).json({ message: 'Video not found' })
@@ -937,7 +937,7 @@ const GiftComment = async (req, res, next) => {
 
 const GiftVideo = async (req, res, next) => {
   try {
-    const { videoId, amount, giftNote } = req.body
+    const { videoId, amount } = req.body
     const gifterId = req.user.id.toString()
 
     // Validation
@@ -964,14 +964,6 @@ const GiftVideo = async (req, res, next) => {
         success: false,
         error: amountValidation.error,
         code: 'INVALID_AMOUNT',
-      })
-    }
-
-    if (giftNote && giftNote.length > 200) {
-      return res.status(400).json({
-        success: false,
-        error: 'Gift note must be less than 200 characters',
-        code: 'INVALID_GIFT_NOTE',
       })
     }
 
@@ -1094,7 +1086,7 @@ const GiftVideo = async (req, res, next) => {
           metadata: {
             video_title: video.name,
             creator_name: receiver.username,
-            transfer_note: giftNote || '',
+            transfer_note: 'video gift',
             video_id: videoId,
           },
         })
@@ -1188,7 +1180,7 @@ const GiftVideo = async (req, res, next) => {
           to: receiver.username,
           videoTitle: video.name,
 
-          giftNote: giftNote || '',
+          giftNote: 'video gift',
           transferType: 'comment_gift',
         },
         gifter: {
@@ -1233,7 +1225,7 @@ const reshareVideo = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    const video = await LongVideo.findById(videoId).select('name created_by')
+    const video = await LongVideo.findById(videoId)
     if (!video) {
       return res.status(404).json({ message: 'Video not found' })
     }
@@ -1245,8 +1237,11 @@ const reshareVideo = async (req, res, next) => {
 
     if (existingReshare) {
       await Reshare.deleteOne({ _id: existingReshare._id })
-      video.shares -= 1
-      await video.save()
+      await LongVideo.updateOne(
+        { _id: videoId, shares: { $gt: 0 } },
+        { $inc: { shares: -1 } }
+      )
+
       const totalReshares = await Reshare.countDocuments({
         long_video: videoId,
       })
@@ -1260,8 +1255,8 @@ const reshareVideo = async (req, res, next) => {
     await Reshare.create({ user: userId, long_video: videoId })
 
     const totalReshares = await Reshare.countDocuments({ long_video: videoId })
-    video.shares += 1
-    await video.save()
+    await LongVideo.updateOne({ _id: videoId }, { $inc: { shares: 1 } })
+
     // Fetch FCM token of the creator
     const videoCreator = await User.findById(video.created_by).select(
       'FCM_token'

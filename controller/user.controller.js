@@ -137,7 +137,7 @@ const GetUserFeed = async (req, res, next) => {
 
 const GetUserProfile = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
 
     const user = await User.findById(userId)
       .populate('followers', 'username profile_photo')
@@ -163,7 +163,7 @@ const GetUserProfile = async (req, res, next) => {
 
 const UpdateUserProfile = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
     const {
       username,
       bio,
@@ -448,7 +448,7 @@ const GetUserVideos = async (req, res, next) => {
 
 const GetUserInteractions = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
     const { type = 'all' } = req.query
 
     let interactions = {}
@@ -500,7 +500,7 @@ const GetUserInteractions = async (req, res, next) => {
 
 const GetUserEarnings = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
 
     const userVideos = await LongVideo.find({ creator: userId }).select(
       'name views likes shares'
@@ -550,7 +550,7 @@ types of notifications:
  */
 const GetUserNotifications = async (req, res, next) => {
   try {
-    const userId = req.user._id.toString()
+    const userId = req.user.id.toString()
     const { page = 1, limit = 20 } = req.query
 
     const notifications = []
@@ -767,7 +767,7 @@ const GetUserNotifications = async (req, res, next) => {
 
 const UpdateUserInterests = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id.toString()
     const { interests, type } = req.body
 
     if (!Array.isArray(interests) || interests.length === 0) {
@@ -1946,6 +1946,18 @@ const AddVideoToUserViewHistory = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
+const getUserReshares = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const reshares = await Reshare.find({ user: userId })
+    return res.status(200).json({
+      message: 'User reshares retrieved successfully',
+      reshares,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
 
 module.exports = {
   getUserProfileDetails,
@@ -1975,4 +1987,5 @@ module.exports = {
   saveUserFCMToken,
   GetStatusOfReshare,
   AddVideoToUserViewHistory,
+  getUserReshares,
 }

@@ -8,8 +8,10 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     const userId = req.user.id
     const { page = 1, batchSize = 5 } = req.query
 
-    const user = await User.findById(userId).select('interests viewed_videos following')
-    
+    const user = await User.findById(userId).select(
+      'interests viewed_videos following'
+    )
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' })
     }
@@ -19,50 +21,69 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     const followingIds = user.following || []
 
     let recommendedVideos = []
-    
+
     if (userInterests.length > 0) {
       const interestedVideos = await LongVideo.find({
-          genre: { $in: userInterests },
-          _id: { $nin: viewedVideoIds },
-          visibility: { $ne: 'hidden' }
-        })
+        genre: { $in: userInterests },
+        _id: { $nin: viewedVideoIds },
+        visibility: { $ne: 'hidden' },
+      })
         .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate({
+          path: 'community',
+          select: 'name profile_photo founder',
+          populate: {
+            path: 'founder',
+            select: 'username profile_photo',
+          },
+        })
+
         .populate({
           path: 'series',
           populate: {
             path: 'episodes',
-            select: 'name episode_number season_number thumbnailUrl views likes',
+            select:
+              'name episode_number season_number thumbnailUrl views likes',
             options: { sort: { season_number: 1, episode_number: 1 } },
           },
         })
         .sort({ views: -1, likes: -1 })
         .limit(Math.ceil(batchSize * 0.7))
 
-
-        // add if user is following the creator
-        interestedVideos.forEach(video => {
-          if (video.created_by && followingIds.includes(video.created_by._id.toString())) {
-            video.is_following_creator = true
-          } else {
-            video.is_following_creator = false
-          }
-        })
+      // add if user is following the creator
+      interestedVideos.forEach((video) => {
+        if (
+          video.created_by &&
+          followingIds.includes(video.created_by._id.toString())
+        ) {
+          video.is_following_creator = true
+        } else {
+          video.is_following_creator = false
+        }
+      })
 
       recommendedVideos.push(...interestedVideos)
     }
 
     // Get random videos from other genres (30% of recommendations)
     const otherGenres = [
-      'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 
-      'Romance', 'Documentary', 'Thriller', 'Fantasy', 'Animation'
-    ].filter(genre => !userInterests.includes(genre))
+      'Action',
+      'Comedy',
+      'Drama',
+      'Horror',
+      'Sci-Fi',
+      'Romance',
+      'Documentary',
+      'Thriller',
+      'Fantasy',
+      'Animation',
+    ].filter((genre) => !userInterests.includes(genre))
 
     if (otherGenres.length > 0) {
       const randomVideos = await LongVideo.find({
         genre: { $in: otherGenres },
         _id: { $nin: viewedVideoIds },
-        visibility: { $ne: 'hidden' }
+        visibility: { $ne: 'hidden' },
       })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
@@ -70,27 +91,31 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           path: 'series',
           populate: {
             path: 'episodes',
-            select: 'name episode_number season_number thumbnailUrl views likes',
+            select:
+              'name episode_number season_number thumbnailUrl views likes',
             options: { sort: { season_number: 1, episode_number: 1 } },
           },
         })
         .sort({ views: -1, likes: -1 })
         .limit(Math.floor(batchSize * 0.3) + 1)
 
-        randomVideos.forEach(video => {
-          if (video.created_by && followingIds.includes(video.created_by._id.toString())) {
-            video.is_following_creator = true
-          } else {
-            video.is_following_creator = false
-          }
-        })
+      randomVideos.forEach((video) => {
+        if (
+          video.created_by &&
+          followingIds.includes(video.created_by._id.toString())
+        ) {
+          video.is_following_creator = true
+        } else {
+          video.is_following_creator = false
+        }
+      })
       recommendedVideos.push(...randomVideos)
     }
 
     // Get reshared videos - Only from users that the current user follows
     const resharedVideoSkip = (page - 1) * 2
     const resharedVideos = await Reshare.find({
-      user: { $in: followingIds }  // Only get reshares from followed users
+      user: { $in: followingIds }, // Only get reshares from followed users
     })
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
@@ -105,7 +130,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       })
     // Shuffle the combined array for better variety
     recommendedVideos = shuffleArray(recommendedVideos)
-    
+
     // we limit to requested batch size
     recommendedVideos = recommendedVideos.slice(0, batchSize)
 
@@ -132,13 +157,21 @@ const addUserInterest = async (req, res, next) => {
     const { genre } = req.body
 
     const validGenres = [
-      'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi',
-      'Romance', 'Documentary', 'Thriller', 'Fantasy', 'Animation'
+      'Action',
+      'Comedy',
+      'Drama',
+      'Horror',
+      'Sci-Fi',
+      'Romance',
+      'Documentary',
+      'Thriller',
+      'Fantasy',
+      'Animation',
     ]
 
     if (!genre || !validGenres.includes(genre)) {
       return res.status(400).json({
-        message: 'Invalid genre. Must be one of: ' + validGenres.join(', ')
+        message: 'Invalid genre. Must be one of: ' + validGenres.join(', '),
       })
     }
 
@@ -149,18 +182,18 @@ const addUserInterest = async (req, res, next) => {
 
     if (user.interests.includes(genre)) {
       return res.status(400).json({
-        message: 'Genre already in user interests'
+        message: 'Genre already in user interests',
       })
     }
 
     await User.findByIdAndUpdate(userId, {
-      $addToSet: { interests: genre }
+      $addToSet: { interests: genre },
     })
 
     res.status(200).json({
       message: 'Interest added successfully',
       addedGenre: genre,
-      allInterests: [...user.interests, genre]
+      allInterests: [...user.interests, genre],
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -189,7 +222,7 @@ const removeUserInterest = async (req, res, next) => {
     res.status(200).json({
       message: 'Interest removed successfully',
       removedGenre: genre,
-      remainingInterests: updatedUser.interests
+      remainingInterests: updatedUser.interests,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -212,12 +245,12 @@ const markVideoAsViewed = async (req, res, next) => {
     }
 
     await User.findByIdAndUpdate(userId, {
-      $addToSet: { viewed_videos: videoId }
+      $addToSet: { viewed_videos: videoId },
     })
 
     res.status(200).json({
       message: 'Video marked as viewed successfully',
-      videoId
+      videoId,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -229,14 +262,14 @@ const resetViewedVideos = async (req, res, next) => {
     const userId = req.user.id
 
     await User.findByIdAndUpdate(userId, {
-      $set: { 
+      $set: {
         viewed_videos: [],
-        'recommendation_settings.last_recommendation_reset': new Date()
-      }
+        'recommendation_settings.last_recommendation_reset': new Date(),
+      },
     })
 
     res.status(200).json({
-      message: 'Viewed videos history reset successfully'
+      message: 'Viewed videos history reset successfully',
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -260,14 +293,14 @@ const getUserRecommendationStats = async (req, res, next) => {
         const totalVideos = await LongVideo.countDocuments({ genre })
         const viewedInGenre = await LongVideo.countDocuments({
           genre,
-          _id: { $in: user.viewed_videos }
+          _id: { $in: user.viewed_videos },
         })
-        
+
         return {
           genre,
           totalVideos,
           viewedVideos: viewedInGenre,
-          remainingVideos: totalVideos - viewedInGenre
+          remainingVideos: totalVideos - viewedInGenre,
         }
       })
     )
@@ -277,7 +310,8 @@ const getUserRecommendationStats = async (req, res, next) => {
       userInterests: user.interests,
       totalViewedVideos: user.viewed_videos.length,
       interestStats,
-      lastRecommendationReset: user.recommendation_settings?.last_recommendation_reset,
+      lastRecommendationReset:
+        user.recommendation_settings?.last_recommendation_reset,
     })
   } catch (error) {
     handleError(error, req, res, next)

@@ -9,7 +9,7 @@ const {
 } = require('../utils/utils')
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
-const Series = require('../models/Series')
+const Reshare = require('../models/Reshare')
 const addVideoToQueue = require('../utils/video_fingerprint_queue')
 const path = require('path')
 const os = require('os')
@@ -719,7 +719,11 @@ const getTrendingVideos = async (req, res, next) => {
       .sort({ views: -1, likes: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
+    const userReshares = await Reshare.find({ user: userId }).select(
+      'long_video'
+    )
     videos = videos.map((video) => {
+      video = video.toObject()
       const community = video.community
       if (community && community.followers) {
         const isFollowing = community.followers.some((followerId) =>
@@ -730,6 +734,8 @@ const getTrendingVideos = async (req, res, next) => {
           isFollowing,
         }
       }
+      video.is_reshared = userReshares.includes(video._id)
+
       return video
     })
     let total = await LongVideo.countDocuments()

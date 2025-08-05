@@ -1,5 +1,5 @@
 const admin = require('../config/Firebase') // from your firebase.js
-const FireBaseNotificationError = require('./errors')
+const { FireBaseNotificationError } = require('./errors')
 const sendPushNotification = async (token, title, body, data = {}) => {
   const message = {
     token, // device's FCM token
