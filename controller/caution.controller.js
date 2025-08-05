@@ -4,6 +4,7 @@ const Community = require('../models/Community')
 const Series = require('../models/Series')
 const { handleError } = require('../utils/utils')
 const { handleFounderLeaving } = require('./community.controller')
+const Report = require('../models/Report')
 
 const DeleteLongVideo = async (req, res, next) => {
   const { videoId } = req.params
@@ -441,6 +442,84 @@ const removeFounderFromCommunity = async (req, res, next) => {
   }
 }
 
+const reportContent=async(req,res,next)=>{
+  try {
+    const userId=req.user.id
+    const {contentId, contentype, reason, description}=req.body
+    if(!contentId || !contentype || !reason){
+      return res.status(400).json({message:'Content ID, type and reason are required'})
+    }
+    const existingReport = await Report.findOne({
+      reporter_id,
+      content_type,
+      content_id
+    })
+
+    if (existingReport) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already reported this content'
+      })
+    }
+    const report=new Report({
+      reporter_id:userId,
+      content_id:contentId,
+      content_type:contentype,
+      reason,
+      description
+    })
+    await report.save()
+    res.status(201).json({
+      success: true,
+      message: 'Report submitted successfully',
+      report: {
+        id: report._id,
+        content_type: report.content_type,
+        reason: report.reason,
+        status: report.status,
+        createdAt: report.createdAt
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getUserReports = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status = 'all' } = req.query
+    const skip = (page - 1) * limit
+    const reporter_id = req.user.id
+
+    let query = { reporter_id }
+    if (status !== 'all') {
+      query.status = status
+    }
+
+    const reports = await Report.find(query)
+      .populate('content_id', 'name title username') // Dynamic population based on content_type
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+
+    const totalReports = await Report.countDocuments(query)
+
+    res.status(200).json({
+      success: true,
+      reports,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalReports,
+        pages: Math.ceil(totalReports / limit)
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+
 module.exports = {
   DeleteLongVideo,
   DeleteUserProfile,
@@ -450,4 +529,6 @@ module.exports = {
   UnfollowCommunity,
   RemoveUserFromCommunity,
   removeFounderFromCommunity,
+  reportContent,
+  getUserReports
 }

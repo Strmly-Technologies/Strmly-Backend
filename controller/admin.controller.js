@@ -309,6 +309,128 @@ const getStats = async (req, res, next) => {
   }
 }
 
+const getReports=async(req,res,next)=>{
+    try {
+         const { page = 1, limit = 50, status = 'all', content_type = 'all', reason = 'all' } = req.query
+         const skip = (page - 1) * limit
+         let query = {}
+            if (status !== 'all') {
+                query.status = status
+            }
+            if (content_type !== 'all') {
+                query.content_type = content_type
+            }
+            if (reason !== 'all') {
+                query.reason = reason
+            }
+            const reports = await Report.find(query)
+            .populate('reporter_id', 'username email')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit))
+            const totalReports = await Report.countDocuments(query)
+
+           const reportsWithContent = await Promise.all(
+      reports.map(async (report) => {
+        let contentDetails = null
+        try {
+          switch (report.content_type) {
+            case 'video':
+              contentDetails = await LongVideo.findById(report.content_id)
+                .select('name description thumbnailUrl created_by')
+                .populate('created_by', 'username')
+              break
+            case 'comment':
+              contentDetails = await Comment.findById(report.content_id)
+                .select('content user video_id')
+                .populate('user', 'username')
+              break
+            case 'community':
+              contentDetails = await Community.findById(report.content_id)
+                .select('name bio profile_photo founder')
+                .populate('founder', 'username')
+              break
+            case 'series':
+              contentDetails = await Series.findById(report.content_id)
+                .select('title description posterUrl created_by')
+                .populate('created_by', 'username')
+              break
+            case 'user':
+              contentDetails = await User.findById(report.content_id)
+                .select('username email profile_photo account_status')
+              break
+          }
+        } catch (err) {
+          console.error(`Error fetching ${report.content_type} details:`, err)
+        }
+
+        return {
+          ...report.toObject(),
+          content_details: contentDetails
+        }
+      })
+    )
+  res.status(200).json({
+      success: true,
+      reports: reportsWithContent,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalReports,
+        pages: Math.ceil(totalReports / limit)
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const updateReportStatus=async(req,res,next)=>{
+    try {
+        const {id}=req.params
+        const{status,admin_notes,action_taken,reviewed_by}=req.body
+        if (!status || !action_taken) {
+            return res.status(400).json({
+                success: false,
+                message: 'Status and action taken are required'
+            })
+        }
+        const validStauses = ['pending', 'reviewed', 'resolved', 'dismissed']
+        if(!validStauses.includes(status)){
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid status'
+            })
+        }
+        const validActions = ['none', 'warning', 'content_removed', 'user_suspended', 'user_banned']
+        if(!validActions.includes(action_taken)){
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid action taken'
+            })
+        }
+        const report = await Report.findByIdAndUpdate(
+            id,
+            {status, admin_notes, action_taken, reviewed_by, reviewed_at: new Date()},
+            { new: true }
+        )
+        if (!report) {
+            return res.status(404).json({
+                success: false,
+                message: 'Report not found'
+            })
+        }
+        res.status(200).json({
+            success: true,
+            message: 'Report status updated successfully',
+            report
+        })
+
+    } catch (error) {
+        handleError(error, req, res, next)
+    }
+}
+
 module.exports = {
   adminLogin,
   getAdminDashboard,
@@ -318,5 +440,7 @@ module.exports = {
   getCreatorPasses,
   getStats,
   getSignedUpUsersOnDate,
+  getReports,
+  updateReportStatus,
 }
              

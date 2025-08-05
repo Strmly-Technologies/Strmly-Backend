@@ -8,6 +8,8 @@ const {
   RemoveVideoFromCommunity,
   UnfollowCommunity,
   RemoveUserFromCommunity,
+  getUserReports,
+  reportContent
 } = require('../controller/caution.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -41,5 +43,11 @@ router.patch(
   authenticateToken,
   RemoveUserFromCommunity
 )
+
+// API to report content (video, community, user)
+router.post('/report', authenticateToken, reportContent)
+
+// API to get user reports
+router.get('/reports', authenticateToken, getUserReports)
 
 module.exports = router
