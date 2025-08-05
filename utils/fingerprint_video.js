@@ -133,11 +133,11 @@ const fingerprintVideo = async (videoId, videoUrl) => {
     const files = await getFrames(inputFilePath, outputDir, inputFileName)
     const pHashes = await generatePHash(files)
     const fingerprint = bitwiseAvgHashes(pHashes)
-    const video = await LongVideo.findById(videoId).select('fingerprint')
-    if (video.fingerprint === '') {
-      video.fingerprint = fingerprint
-      await video.save()
-    }
+    await LongVideo.findOneAndUpdate(
+      { _id: videoId, fingerprint: '' },
+      { $set: { fingerprint } },
+      { new: true }
+    )
 
     cleanup(tempDir, outputDir)
   } catch (e) {

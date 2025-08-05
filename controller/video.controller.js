@@ -500,8 +500,12 @@ const createVideoABSSegments = async (req, res, next) => {
     const videoFile = await getFileFromS3Url(videoUrl)
 
     const videoSegmentUrls = await generateVideoABSSegments(videoFile, videoId)
-    video.videoResolutions = videoSegmentUrls
-    await video.save()
+    await LongVideo.findOneAndUpdate(
+      { _id: videoId },
+      { $set: { videoResolutions: videoSegmentUrls } },
+      { new: true }
+    )
+
     res.status(200).json({
       message: 'Segments created successfully',
       segments: videoSegmentUrls,
@@ -690,10 +694,17 @@ const deleteVideo = async (req, res, next) => {
         .json({ error: 'Not authorized to delete this video' })
     }
     //unpublish video
-    video.visibility = 'hidden'
-    video.hidden_reason = 'video_deleted'
-    video.hidden_at = new Date()
-    await video.save()
+    await LongVideo.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          visibility: 'hidden',
+          hidden_reason: 'video_deleted',
+          hidden_at: new Date(),
+        },
+      },
+      { new: true }
+    )
 
     res.status(200).json({
       message: 'Video deleted successfully',

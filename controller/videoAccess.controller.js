@@ -453,8 +453,14 @@ const purchaseIndividualVideo = async (req, res, next) => {
 
         await buyerTransaction.save({ session })
         await creatorTransaction.save({ session })
-        video.earned_till_date += amount
-        await video.save()
+        video = await LongVideo.findOneAndUpdate(
+          { _id: id },
+          { $inc: { earned_till_date: amount } },
+          {
+            new: true,
+            session: session,
+          }
+        )
       })
 
       await session.endSession()

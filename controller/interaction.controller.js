@@ -212,36 +212,59 @@ const LikeVideo = async (req, res, next) => {
 
     if (hasLiked) {
       // Unlike the video
-      video.liked_by.pull(userId)
-      video.likes = Math.max(0, video.likes - 1)
+      const updatedVideo = await LongVideo.findOneAndUpdate(
+        { _id: videoId },
+        [
+          {
+            $set: {
+              liked_by: { $setDifference: ['$liked_by', [userId]] },
+              likes: {
+                $cond: [
+                  { $gt: ['$likes', 0] },
+                  { $subtract: ['$likes', 1] },
+                  0,
+                ],
+              },
+            },
+          },
+        ],
+        { new: true }
+      )
 
-      if (Array.isArray(user.liked_videos)) {
-        user.liked_videos.pull(videoId)
-      }
-
-      await video.save()
-      await user.save()
-
+      await User.updateOne(
+        { _id: userId },
+        {
+          $pull: { liked_videos: videoId },
+        }
+      )
       res.status(200).json({
         message: 'Video unliked successfully',
-        likes: video.likes,
+        likes: updatedVideo.likes,
         isLiked: false,
       })
     } else {
       // Like the video
-      video.liked_by.push(userId)
-      video.likes += 1
+      const updatedVideo = await LongVideo.findOneAndUpdate(
+        { _id: videoId },
+        {
+          $addToSet: { liked_by: userId },
+          $inc: { likes: 1 },
+        },
+        { new: true }
+      )
 
-      if (!Array.isArray(user.liked_videos)) {
-        user.liked_videos = []
-      }
-      if (!user.liked_videos.includes(videoId)) {
-        user.liked_videos.push(videoId)
-      }
-      const videoCreator = video.created_by.toString()
-      const videoName = video.name
-      const userName = user.username
-      const userProfilePhoto = user.profile_photo
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: userId },
+        {
+          $addToSet: { liked_videos: videoId },
+        },
+        { new: true }
+      )
+
+      const videoCreator = updatedVideo.created_by.toString()
+      const videoName = updatedVideo.name
+      const userName = updatedUser.username
+      const userProfilePhoto = updatedUser.profile_photo
       await addVideoLikeNotificationToQueue(
         videoCreator,
         userId,
@@ -249,14 +272,12 @@ const LikeVideo = async (req, res, next) => {
         userName,
         videoName,
         userProfilePhoto,
-        user.FCM_token
+        updatedUser.FCM_token
       )
-      await video.save()
-      await user.save()
 
       res.status(200).json({
         message: 'Video liked successfully',
-        likes: video.likes,
+        likes: updatedVideo.likes,
         isLiked: true,
       })
     }
@@ -267,7 +288,7 @@ const LikeVideo = async (req, res, next) => {
 
 const ShareVideo = async (req, res, next) => {
   const { videoId } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
 
   if (!videoId) {
     return res
@@ -276,24 +297,24 @@ const ShareVideo = async (req, res, next) => {
   }
 
   try {
-    const video = await LongVideo.findById(videoId)
+    let video = await LongVideo.findById(videoId)
 
     if (!video) {
       return res.status(404).json({ message: 'Video not found' })
     }
+    video = await LongVideo.findOneAndUpdate(
+      { _id: videoId },
+      { $inc: { shares: 1 } },
+      { new: true }
+    )
 
-    video.shares += 1
-    await video.save()
-
-    const user = await User.findById(userId)
-    // Fix: Use shared_videos instead of sharedVideos
-    if (!Array.isArray(user.shared_videos)) {
-      user.shared_videos = []
-    }
-    if (!user.shared_videos.includes(videoId)) {
-      user.shared_videos.push(videoId)
-      await user.save()
-    }
+    await User.findOneAndUpdate(
+      { _id: userId },
+      {
+        $addToSet: { shared_videos: videoId },
+      },
+      { new: true }
+    )
 
     res.status(200).json({
       message: 'Video shared successfully',
@@ -347,7 +368,7 @@ const CommentOnVideo = async (req, res, next) => {
   }
 
   try {
-    const video = await LongVideo.findById(videoId)
+    let video = await LongVideo.findById(videoId)
 
     if (!video) {
       return res.status(404).json({ message: 'Video not found' })
@@ -361,8 +382,11 @@ const CommentOnVideo = async (req, res, next) => {
     })
 
     await newComment.save()
-    video.comments.push(newComment._id)
-    await video.save()
+    video = await LongVideo.findOneAndUpdate(
+      { _id: videoId },
+      { $push: { comments: newComment._id } },
+      { new: true }
+    )
 
     const userCommentType = 'commented_videos'
 
@@ -406,7 +430,7 @@ const CommentOnVideo = async (req, res, next) => {
 
 const getVideoComments = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const { videoId } = req.params
 
     if (!videoId) {
@@ -510,15 +534,15 @@ const getCommentReplies = async (req, res, next) => {
 const upvoteComment = async (req, res, next) => {
   try {
     const { videoId, commentId } = req.body
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
-    const video = await LongVideo.findById(videoId)
+    let video = await LongVideo.findById(videoId)
     const user = await User.findById(userId).select('username profile_photo')
     if (!video) {
       return res.status(404).json({ error: 'Video not found' })
     }
 
-    const comment = video.comments.id(commentId)
+    const comment = await Comment.findById(commentId)
     if (!comment) {
       return res.status(404).json({ error: 'Comment not found' })
     }
@@ -539,7 +563,7 @@ const upvoteComment = async (req, res, next) => {
       comment.upvotes += 1
     }
 
-    await video.save()
+    await comment.save()
     if (!alreadyUpvoted) {
       //add upvote notification to queue
       const commentcreator = comment.user.toString()
@@ -571,7 +595,7 @@ const upvoteComment = async (req, res, next) => {
 const downvoteComment = async (req, res, next) => {
   try {
     const { videoId, commentId } = req.body
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
     const video = await LongVideo.findById(videoId)
 
@@ -579,7 +603,7 @@ const downvoteComment = async (req, res, next) => {
       return res.status(404).json({ error: 'Video not found' })
     }
 
-    const comment = video.comments.id(commentId)
+    const comment = await Comment.findById(commentId)
     if (!comment) {
       return res.status(404).json({ error: 'Comment not found' })
     }
@@ -599,7 +623,7 @@ const downvoteComment = async (req, res, next) => {
       comment.downvotes += 1
     }
 
-    await video.save()
+    await comment.save()
 
     res.status(200).json({
       success: true,
@@ -1153,10 +1177,15 @@ const GiftVideo = async (req, res, next) => {
         })
 
         await receiverTransaction.save({ session })
-        //update comment analytics
-        video.gifts += amount
-        video.gifted_by.push(gifterId)
-        await video.save({ session })
+        //update video analytics
+        await LongVideo.updateOne(
+          { _id: videoId },
+          {
+            $inc: { gifts: amount },
+            $push: { gifted_by: gifterId },
+          },
+          { session }
+        )
       })
 
       await session.endSession()
@@ -1286,7 +1315,7 @@ const reshareVideo = async (req, res, next) => {
 const saveVideo = async (req, res, next) => {
   try {
     const { videoId, videoType, seriesId } = req.body
-    const userId = req.user.id
+    const userId = req.user.id.toString()
 
     if (!videoId || !videoType) {
       return res
@@ -1351,7 +1380,7 @@ const saveVideo = async (req, res, next) => {
 
 const checkForSaveVideo = async (req, res, next) => {
   const { videoId, videoType, seriesId } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
   if (!videoId || !videoType || !seriesId) {
     return res
       .status(400)
@@ -1533,7 +1562,7 @@ const DownvoteReply = async (req, res, next) => {
 
 const UnsaveVideo = async (req, res, next) => {
   const { videoId, videoType, seriesId } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
 
   if (!videoId || !videoType || !seriesId) {
     return res
@@ -1641,9 +1670,12 @@ const deleteComment = async (req, res, next) => {
     //delete comment/reply
     await Comment.deleteOne({ _id: commentId })
     //delete it from video's list of comments
-    video.comments = video.comments.filter(
-      (comment) => comment.toString() !== commentId
+    await LongVideo.findOneAndUpdate(
+      { _id: videoId },
+      { $pull: { comments: commentId } },
+      { new: true }
     )
+
     //if reply:delete it from comment's list of replies
     const parentCommentId = comment.parent_comment.toString()
     if (parentCommentId) {
@@ -1655,7 +1687,6 @@ const deleteComment = async (req, res, next) => {
         await parentComment.save()
       }
     }
-    await video.save()
     return res
       .status(200)
       .json({ message: 'Comment deleted successfully', commentId })
