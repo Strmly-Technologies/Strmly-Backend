@@ -30,6 +30,8 @@ const {
   AddVideoToUserViewHistory,
   getUserReshares,
   getUserInterests,
+  getMonetizationStatus,
+  toggleVideoMonetization,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -59,6 +61,16 @@ router.put(
   authenticateToken,
   toggleCommentMonetization
 )
+
+//enable/disable video monetization
+router.put(
+  '/toggle-video-monetization',
+  authenticateToken,
+  toggleVideoMonetization
+)
+
+//get comment and video monetization status
+router.get('/monetization-status', authenticateToken, getMonetizationStatus)
 
 //send firebase FCM token for the user
 router.post('/fcm_token', authenticateToken, saveUserFCMToken)
@@ -92,31 +104,6 @@ router.get('/following', authenticateToken, GetUserFollowing)
 // Get user profile details
 router.get('/profile-details', authenticateToken, getUserProfileDetails)
 
-// Get user profile by ID
-router.get('/profile/:id', authenticateToken, GetUserProfileById)
-
-// Get user videos by ID
-router.get('/videos/:id', authenticateToken, GetUserVideosById)
-
-router.get('/videos', authenticateToken, GetUserVideos)
-
-// Set creator pass price
-router.put('/creator-pass-price', authenticateToken, SetCreatorPassPrice)
-
-// Check creator pass deletion status
-router.get(
-  '/creator-pass-deletion-status',
-  authenticateToken,
-  (req, res, next) => {
-    // Redirect to creator pass routes
-    req.url = '/deletion-status'
-    next()
-  }
-)
-
-// Check if user has creator pass for specific creator
-router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass)
-
 // follow a user
 router.post('/follow', authenticateToken, followUser)
 
@@ -143,5 +130,29 @@ router.put('/social-media-links', authenticateToken, updateSocialMediaLinks)
 
 // Add video to user view history
 router.post('/history', authenticateToken, AddVideoToUserViewHistory)
+
+router.get('/videos', authenticateToken, GetUserVideos)
+
+// Set creator pass price
+router.put('/creator-pass-price', authenticateToken, SetCreatorPassPrice)
+
+// Check creator pass deletion status
+router.get(
+  '/creator-pass-deletion-status',
+  authenticateToken,
+  (req, res, next) => {
+    // Redirect to creator pass routes
+    req.url = '/deletion-status'
+    next()
+  }
+)
+// Get user profile by ID
+router.get('/profile/:id', authenticateToken, GetUserProfileById)
+
+// Get user videos by ID
+router.get('/videos/:id', authenticateToken, GetUserVideosById)
+
+// Check if user has creator pass for specific creator
+router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass)
 
 module.exports = router

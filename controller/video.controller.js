@@ -22,7 +22,7 @@ const uploadVideoToCommunity = async (req, res, next) => {
     const { communityId, videoId } = req.body
     const userId = req.user.id
     const video = await LongVideo.findById(videoId).select(
-      'visibility video_deleted'
+      'visibility hidden_reason community'
     )
     if (
       !video ||
@@ -41,6 +41,17 @@ const uploadVideoToCommunity = async (req, res, next) => {
         communityName: hasPermission.communityName,
       })
     }
+    if (video.community) {
+      if (video.community.toString() === communityId) {
+        return res
+          .status(400)
+          .json({ error: 'Video already uploaded in the Community' })
+      } else {
+        return res
+          .status(404)
+          .json({ error: 'Video is uploaded in another community' })
+      }
+    }
     const updatedCommunity = await Community.findByIdAndUpdate(
       communityId,
       {
@@ -53,7 +64,11 @@ const uploadVideoToCommunity = async (req, res, next) => {
     if (!updatedCommunity) {
       return res.status(404).json({ error: 'Community not found' })
     }
-
+    await LongVideo.findByIdAndUpdate(
+      videoId,
+      { $set: { community: communityId } },
+      { new: true }
+    )
     res.status(200).json({
       message: 'Video added to community successfully',
       community: {
@@ -85,7 +100,6 @@ const uploadVideo = async (req, res, next) => {
       is_standalone,
       episodeNumber,
       amount,
-      freeTierLimit,
     } = req.body
 
     if (!userId) {
@@ -202,7 +216,7 @@ const uploadVideo = async (req, res, next) => {
       display_till_time: display_till_time ? Number(display_till_time) : 0,
       subtitles: [],
       is_standalone: is_standalone === 'true',
-      free_tier_limit: parseInt(freeTierLimit) || 0,
+      is_monetized: user.video_monetization_enabled,
     }
     let savedVideo = new LongVideo(longVideo)
 

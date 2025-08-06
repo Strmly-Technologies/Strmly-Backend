@@ -307,7 +307,7 @@ const addEpisodeToSeries = async (req, res, next) => {
 
     if (video.created_by.toString() !== userId.toString()) {
       console.error(
-        `${video.created_by.toString()} is not authorized to use video ${videoId} by user ${userId.toString()}`
+        `user ${userId.toString()} is not authorized to use video ${videoId} by user ${video.created_by.toString()}`
       )
       return res.status(403).json({ error: 'Not authorized to use this video' })
     }

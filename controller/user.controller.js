@@ -1964,11 +1964,54 @@ const getUserInterests = async (req, res, next) => {
     const userId = req.user.id.toString()
     const user = await User.findById(userId).select('interests')
     return res.status(200).json({
-      message: 'User reshares retrieved successfully',
+      message: 'User interests retrieved successfully',
       user_interests: user.interests,
     })
   } catch (error) {
     handleError(error, req, res, next)
+  }
+}
+
+const getMonetizationStatus = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const user = await User.findById(userId).select(
+      'comment_monetization_enabled video_monetization_enabled'
+    )
+    return res.status(200).json({
+      message: 'User comment monetization status retrieved successfully',
+      comment_monetization_status: user.comment_monetization_enabled,
+      video_monetization_status: user.video_monetization_enabled,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const toggleVideoMonetization = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+
+    const currentUser = await User.findById(userId).select(
+      'video_monetization_enabled'
+    )
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const newStatus = !currentUser.video_monetization_enabled
+
+    await User.findByIdAndUpdate(
+      userId,
+      { $set: { video_monetization_enabled: newStatus } },
+      { new: true }
+    )
+
+    return res.status(200).json({
+      message: `User video monetization ${newStatus ? 'enabled' : 'disabled'} successfully`,
+    })
+  } catch (error) {
+    return handleError(error, req, res, next)
   }
 }
 
@@ -2002,4 +2045,6 @@ module.exports = {
   AddVideoToUserViewHistory,
   getUserReshares,
   getUserInterests,
+  getMonetizationStatus,
+  toggleVideoMonetization,
 }
