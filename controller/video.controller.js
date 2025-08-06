@@ -772,7 +772,7 @@ const getTrendingVideos = async (req, res, next) => {
           (followerId) => followerId.toString() === userId
         )
         video.community = {
-          ...community.toObject(),
+          ...community,
           is_following_community: isFollowing,
         }
       }
