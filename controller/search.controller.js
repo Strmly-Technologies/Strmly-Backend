@@ -12,17 +12,17 @@ const GlobalSearch = async (req, res, next) => {
     if (!query || query.trim() === '') {
       return res.status(400).json({ message: 'Search query is required' })
     }
-     const redis = getRedisClient();
-    const cacheKey = `global_search:${query}:${page}:${limit}`;
-    
+    const redis = getRedisClient()
+    const cacheKey = `global_search:${query}:${page}:${limit}`
+
     if (redis) {
-      const cachedResult = await redis.get(cacheKey);
+      const cachedResult = await redis.get(cacheKey)
       if (cachedResult) {
-        console.log(`📦 Search cache HIT for query: ${query}`);
+        console.log(`📦 Search cache HIT for query: ${query}`)
         return res.status(200).json({
           ...JSON.parse(cachedResult),
-          cached: true
-        });
+          cached: true,
+        })
       }
     }
 
@@ -30,7 +30,7 @@ const GlobalSearch = async (req, res, next) => {
     const skip = (page - 1) * limit
     const limitNum = parseInt(limit)
 
-    const [users, videos, series] = await Promise.all([
+    const [users, videos, series, communities] = await Promise.all([
       User.find({
         $or: [{ username: searchRegex }, { email: searchRegex }],
       })
@@ -57,11 +57,19 @@ const GlobalSearch = async (req, res, next) => {
         .populate('created_by', 'username profile_photo')
         .limit(limitNum)
         .skip(skip),
+
+      Community.find({
+        $or: [{ name: searchRegex }, { bio: searchRegex }],
+      })
+        .populate('founder', 'username profile_photo')
+        .limit(limitNum)
+        .skip(skip),
     ])
 
-    const totalResults = users.length + videos.length + series.length
+    const totalResults =
+      users.length + videos.length + series.length + communities.length
 
-     const result = {
+    const result = {
       message: 'Search completed successfully',
       query,
       totalResults,
@@ -69,22 +77,23 @@ const GlobalSearch = async (req, res, next) => {
         users,
         videos,
         series,
+        communities,
       },
       pagination: {
         currentPage: parseInt(page),
         limit: limitNum,
         hasMore: totalResults === limitNum * 3,
       },
-      cached: false
-    };
+      cached: false,
+    }
 
     // Cache the result for 5 minutes
     if (redis && totalResults > 0) {
-      await redis.setex(cacheKey, 300, JSON.stringify(result));
-      console.log(`💾 Search results cached for query: ${query}`);
+      await redis.setex(cacheKey, 300, JSON.stringify(result))
+      console.log(`💾 Search results cached for query: ${query}`)
     }
 
-    res.status(200).json(result);
+    res.status(200).json(result)
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -106,16 +115,16 @@ const searchFollowersOrFollowing = async (req, res, next) => {
       })
     }
 
-    const redis = getRedisClient();
-    const cacheKey = `search_connections:${userId}:${type}:${query}:${page}:${limit}`;
-    
+    const redis = getRedisClient()
+    const cacheKey = `search_connections:${userId}:${type}:${query}:${page}:${limit}`
+
     if (redis) {
-      const cachedResult = await redis.get(cacheKey);
+      const cachedResult = await redis.get(cacheKey)
       if (cachedResult) {
         return res.status(200).json({
           ...JSON.parse(cachedResult),
-          cached: true
-        });
+          cached: true,
+        })
       }
     }
 
@@ -166,14 +175,14 @@ const searchFollowersOrFollowing = async (req, res, next) => {
         totalPages: Math.ceil(totalCount / limitNum),
         hasMore: skip + limitNum < totalCount,
       },
-      cached: false
-    };
-
-    if (redis) {
-      await redis.setex(cacheKey, 300, JSON.stringify(result));
+      cached: false,
     }
 
-    res.status(200).json(result);
+    if (redis) {
+      await redis.setex(cacheKey, 300, JSON.stringify(result))
+    }
+
+    res.status(200).json(result)
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -242,11 +251,9 @@ const PersonalizedSearch = async (req, res, next) => {
         .sort({ views: -1, likes: -1 })
         .limit(limitNum)
         .skip(skip),
-
- 
     ])
 
-    const totalResults = videos.length + series.length  
+    const totalResults = videos.length + series.length
 
     res.status(200).json({
       message: 'Personalized search completed successfully',
@@ -255,7 +262,6 @@ const PersonalizedSearch = async (req, res, next) => {
       results: {
         videos,
         series,
-     
       },
       userPreferences: {
         favoriteGenres: userGenres,
@@ -292,21 +298,20 @@ const GetContentByType = async (req, res, next) => {
     const validTypes = ['videos', 'series', 'users']
     if (!validTypes.includes(type)) {
       return res.status(400).json({
-        message:
-          'Invalid content type. Valid types are: videos, series,users',
+        message: 'Invalid content type. Valid types are: videos, series,users',
       })
     }
 
-    const redis = getRedisClient();
-    const cacheKey = `content_by_type:${type}:${genre || 'all'}:${language || 'all'}:${sortBy}:${page}:${limit}`;
-    
+    const redis = getRedisClient()
+    const cacheKey = `content_by_type:${type}:${genre || 'all'}:${language || 'all'}:${sortBy}:${page}:${limit}`
+
     if (redis) {
-      const cachedResult = await redis.get(cacheKey);
+      const cachedResult = await redis.get(cacheKey)
       if (cachedResult) {
         return res.status(200).json({
           ...JSON.parse(cachedResult),
-          cached: true
-        });
+          cached: true,
+        })
       }
     }
 
@@ -405,15 +410,15 @@ const GetContentByType = async (req, res, next) => {
         limit: limitNum,
         hasMore: parseInt(page) < totalPages,
       },
-      cached: false
-    };
+      cached: false,
+    }
 
     // Cache for 10 minutes
     if (redis) {
-      await redis.setex(cacheKey, 600, JSON.stringify(result));
+      await redis.setex(cacheKey, 600, JSON.stringify(result))
     }
 
-    res.status(200).json(result);
+    res.status(200).json(result)
   } catch (error) {
     handleError(error, req, res, next)
   }
