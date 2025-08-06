@@ -30,7 +30,11 @@ const longVideoSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-
+    free_tier_limit: {
+      //waitch time limit for paid vids in seconds
+      type: Number,
+      default: 0,
+    },
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {

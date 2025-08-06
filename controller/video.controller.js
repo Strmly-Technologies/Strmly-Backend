@@ -85,6 +85,7 @@ const uploadVideo = async (req, res, next) => {
       is_standalone,
       episodeNumber,
       amount,
+      freeTierLimit,
     } = req.body
 
     if (!userId) {
@@ -201,6 +202,7 @@ const uploadVideo = async (req, res, next) => {
       display_till_time: display_till_time ? Number(display_till_time) : 0,
       subtitles: [],
       is_standalone: is_standalone === 'true',
+      free_tier_limit: parseInt(freeTierLimit) || 0,
     }
     let savedVideo = new LongVideo(longVideo)
 
@@ -601,7 +603,14 @@ const getVideoById = async (req, res, next) => {
     let video = await LongVideo.findById(id)
       .populate('created_by', 'username email')
       .populate('community', 'name')
-      .populate('series', 'title')
+      .populate({
+        path: 'series',
+        populate: {
+          path: 'episodes',
+          select: 'name episode_number season_number thumbnailUrl views likes',
+          options: { sort: { season_number: 1, episode_number: 1 } },
+        },
+      })
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' })

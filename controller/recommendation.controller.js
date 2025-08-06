@@ -52,10 +52,12 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         } else {
           video.is_following_creator = false
         }
-        const isFollowing = video.community.followers.some(
-          (followerId) => followerId.toString() === userId
-        )
-        video.is_following_community = isFollowing
+        if (video.community) {
+          const isFollowing = video.community.followers.some(
+            (followerId) => followerId.toString() === userId
+          )
+          video.is_following_community = isFollowing
+        }
       })
 
       recommendedVideos.push(...interestedVideos)
@@ -104,10 +106,12 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         } else {
           video.is_following_creator = false
         }
-        const isFollowing = video.community.followers.some(
-          (followerId) => followerId.toString() === userId
-        )
-        video.is_following_community = isFollowing
+        if (video.community) {
+          const isFollowing = video.community.followers.some(
+            (followerId) => followerId.toString() === userId
+          )
+          video.is_following_community = isFollowing
+        }
       })
       recommendedVideos.push(...randomVideos)
     }
@@ -137,10 +141,12 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       } else {
         reshare.long_video.is_following_creator = false
       }
-      const isFollowing = reshare.long_video.community.followers.some(
-        (followerId) => followerId.toString() === userId
-      )
-      reshare.long_video.is_following_community = isFollowing
+      if (reshare.long_video.community) {
+        const isFollowing = reshare.long_video.community.followers.some(
+          (followerId) => followerId.toString() === userId
+        )
+        reshare.long_video.is_following_community = isFollowing
+      }
     })
 
     // Shuffle the combined array for better variety

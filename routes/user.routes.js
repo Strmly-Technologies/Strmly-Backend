@@ -29,6 +29,7 @@ const {
   GetStatusOfReshare,
   AddVideoToUserViewHistory,
   getUserReshares,
+  getUserInterests,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -78,6 +79,9 @@ router.get('/notifications', authenticateToken, GetUserNotifications)
 
 // Update user interests
 router.put('/interests', authenticateToken, UpdateUserInterests)
+
+// Get user interests
+router.get('/interests', authenticateToken, getUserInterests)
 
 // Get all user followers
 router.get('/followers', authenticateToken, GetUserFollowers)

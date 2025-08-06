@@ -1959,6 +1959,19 @@ const getUserReshares = async (req, res, next) => {
   }
 }
 
+const getUserInterests = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const user = await User.findById(userId).select('interests')
+    return res.status(200).json({
+      message: 'User reshares retrieved successfully',
+      user_interests: user.interests,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -1988,4 +2001,5 @@ module.exports = {
   GetStatusOfReshare,
   AddVideoToUserViewHistory,
   getUserReshares,
+  getUserInterests,
 }

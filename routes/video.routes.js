@@ -59,22 +59,22 @@ router.post('/create-segments', authenticateToken, createVideoABSSegments)
 router.get('/get-segments', authenticateToken, getVideoABSSegments)
 
 // Route to search for videos with pagination
-router.get('/search', searchVideos)
+router.get('/search', authenticateToken, searchVideos)
 
 // Route to get trending videos
-router.get('/trending', getTrendingVideos)
+router.get('/trending', authenticateToken, getTrendingVideos)
 
 //add video to community
 router.post('/upload/community', authenticateToken, uploadVideoToCommunity)
 
 // Route to get videos by genre
-router.get('/by-genre/:genre', getVideosByGenre)
+router.get('/by-genre/:genre', authenticateToken, getVideosByGenre)
 
 // Route to increment video view count
 router.post('/:id/view', authenticateToken, incrementVideoView)
 
 // Route to get related videos by video ID
-router.get('/:id/related', getRelatedVideos)
+router.get('/:id/related', authenticateToken, getRelatedVideos)
 
 // Video access control routes
 router.get('/:id/access-check', authenticateToken, checkVideoAccess)
@@ -84,7 +84,7 @@ router.get('/:id/stream', authenticateToken, streamVideo)
 router.post('/:id/purchase', authenticateToken, purchaseIndividualVideo)
 
 // Route to get a video by ID
-router.get('/:id', getVideoById)
+router.get('/:id', authenticateToken, getVideoById)
 
 // Route to update a video by ID
 router.put('/:id', authenticateToken, updateVideo)
