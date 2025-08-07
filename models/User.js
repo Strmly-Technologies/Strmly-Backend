@@ -262,11 +262,11 @@ const userSchema = new mongoose.Schema(
       },
     },
     password_reset: {
-      reset_token: {
+      reset_otp: {
         type: String,
         default: null,
       },
-      reset_token_expires: {
+      reset_otp_expires: {
         type: Date,
         default: null,
       },
@@ -315,6 +315,14 @@ const userSchema = new mongoose.Schema(
         type: String,
         default: null,
       },
+    },
+    deletion_requested: {
+      type: Boolean,
+      default: false,
+    },
+    deletion_requested_at: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }

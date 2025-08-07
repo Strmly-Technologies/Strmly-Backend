@@ -106,10 +106,9 @@ const sendWelcomeEmail = async (email, username) => {
   }
 };
 
-const sendPasswordResetEmail = async (email, username, resetToken) => {
+const sendPasswordResetEmail = async (email, username, reset_otp) => {
   const transporter = createTransporter();
   
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
   
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -119,19 +118,13 @@ const sendPasswordResetEmail = async (email, username, resetToken) => {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #333;">Password Reset Request</h1>
         <p>Hi ${username},</p>
-        <p>We received a request to reset your password for your Strmly account. If you didn't make this request, please ignore this email.</p>
+        <p>We received a request to reset your password for your Strmly account. If you didn't make this request, please ignore this email. Here is your OTP</p>
         
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetUrl}" 
-             style="background-color: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            Reset Password
-          </a>
+       <div style="text-align: center; margin: 30px 0;">
+          <div style="background-color: #f8f9fa; border: 2px dashed #007bff; padding: 20px; border-radius: 10px; display: inline-block;">
+            <h2 style="color: #007bff; margin: 0; letter-spacing: 3px; font-size: 32px;">${reset_otp}</h2>
+          </div>
         </div>
-        
-        <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-        <p style="word-break: break-all; color: #dc3545;">${resetUrl}</p>
-        
-        <p><strong>This link will expire in 1 hour.</strong></p>
         
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #333; margin-top: 0;">Security Tips:</h3>
@@ -202,6 +195,67 @@ const sendPasswordResetConfirmationEmail = async (email, username) => {
   }
 };
 
+const sendAccountDeletionRequestEmail = async (email, username) => {
+  const transporter = createTransporter();
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: process.env.EMAIL_USER,
+    subject: 'Account Deletion Request - Strmly',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #dc3545;">Account Deletion Request</h1>
+        <p>Hi Admin,</p>
+        <p>User <strong>${username}</strong> (${email}) has requested to delete their account.</p>
+        
+        <p>Please review the request and take necessary actions.</p>
+        
+        <hr style="margin: 30px 0;">
+        <p style="color: #666; font-size: 12px;">
+          This is an automated message from Strmly. Please do not reply to this email.
+        </p>
+      </div>
+    `,
+  };
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Account deletion email error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+ const sendDeletionRequestEmailToUser= async (email, username) => {
+  const transporter = createTransporter();
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Account Deletion Request Received - Strmly',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #dc3545;">Account Deletion Request Received</h1>
+        <p>Hi ${username},</p>
+        <p>We have received your request to delete your Strmly account. Your account will be deleted within 30-45 days.</p>
+        
+        <p>If you change your mind, please contact us within this period to cancel the deletion.</p>
+        
+        <hr style="margin: 30px 0;">
+        <p style="color: #666; font-size: 12px;">
+          This is an automated message from Strmly. Please do not reply to this email.
+        </p>
+      </div>
+    `,
+  };
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error('Account deletion request confirmation email error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 const generatePasswordResetToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
@@ -213,5 +267,7 @@ module.exports = {
     sendPasswordResetEmail,
     sendPasswordResetConfirmationEmail,
     generatePasswordResetToken,
+    sendAccountDeletionRequestEmail,
+    sendDeletionRequestEmailToUser,
 }
   

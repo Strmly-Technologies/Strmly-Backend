@@ -9,7 +9,9 @@ const {
   UnfollowCommunity,
   RemoveUserFromCommunity,
   getUserReports,
-  reportContent
+  reportContent,
+  requestAccountDeletion,
+  cancelAccountDeletionRequest
 } = require('../controller/caution.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -49,5 +51,10 @@ router.post('/report', authenticateToken, reportContent)
 
 // API to get user reports
 router.get('/reports', authenticateToken, getUserReports)
+
+router.post('/request-account-deletion', authenticateToken, requestAccountDeletion)
+
+// API to cancel account deletion request
+router.post('/cancel-account-deletion', authenticateToken, cancelAccountDeletionRequest)
 
 module.exports = router
