@@ -799,6 +799,8 @@ const getTrendingVideos = async (req, res, next) => {
       } else {
         video.is_following_creator = false
       }
+      video.start_time = video.start_time || 0
+      video.display_till_time = video.display_till_time || 0
       return video
     })
     let total = await LongVideo.countDocuments()

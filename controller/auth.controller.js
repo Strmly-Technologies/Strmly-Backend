@@ -448,11 +448,11 @@ const forgotPassword = async (req, res, next) => {
     }
 
     // Generate reset token
-    const resetToken = generatePasswordResetToken()
+    const reset_otp = generatePasswordResetOTP()
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
 
-    user.password_reset.reset_token = resetToken
-    user.password_reset.reset_token_expires = resetExpires
+    user.password_reset.reset_otp = reset_otp
+    user.password_reset.reset_otp_expires = resetExpires
     user.password_reset.reset_requested_at = new Date()
     await user.save()
 
@@ -460,13 +460,13 @@ const forgotPassword = async (req, res, next) => {
     const emailResult = await sendPasswordResetEmail(
       user.email,
       user.username,
-      resetToken
+      reset_otp
     )
 
     if (!emailResult.success) {
       // Reset the token if email fails
-      user.password_reset.reset_token = null
-      user.password_reset.reset_token_expires = null
+      user.password_reset.reset_otp = null
+      user.password_reset.reset_otp_expires = null
       await user.save()
 
       return res.status(500).json({
@@ -486,29 +486,37 @@ const forgotPassword = async (req, res, next) => {
 
 const verifyResetToken = async (req, res, next) => {
   try {
-    const { token } = req.body
+    const { otp } = req.body
 
-    if (!token) {
+    if (!otp) {
       return res.status(400).json({
-        message: 'Reset token is required',
+        message: 'Reset otp is required',
         code: 'TOKEN_REQUIRED',
       })
     }
 
+   const otpValidation = validateAndSanitize.otp(otp)
+    if (!otpValidation.isValid) {
+      return res.status(400).json({
+        message: otpValidation.error,
+        code: 'INVALID_OTP_FORMAT',
+      })
+    }
+
     const user = await User.findOne({
-      'password_reset.reset_token': token,
-      'password_reset.reset_token_expires': { $gt: new Date() },
+      'password_reset.reset_otp': otp,
+      'password_reset.reset_otp_expires': { $gt: new Date() },
     })
 
     if (!user) {
       return res.status(400).json({
-        message: 'Invalid or expired reset token',
+        message: 'Invalid or expired reset otp',
         code: 'INVALID_TOKEN',
       })
     }
 
     res.status(200).json({
-      message: 'Reset token is valid',
+      message: 'Reset otp is valid',
       valid: true,
       email: user.email,
     })
@@ -519,9 +527,9 @@ const verifyResetToken = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const { token, newPassword, confirmPassword } = req.body
+    const { otp, newPassword, confirmPassword } = req.body
 
-    if (!token || !newPassword || !confirmPassword) {
+    if (!otp || !newPassword || !confirmPassword) {
       return res.status(400).json({
         message: 'Token, new password, and password confirmation are required',
       })
@@ -540,13 +548,13 @@ const resetPassword = async (req, res, next) => {
     }
 
     const user = await User.findOne({
-      'password_reset.reset_token': token,
-      'password_reset.reset_token_expires': { $gt: new Date() },
+      'password_reset.reset_otp': otp,
+      'password_reset.reset_otp_expires': { $gt: new Date() },
     }).select('+password')
 
     if (!user) {
       return res.status(400).json({
-        message: 'Invalid or expired reset token',
+        message: 'Invalid or expired reset otp',
         code: 'INVALID_TOKEN',
       })
     }
@@ -561,8 +569,8 @@ const resetPassword = async (req, res, next) => {
 
     // Update password and clear reset token
     user.password = newPassword
-    user.password_reset.reset_token = null
-    user.password_reset.reset_token_expires = null
+    user.password_reset.reset_otp = null
+    user.password_reset.reset_otp_expires = null
     user.password_reset.reset_requested_at = null
     await user.save()
 
@@ -622,6 +630,10 @@ const checkEmailExists = async (req, res, next) => {
   } catch (error) {
     handleError(error, req, res, next)
   }
+}
+
+const generatePasswordResetOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString() // 6-digit OTP
 }
 
 module.exports = {

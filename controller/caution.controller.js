@@ -5,6 +5,7 @@ const Series = require('../models/Series')
 const { handleError } = require('../utils/utils')
 const { handleFounderLeaving } = require('./community.controller')
 const Report = require('../models/Report')
+const { sendAccountDeletionRequestEmail, sendDeletionRequestEmailToUser } = require('../utils/email')
 
 const DeleteLongVideo = async (req, res, next) => {
   const { videoId } = req.params
@@ -522,6 +523,152 @@ const getUserReports = async (req, res, next) => {
   }
 }
 
+const requestAccountDeletion = async (req, res, next) => {
+  const userId = req.user.id
+  
+  try {
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      })
+    }
+
+    // Check if user has already requested deletion
+    if (user.account_status.is_deactivated) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Account is already deactivated. Please contact support.' 
+      })
+    }
+
+    if (user.deletion_requested) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Deletion request already exists',
+        requestedAt: user.deletion_requested_at,
+        estimatedDeletionDate: new Date(user.deletion_requested_at.getTime() + 30 * 24 * 60 * 60 * 1000)
+      })
+    }
+
+    // Check for active subscriptions or pending transactions
+    const hasActiveCreatorPass = user.creator_profile?.creator_pass_price > 0
+    if (hasActiveCreatorPass) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete account with active Creator Pass. Please disable it first.',
+        code: 'ACTIVE_CREATOR_PASS'
+      })
+    }
+
+    user.deletion_requested = true
+    user.deletion_requested_at = new Date()
+    await user.save()
+
+    // Send email to admin
+    const deleteEmailResult = await sendAccountDeletionRequestEmail(
+      user.email,
+      user.username,
+    )
+    if (!deleteEmailResult.success) {
+      // Rollback the deletion request if email fails
+      user.deletion_requested = false
+      user.deletion_requested_at = null
+      await user.save()
+      
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send account deletion request email',
+        error: deleteEmailResult.error,
+      })
+    }
+
+    // Send confirmation email to user
+    const deletionRequestEmailResult = await sendDeletionRequestEmailToUser(
+      user.email,
+      user.username,
+    )
+    if (!deletionRequestEmailResult.success) {
+      console.error('Failed to send user confirmation email:', deletionRequestEmailResult.error)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Account deletion request submitted successfully',
+      deletionRequest: {
+        requestedAt: user.deletion_requested_at,
+        estimatedDeletionDate: new Date(user.deletion_requested_at.getTime() + 30 * 24 * 60 * 60 * 1000),
+        note: 'Your account will be deleted within 30-45 days. You can contact support to cancel this request.'
+      }
+    })
+    
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const cancelAccountDeletionRequest = async (req, res, next) => {
+  try {
+    const userId = req.user.id
+    const { password } = req.body
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required to cancel deletion request'
+      })
+    }
+
+    const user = await User.findById(userId).select('+password')
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      })
+    }
+
+    if (!user.deletion_requested) {
+      return res.status(400).json({
+        success: false,
+        message: 'No deletion request found to cancel'
+      })
+    }
+
+    // Verify password
+    const isPasswordValid = await user.comparePassword(password)
+    if (!isPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid password'
+      })
+    }
+
+    // Check if still within cancellable period (e.g., 30 days)
+    const daysSinceRequest = (new Date() - user.deletion_requested_at) / (1000 * 60 * 60 * 24)
+    if (daysSinceRequest > 30) {
+      return res.status(400).json({
+        success: false,
+        message: 'Deletion request can no longer be cancelled. Please contact support.',
+        daysSinceRequest: Math.floor(daysSinceRequest)
+      })
+    }
+
+    // Cancel the deletion request
+    user.deletion_requested = false
+    user.deletion_requested_at = null
+    await user.save()
+
+    res.status(200).json({
+      success: true,
+      message: 'Account deletion request cancelled successfully'
+    })
+
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   DeleteLongVideo,
   DeleteUserProfile,
@@ -533,4 +680,6 @@ module.exports = {
   removeFounderFromCommunity,
   reportContent,
   getUserReports,
+  requestAccountDeletion,
+  cancelAccountDeletionRequest,
 }
