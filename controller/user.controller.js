@@ -806,7 +806,7 @@ const UpdateUserInterests = async (req, res, next) => {
 
 const GetUserFollowers = async (req, res, next) => {
   try {
-    const userId = req.params.id || req.user._id
+    const userId = req.params.id || req.user.id
     const user = await User.findById(userId).populate(
       'followers',
       'username profile_photo followers'
@@ -834,7 +834,7 @@ const GetUserFollowers = async (req, res, next) => {
 
 const GetUserFollowing = async (req, res, next) => {
   try {
-    const userId = req.params.id || req.user._id
+    const userId = req.params.id || req.user.id
     const user = await User.findById(userId).populate(
       'following',
       'username profile_photo'
@@ -1462,7 +1462,7 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
 
 const updateSocialMediaLinks = async (req, res, next) => {
   try {
-    const userId = req.user._id
+    const userId = req.user.id
     const { facebook, twitter, instagram, youtube, snapchat } = req.body
 
     // Validate URLs if provided
@@ -1534,7 +1534,7 @@ const updateSocialMediaLinks = async (req, res, next) => {
 }
 
 const getUserDashboardAnalytics = async (req, res, next) => {
-  const userId = req.user._id.toString()
+  const userId = req.user.id.toString()
   const group = req.query.group
     ? Array.isArray(req.query.group)
       ? req.query.group
@@ -1820,7 +1820,7 @@ const getUserDashboardAnalytics = async (req, res, next) => {
 
 const getUserPurchasedAccess = async (req, res, next) => {
   try {
-    const userId = req.user._id.toString()
+    const userId = req.user.id.toString()
     const response = {}
 
     const individualPurchases = await UserAccess.find({

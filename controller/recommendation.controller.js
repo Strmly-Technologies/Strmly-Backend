@@ -261,7 +261,10 @@ const markVideoAsViewed = async (req, res, next) => {
 
     // Check if video exists
     const video = await LongVideo.findById(videoId)
-    if (!video) {
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
       return res.status(404).json({ message: 'Video not found' })
     }
 

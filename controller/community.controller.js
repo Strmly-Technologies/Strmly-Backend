@@ -888,11 +888,16 @@ const handleFounderLeaving = async (communityId, currentFounderId) => {
 const getCommunityFollowingStatus = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const id = req.params
+    const { id } = req.params
     const community = await Community.findById(id).select('followers')
-    const status = community.followers.some(
-      (follower) => follower.toString() === userId
-    )
+    if (!community) {
+      res.status(404).json({
+        error: 'Community not found',
+      })
+    }
+    const status =
+      community.followers?.some((follower) => follower.toString() === userId) ||
+      false
     res.status(200).json({
       message: 'community following status retrieved successfully',
       status,

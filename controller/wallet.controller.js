@@ -1217,7 +1217,7 @@ const getWalletDetails = async (req, res, next) => {
       })
     }
 
-    const wallet = await Wallet.find({ user_id: userId })
+    const wallet = await Wallet.findOne({ user_id: userId })
     if (!wallet) {
       return res.status(404).json({
         error: 'wallet not found',

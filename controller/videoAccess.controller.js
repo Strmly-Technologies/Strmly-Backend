@@ -22,7 +22,10 @@ const checkVideoAccess = async (req, res, next) => {
       .populate('community', 'name')
       .populate('series', 'title price type')
 
-    if (!video) {
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
       return res.status(404).json({
         success: false,
         error: 'Video not found',
@@ -214,7 +217,10 @@ const streamVideo = async (req, res, next) => {
     // Get video with URL
     let video = await LongVideo.findById(id)
 
-    if (!video) {
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
       return res.status(404).json({
         success: false,
         error: 'Video not found',

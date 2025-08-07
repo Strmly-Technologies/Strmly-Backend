@@ -12,7 +12,10 @@ const DeleteLongVideo = async (req, res, next) => {
 
   try {
     const video = await LongVideo.findById(videoId)
-    if (!video) {
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
       return res.status(404).json({ message: 'Video not found' })
     }
 
@@ -144,8 +147,6 @@ const DeleteUserProfile = async (req, res, next) => {
 //       user.email,
 //       user.username,
 //     )
-
-
 
 //     res.status(200).json({ message: 'Deletion email sent successfully' })
 //   }
@@ -442,31 +443,33 @@ const removeFounderFromCommunity = async (req, res, next) => {
   }
 }
 
-const reportContent=async(req,res,next)=>{
+const reportContent = async (req, res, next) => {
   try {
-    const userId=req.user.id
-    const {contentId, contentype, reason, description}=req.body
-    if(!contentId || !contentype || !reason){
-      return res.status(400).json({message:'Content ID, type and reason are required'})
+    const userId = req.user.id
+    const { contentId, contentype, reason, description } = req.body
+    if (!contentId || !contentype || !reason) {
+      return res
+        .status(400)
+        .json({ message: 'Content ID, type and reason are required' })
     }
     const existingReport = await Report.findOne({
       reporter_id,
       content_type,
-      content_id
+      content_id,
     })
 
     if (existingReport) {
       return res.status(400).json({
         success: false,
-        message: 'You have already reported this content'
+        message: 'You have already reported this content',
       })
     }
-    const report=new Report({
-      reporter_id:userId,
-      content_id:contentId,
-      content_type:contentype,
+    const report = new Report({
+      reporter_id: userId,
+      content_id: contentId,
+      content_type: contentype,
       reason,
-      description
+      description,
     })
     await report.save()
     res.status(201).json({
@@ -477,8 +480,8 @@ const reportContent=async(req,res,next)=>{
         content_type: report.content_type,
         reason: report.reason,
         status: report.status,
-        createdAt: report.createdAt
-      }
+        createdAt: report.createdAt,
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -511,14 +514,13 @@ const getUserReports = async (req, res, next) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total: totalReports,
-        pages: Math.ceil(totalReports / limit)
-      }
+        pages: Math.ceil(totalReports / limit),
+      },
     })
   } catch (error) {
     handleError(error, req, res, next)
   }
 }
-
 
 module.exports = {
   DeleteLongVideo,
@@ -530,5 +532,5 @@ module.exports = {
   RemoveUserFromCommunity,
   removeFounderFromCommunity,
   reportContent,
-  getUserReports
+  getUserReports,
 }

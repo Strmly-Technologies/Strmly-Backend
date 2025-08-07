@@ -301,7 +301,10 @@ const addEpisodeToSeries = async (req, res, next) => {
     }
 
     const video = await LongVideo.findById(videoId)
-    if (!video) {
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
       return res.status(404).json({ error: 'Video not found' })
     }
 
@@ -371,7 +374,10 @@ const removeEpisodeFromSeries = async (req, res, next) => {
     }
 
     const video = await LongVideo.findById(episodeId)
-    if (!video) {
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
       return res.status(404).json({ error: 'Episode not found' })
     }
 

@@ -403,13 +403,13 @@ const LogoutUser = (req, res) => {
 
 const RefreshToken = async (req, res, next) => {
   try {
-    const token = generateToken(req.user._id)
+    const token = generateToken(req.user.id)
 
     res.status(200).json({
       message: 'Token refreshed successfully',
       token,
       user: {
-        id: req.user._id,
+        id: req.user.id,
         username: req.user.username,
         email: req.user.email,
       },
