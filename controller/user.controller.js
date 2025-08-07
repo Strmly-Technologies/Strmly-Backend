@@ -969,6 +969,8 @@ const GetUserProfileById = async (req, res, next) => {
             (follower) => follower._id.toString() === userid.toString()
           ) || false
       ) || []
+      // creator pass details
+      const creatorPriceDetails=userDetails.creator_profile.creator_pass_price||0
     const result = {
       message: 'User profile details retrieved successfully',
       user: {
@@ -982,6 +984,7 @@ const GetUserProfileById = async (req, res, next) => {
         isFollowing,
         myLikedVideos,
         myFollowingCommunities,
+        creatorPriceDetails,
       },
       cached: false,
     }
