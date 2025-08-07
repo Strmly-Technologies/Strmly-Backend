@@ -928,9 +928,12 @@ const GetUserProfileById = async (req, res, next) => {
         })
       }
     }
-    const userDetails = await User.findById(userId).select(
-      'username profile_photo followers following my_communities social_media_links'
-    )
+    const userDetails = await User.findById(userId)
+      .populate('followers', 'username profile_photo')
+      .populate('following', 'username profile_photo')
+      .populate('my_communities', 'name profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate('following_communities', 'name profile_photo')
 
     if (!userDetails) {
       return res.status(404).json({ message: 'User not found' })
@@ -938,19 +941,47 @@ const GetUserProfileById = async (req, res, next) => {
 
     const totalFollowers = userDetails.followers?.length || 0
     const totalFollowing = userDetails.following?.length || 0
-    const totalCommunities = userDetails.my_communities?.length || 0
-    const isBeingFollowed = userDetails.followers?.includes(userid) || false
+    const totalUserCreatedCommunities = userDetails.my_communities?.length || 0
+    const totalJoinedCommunities = userDetails.community?.length || 0
+    const totalFollowingCommunities =
+      userDetails.following_communities?.length || 0
+    const isBeingFollowed =
+      userDetails.followers?.some(
+        (follower) => follower._id.toString() === userid.toString()
+      ) || false
+    const isFollowing =
+      userDetails.following?.some(
+        (following) => following._id.toString() === userid.toString()
+      ) || false
 
+    const videos = await LongVideo.find({ created_by: userId })
+    const myLikedVideos =
+      videos?.filter(
+        (video) =>
+          video.liked_by?.some(
+            (liked_user) => liked_user._id.toString() === userid.toString()
+          ) || false
+      ) || []
+    const myFollowingCommunities =
+      userDetails.my_communities?.filter(
+        (community) =>
+          community.followers?.some(
+            (follower) => follower._id.toString() === userid.toString()
+          ) || false
+      ) || []
     const result = {
       message: 'User profile details retrieved successfully',
       user: {
-        username: userDetails.username,
-        profile_photo: userDetails.profile_photo,
+        userDetails,
         totalFollowers,
         totalFollowing,
-        totalCommunities,
+        totalUserCreatedCommunities,
+        totalFollowingCommunities,
+        totalJoinedCommunities,
         isBeingFollowed,
-        social_media_links: userDetails.social_media_links || {},
+        isFollowing,
+        myLikedVideos,
+        myFollowingCommunities,
       },
       cached: false,
     }

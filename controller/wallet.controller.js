@@ -75,10 +75,11 @@ const getOrCreateWallet = async (req, res, next) => {
     if (!wallet) {
       wallet = new Wallet({
         user_id: userId,
-        balance: 0,
+        balance: 100,
         currency: 'INR',
         wallet_type: walletType,
         status: 'active',
+        total_loaded: 100,
       })
       await wallet.save()
     }
@@ -86,6 +87,8 @@ const getOrCreateWallet = async (req, res, next) => {
       success: true,
       message: {
         wallet_id: wallet._id.toString(),
+        total_loaded: wallet.total_loaded,
+        balance: wallet.balance,
       },
     })
   } catch (error) {
