@@ -861,7 +861,7 @@ const GiftComment = async (req, res, next) => {
 
         receiverWallet.balance = receiverBalanceAfter
         receiverWallet.total_received += amount
-        receiverWallet.revenue += amount
+
         receiverWallet.last_transaction_at = new Date()
         await receiverWallet.save({ session })
 
@@ -1135,7 +1135,7 @@ const GiftVideo = async (req, res, next) => {
 
         receiverWallet.balance = receiverBalanceAfter
         receiverWallet.total_received += amount
-        receiverWallet.revenue += amount
+    
         receiverWallet.last_transaction_at = new Date()
         await receiverWallet.save({ session })
 

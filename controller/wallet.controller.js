@@ -309,7 +309,7 @@ const verifyWalletLoad = async (req, res, next) => {
 
         wallet.balance = balanceAfter
         wallet.total_loaded += amount
-        wallet.loaded += amount
+
         wallet.last_transaction_at = new Date()
         await wallet.save({ session })
       })
@@ -681,7 +681,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
 
         creatorWallet.balance = creatorBalanceAfter
         creatorWallet.total_received += creatorAmount
-        creatorWallet.revenue += creatorAmount
+
         creatorWallet.last_transaction_at = new Date()
         await creatorWallet.save({ session })
         series.earned_till_date += amount
@@ -1043,7 +1043,7 @@ const transferCommunityFee = async (req, res, next) => {
         // Update founder wallet
         founderWallet.balance = founderBalanceAfter
         founderWallet.total_received += founderAmount
-        founderWallet.revenue += founderAmount
+
         founderWallet.last_transaction_at = new Date()
         await founderWallet.save({ session })
 

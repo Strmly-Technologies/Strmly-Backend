@@ -31,7 +31,6 @@ const {
   getUserReshares,
   getUserInterests,
   getMonetizationStatus,
-  toggleVideoMonetization,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -62,14 +61,7 @@ router.put(
   toggleCommentMonetization
 )
 
-//enable/disable video monetization
-router.put(
-  '/toggle-video-monetization',
-  authenticateToken,
-  toggleVideoMonetization
-)
-
-//get comment and video monetization status
+//get comment monetization status
 router.get('/monetization-status', authenticateToken, getMonetizationStatus)
 
 //send firebase FCM token for the user

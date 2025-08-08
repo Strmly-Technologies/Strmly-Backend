@@ -216,7 +216,7 @@ const purchaseCreatorPassWithWallet = async (req, res, next) => {
 
         creatorWallet.balance = creatorBalanceAfter
         creatorWallet.total_received += amount
-        creatorWallet.revenue += amount
+
         creatorWallet.last_transaction_at = new Date()
         await creatorWallet.save({ session })
 

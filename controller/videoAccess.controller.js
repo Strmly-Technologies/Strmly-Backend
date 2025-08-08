@@ -408,7 +408,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
         buyerWallet.total_spent += amount
         creatorWallet.balance += amount
         creatorWallet.total_received += amount
-        creatorWallet.revenue += amount
+     
         await buyerWallet.save({ session })
         await creatorWallet.save({ session })
 

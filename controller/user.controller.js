@@ -11,7 +11,8 @@ const Series = require('../models/Series')
 const GetUserFeed = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const { page = 1, limit = 10 } = req.query
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
     const skip = (page - 1) * (limit - 2)
     const resharedVideoSkip = (page - 1) * 2
 
@@ -97,23 +98,25 @@ const GetUserFeed = async (req, res, next) => {
       .populate('user', 'username profile_photo')
       .populate({
         path: 'long_video',
+        select: 'thumbnailUrl name description _id',
         populate: [
-          { path: 'created_by', select: 'username profile_photo' },
+          { path: 'created_by', select: 'username profile_photo _id' },
           { path: 'community', select: 'name profile_photo followers _id' },
         ],
       })
-    resharedVideos = resharedVideos.map((video) => {
-      const community = video.community
+
+    resharedVideos = resharedVideos.map((reshare) => {
+      const community = reshare.long_video?.community
       if (community && community.followers) {
         const isFollowing = community.followers.some((followerId) =>
           followerId.equals(userId)
         )
-        video.community = {
+        reshare.long_video.community = {
           ...community.toObject(),
           isFollowing,
         }
       }
-      return video
+      return reshare
     })
     console.log('Recommended videos from interests:', recommendedVideos)
 
@@ -449,7 +452,7 @@ const GetUserInteractions = async (req, res, next) => {
         path: 'liked_videos',
         select: 'name thumbnailUrl creator views likes',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
       })
@@ -1620,7 +1623,7 @@ const getUserDashboardAnalytics = async (req, res, next) => {
         path: 'liked_videos',
         select: 'name thumbnailUrl creator views likes',
         populate: {
-          path: 'creator',
+          path: 'created_by',
           select: 'username profile_photo',
         },
       })
@@ -2002,42 +2005,14 @@ const getMonetizationStatus = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
     const user = await User.findById(userId).select(
-      'comment_monetization_enabled video_monetization_enabled'
+      'comment_monetization_enabled'
     )
     return res.status(200).json({
       message: 'User comment monetization status retrieved successfully',
       comment_monetization_status: user.comment_monetization_enabled,
-      video_monetization_status: user.video_monetization_enabled,
     })
   } catch (error) {
     handleError(error, req, res, next)
-  }
-}
-
-const toggleVideoMonetization = async (req, res, next) => {
-  try {
-    const userId = req.user.id.toString()
-
-    const currentUser = await User.findById(userId).select(
-      'video_monetization_enabled'
-    )
-    if (!currentUser) {
-      return res.status(404).json({ message: 'User not found' })
-    }
-
-    const newStatus = !currentUser.video_monetization_enabled
-
-    await User.findByIdAndUpdate(
-      userId,
-      { $set: { video_monetization_enabled: newStatus } },
-      { new: true }
-    )
-
-    return res.status(200).json({
-      message: `User video monetization ${newStatus ? 'enabled' : 'disabled'} successfully`,
-    })
-  } catch (error) {
-    return handleError(error, req, res, next)
   }
 }
 
@@ -2072,5 +2047,4 @@ module.exports = {
   getUserReshares,
   getUserInterests,
   getMonetizationStatus,
-  toggleVideoMonetization,
 }

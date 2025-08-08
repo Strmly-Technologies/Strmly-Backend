@@ -6,7 +6,8 @@ const { handleError } = require('../utils/utils')
 const getPersonalizedVideoRecommendations = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const { page = 1, batchSize = 5 } = req.query
+    const page = parseInt(req.query.page) || 1
+    const batchSize = parseInt(req.query.batchSize) || 5
 
     const user = await User.findById(userId).select(
       'interests viewed_videos following'
@@ -28,6 +29,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         _id: { $nin: viewedVideoIds },
         visibility: { $ne: 'hidden' },
       })
+        .lean()
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo followers')
         .populate({
@@ -58,10 +60,10 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           )
           video.is_following_community = isFollowing
         }
-        if(video.start_time && video.display_till_time){
+        /*         if (video.start_time && video.display_till_time) {
           video.start_time = video.start_time
           video.display_till_time = video.display_till_time
-        }
+        } */
       })
 
       recommendedVideos.push(...interestedVideos)
@@ -87,6 +89,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         _id: { $nin: viewedVideoIds },
         visibility: { $ne: 'hidden' },
       })
+        .lean()
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo followers')
         .populate({
@@ -116,10 +119,10 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           )
           video.is_following_community = isFollowing
         }
-         if(video.start_time && video.display_till_time){
+        /*         if (video.start_time && video.display_till_time) {
           video.start_time = video.start_time
           video.display_till_time = video.display_till_time
-        }
+        } */
       })
       recommendedVideos.push(...randomVideos)
     }
@@ -129,35 +132,40 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     const resharedVideos = await Reshare.find({
       user: { $in: followingIds }, // Only get reshares from followed users
     })
+      .lean()
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
       .limit(2)
       .populate('user', 'username profile_photo')
       .populate({
         path: 'long_video',
+        select: 'name description thumbnailUrl _id',
         populate: [
-          { path: 'created_by', select: 'username profile_photo' },
-          { path: 'community', select: 'name profile_photo followers' },
+          { path: 'created_by', select: 'username profile_photo _id' },
+          { path: 'community', select: 'name profile_photo followers _id' },
         ],
       })
     resharedVideos.forEach((reshare) => {
       if (
-        reshare.long_video.created_by &&
-        followingIds.includes(reshare.long_video.created_by._id.toString())
+        reshare.long_video?.created_by &&
+        followingIds.includes(reshare.long_video?.created_by._id.toString())
       ) {
-        reshare.long_video.is_following_creator = true
+        reshare.is_following_creator = true
       } else {
-        reshare.long_video.is_following_creator = false
+        reshare.is_following_creator = false
       }
-      if (reshare.long_video.community) {
+      if (reshare.long_video?.community) {
         const isFollowing = reshare.long_video.community.followers.some(
           (followerId) => followerId.toString() === userId
         )
-        reshare.long_video.is_following_community = isFollowing
+        reshare.is_following_community = isFollowing
       }
-      if(reshare.long_video.start_time && reshare.long_video.display_till_time){
-        reshare.long_video.start_time = reshare.long_video.start_time
-        reshare.long_video.display_till_time = reshare.long_video.display_till_time
+      if (
+        reshare.long_video?.start_time &&
+        reshare.long_video?.display_till_time
+      ) {
+        reshare.start_time = reshare.long_video?.start_time
+        reshare.display_till_time = reshare.long_video?.display_till_time
       }
     })
 
