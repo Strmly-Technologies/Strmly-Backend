@@ -287,7 +287,6 @@ const checkAccess = async (video, userId) => {
   }
 }
 
-// ...rest of existing code...
 
 const addUserInterest = async (req, res, next) => {
   try {
