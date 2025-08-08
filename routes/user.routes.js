@@ -147,4 +147,6 @@ router.get('/videos/:id', authenticateToken, GetUserVideosById)
 // Check if user has creator pass for specific creator
 router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass)
 
+router.get('/reshares/:id', authenticateToken, getResharesOfOtherUser)
+
 module.exports = router

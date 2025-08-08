@@ -2,6 +2,8 @@ const User = require('../models/User')
 const LongVideo = require('../models/LongVideo')
 const Reshare = require('../models/Reshare')
 const { handleError } = require('../utils/utils')
+const { checkCreatorPassAccess } = require('./creatorpass.controller')
+const UserAccess = require('../models/UserAccess')
 
 const getPersonalizedVideoRecommendations = async (req, res, next) => {
   try {
@@ -44,8 +46,11 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         .sort({ views: -1, likes: -1 })
         .limit(Math.ceil(batchSize * 0.7))
 
-      // add if user is following the creator
-      interestedVideos.forEach((video) => {
+      // Process each video with access check
+      for (let i = 0; i < interestedVideos.length; i++) {
+        let video = interestedVideos[i].toObject() // Convert to plain object
+
+        // Add following status
         if (
           video.created_by &&
           followingIds.includes(video.created_by._id.toString())
@@ -54,6 +59,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         } else {
           video.is_following_creator = false
         }
+
         if (video.community) {
           const isFollowing = video.community.followers.some(
             (followerId) => followerId.toString() === userId
@@ -64,7 +70,11 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           video.start_time = video.start_time
           video.display_till_time = video.display_till_time
         } */
-      })
+
+        // Check access and add access field
+        video = await checkAccess(video, userId)
+        interestedVideos[i] = video
+      }
 
       recommendedVideos.push(...interestedVideos)
     }
@@ -104,7 +114,11 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         .sort({ views: -1, likes: -1 })
         .limit(Math.floor(batchSize * 0.3) + 1)
 
-      randomVideos.forEach((video) => {
+      // Process each random video with access check
+      for (let i = 0; i < randomVideos.length; i++) {
+        let video = randomVideos[i].toObject() // Convert to plain object
+
+        // Add following status
         if (
           video.created_by &&
           followingIds.includes(video.created_by._id.toString())
@@ -113,6 +127,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         } else {
           video.is_following_creator = false
         }
+
         if (video.community) {
           const isFollowing = video.community.followers.some(
             (followerId) => followerId.toString() === userId
@@ -123,14 +138,20 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           video.start_time = video.start_time
           video.display_till_time = video.display_till_time
         } */
-      })
+
+        // Check access and add access field
+        video = await checkAccess(video, userId)
+        randomVideos[i] = video
+      }
+
       recommendedVideos.push(...randomVideos)
     }
 
     // Get reshared videos - Only from users that the current user follows
     const resharedVideoSkip = (page - 1) * 2
     const resharedVideos = await Reshare.find({
-      user: { $in: followingIds }, // Only get reshares from followed users
+      user: { $in: followingIds },
+      long_video: { $ne: null }, // Filter out null long_video entries
     })
       .lean()
       .sort({ createdAt: -1 })
@@ -145,34 +166,41 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           { path: 'community', select: 'name profile_photo followers _id' },
         ],
       })
-    resharedVideos.forEach((reshare) => {
-      if (
-        reshare.long_video?.created_by &&
-        followingIds.includes(reshare.long_video?.created_by._id.toString())
-      ) {
-        reshare.is_following_creator = true
-      } else {
-        reshare.is_following_creator = false
+
+    // Process reshared videos with access check
+    for (let i = 0; i < resharedVideos.length; i++) {
+      const reshare = resharedVideos[i]
+
+      if (reshare.long_video) {
+        let video = reshare.long_video.toObject() // Convert to plain object
+
+        // Add following status
+        if (
+          video.created_by &&
+          followingIds.includes(video.created_by._id.toString())
+        ) {
+          video.is_following_creator = true
+        } else {
+          video.is_following_creator = false
+        }
+
+        if (video.community) {
+          const isFollowing = video.community.followers.some(
+            (followerId) => followerId.toString() === userId
+          )
+          video.is_following_community = isFollowing
+        }
+
+        // Check access and add access field
+        video = await checkAccess(video, userId)
+        resharedVideos[i].long_video = video
       }
-      if (reshare.long_video?.community) {
-        const isFollowing = reshare.long_video.community.followers.some(
-          (followerId) => followerId.toString() === userId
-        )
-        reshare.is_following_community = isFollowing
-      }
-      if (
-        reshare.long_video?.start_time &&
-        reshare.long_video?.display_till_time
-      ) {
-        reshare.start_time = reshare.long_video?.start_time
-        reshare.display_till_time = reshare.long_video?.display_till_time
-      }
-    })
+    }
 
     // Shuffle the combined array for better variety
     recommendedVideos = shuffleArray(recommendedVideos)
 
-    // we limit to requested batch size
+    // Limit to requested batch size
     recommendedVideos = recommendedVideos.slice(0, batchSize)
 
     res.status(200).json({
@@ -189,6 +217,98 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
     })
   } catch (error) {
     handleError(error, req, res, next)
+  }
+}
+
+// Fixed checkAccess function
+const checkAccess = async (video, userId) => {
+  try {
+    if (video.type === 'Free') {
+      video.access = {
+        isPlayable: true,
+        freeRange: {
+          start_time: video.start_time || 0,
+          display_till_time: video.display_till_time || 0,
+        },
+        isPurchased: true,
+        accessType: 'free',
+      }
+    } else if (video.type === 'Paid') {
+      // Check if user has creator pass access
+      const hasCreatorPass = await checkCreatorPassAccess(
+        userId,
+        video.created_by._id.toString()
+      )
+
+      if (hasCreatorPass.hasAccess) {
+        video.access = {
+          isPlayable: true,
+          freeRange: {
+            start_time: video.start_time || 0,
+            display_till_time: video.display_till_time || 0,
+          },
+          isPurchased: true,
+          accessType: 'creator_pass',
+        }
+      } else {
+        // Check if user has purchased the video
+        const hasPurchasedVideo = await UserAccess.findOne({
+          user_id: userId,
+          content_id: video._id,
+          content_type: 'video',
+          access_type: 'paid',
+        })
+
+        if (hasPurchasedVideo) {
+          video.access = {
+            isPlayable: true,
+            freeRange: {
+              start_time: video.start_time || 0,
+              display_till_time: video.display_till_time || 0,
+            },
+            isPurchased: true,
+            accessType: 'purchased',
+          }
+        } else {
+          video.access = {
+            isPlayable: false,
+            freeRange: {
+              start_time: video.start_time || 0,
+              display_till_time: video.display_till_time || 0,
+            },
+            isPurchased: false,
+            accessType: 'limited',
+            price: video.amount || 0,
+          }
+        }
+      }
+    } else {
+      // Default access for unknown type
+      video.access = {
+        isPlayable: false,
+        freeRange: {
+          start_time: video.start_time || 0,
+          display_till_time: video.display_till_time || 0,
+        },
+        isPurchased: false,
+        accessType: 'unknown',
+      }
+    }
+
+    return video
+  } catch (error) {
+    console.error('Error checking video access:', error)
+    // Return video with limited access if error occurs
+    video.access = {
+      isPlayable: false,
+      freeRange: {
+        start_time: video.start_time || 0,
+        display_till_time: video.display_till_time || 0,
+      },
+      isPurchased: false,
+      accessType: 'error',
+    }
+    return video
   }
 }
 

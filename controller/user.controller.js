@@ -1987,6 +1987,34 @@ const getUserReshares = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
+const getResharesOfOtherUser = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    if (!id) {
+      return res.status(400).json({ message: 'User ID is required' })
+    }
+    const reshares = await Reshare.find({ user: id }).populate({
+      path: 'long_video',
+      select:
+        'name description videoUrl thumbnailUrl created_by likes views reshares createdAt',
+      populate: {
+        path: 'created_by',
+        select: 'username profile_photo',
+      },
+    })
+    if (!reshares || reshares.length === 0) {
+      return res
+        .status(404)
+        .json({ message: 'No reshares found for this user' })
+    }
+    return res.status(200).json({
+      message: 'User reshares retrieved successfully',
+      reshares,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
 
 const getUserInterests = async (req, res, next) => {
   try {
