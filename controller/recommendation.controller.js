@@ -48,7 +48,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
       // Process each video with access check
       for (let i = 0; i < interestedVideos.length; i++) {
-        let video = interestedVideos[i].toObject() // Convert to plain object
+        let video = interestedVideos[i] // Convert to plain object
 
         // Add following status
         if (
@@ -116,7 +116,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
       // Process each random video with access check
       for (let i = 0; i < randomVideos.length; i++) {
-        let video = randomVideos[i].toObject() // Convert to plain object
+        let video = randomVideos[i] // Convert to plain object
 
         // Add following status
         if (
@@ -172,7 +172,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       const reshare = resharedVideos[i]
 
       if (reshare.long_video) {
-        let video = reshare.long_video.toObject() // Convert to plain object
+        let video = reshare.long_video // Convert to plain object
 
         // Add following status
         if (
