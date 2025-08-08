@@ -32,6 +32,7 @@ const {
   getUserInterests,
   getMonetizationStatus,
   toggleVideoMonetization,
+  getResharesOfOtherUser,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -116,6 +117,8 @@ router.get('/history', authenticateToken, getUserHistory)
 //get user reshared videos
 router.get('/reshares', authenticateToken, getUserReshares)
 
+
+
 router.post('/reshare/status', authenticateToken, GetStatusOfReshare)
 
 // Get user liked videos in a community
@@ -154,5 +157,7 @@ router.get('/videos/:id', authenticateToken, GetUserVideosById)
 
 // Check if user has creator pass for specific creator
 router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass)
+
+router.get('/reshares/:id', authenticateToken, getResharesOfOtherUser)
 
 module.exports = router
