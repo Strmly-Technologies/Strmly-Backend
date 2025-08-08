@@ -216,7 +216,7 @@ const uploadVideo = async (req, res, next) => {
       display_till_time: display_till_time ? Number(display_till_time) : 0,
       subtitles: [],
       is_standalone: is_standalone === 'true',
-      is_monetized: user.video_monetization_enabled,
+      
     }
     let savedVideo = new LongVideo(longVideo)
 

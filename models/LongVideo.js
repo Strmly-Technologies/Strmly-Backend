@@ -152,7 +152,7 @@ const longVideoSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    is_monetized: { type: Boolean, default: false },
+
     gifts: { type: Number, default: 0 },
     gifted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },

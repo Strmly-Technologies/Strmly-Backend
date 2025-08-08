@@ -5,7 +5,10 @@ const Series = require('../models/Series')
 const { handleError } = require('../utils/utils')
 const { handleFounderLeaving } = require('./community.controller')
 const Report = require('../models/Report')
-const { sendAccountDeletionRequestEmail, sendDeletionRequestEmailToUser } = require('../utils/email')
+const {
+  sendAccountDeletionRequestEmail,
+  sendDeletionRequestEmailToUser,
+} = require('../utils/email')
 
 const DeleteLongVideo = async (req, res, next) => {
   const { videoId } = req.params
@@ -284,7 +287,7 @@ const RemoveVideoFromCommunity = async (req, res, next) => {
 
 const UnfollowCommunity = async (req, res, next) => {
   const { communityId } = req.body
-  const userId = req.user.id
+  const userId = req.user.id.toString()
 
   if (!communityId) {
     return res.status(400).json({ message: 'Community ID is required' })
@@ -309,7 +312,9 @@ const UnfollowCommunity = async (req, res, next) => {
       $pull: { followers: userId },
     })
 
-    await User.findByIdAndUpdate(userId, { $pull: { community: communityId } })
+    await User.findByIdAndUpdate(userId, {
+      $pull: { following_communities: communityId },
+    })
 
     res.status(200).json({
       message: 'Successfully unfollowed the community',
@@ -525,30 +530,32 @@ const getUserReports = async (req, res, next) => {
 
 const requestAccountDeletion = async (req, res, next) => {
   const userId = req.user.id
-  
+
   try {
     const user = await User.findById(userId)
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'User not found' 
+        message: 'User not found',
       })
     }
 
     // Check if user has already requested deletion
     if (user.account_status.is_deactivated) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Account is already deactivated. Please contact support.' 
+        message: 'Account is already deactivated. Please contact support.',
       })
     }
 
     if (user.deletion_requested) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'Deletion request already exists',
         requestedAt: user.deletion_requested_at,
-        estimatedDeletionDate: new Date(user.deletion_requested_at.getTime() + 30 * 24 * 60 * 60 * 1000)
+        estimatedDeletionDate: new Date(
+          user.deletion_requested_at.getTime() + 30 * 24 * 60 * 60 * 1000
+        ),
       })
     }
 
@@ -557,8 +564,9 @@ const requestAccountDeletion = async (req, res, next) => {
     if (hasActiveCreatorPass) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot delete account with active Creator Pass. Please disable it first.',
-        code: 'ACTIVE_CREATOR_PASS'
+        message:
+          'Cannot delete account with active Creator Pass. Please disable it first.',
+        code: 'ACTIVE_CREATOR_PASS',
       })
     }
 
@@ -569,14 +577,14 @@ const requestAccountDeletion = async (req, res, next) => {
     // Send email to admin
     const deleteEmailResult = await sendAccountDeletionRequestEmail(
       user.email,
-      user.username,
+      user.username
     )
     if (!deleteEmailResult.success) {
       // Rollback the deletion request if email fails
       user.deletion_requested = false
       user.deletion_requested_at = null
       await user.save()
-      
+
       return res.status(500).json({
         success: false,
         message: 'Failed to send account deletion request email',
@@ -587,10 +595,13 @@ const requestAccountDeletion = async (req, res, next) => {
     // Send confirmation email to user
     const deletionRequestEmailResult = await sendDeletionRequestEmailToUser(
       user.email,
-      user.username,
+      user.username
     )
     if (!deletionRequestEmailResult.success) {
-      console.error('Failed to send user confirmation email:', deletionRequestEmailResult.error)
+      console.error(
+        'Failed to send user confirmation email:',
+        deletionRequestEmailResult.error
+      )
     }
 
     res.status(200).json({
@@ -598,11 +609,12 @@ const requestAccountDeletion = async (req, res, next) => {
       message: 'Account deletion request submitted successfully',
       deletionRequest: {
         requestedAt: user.deletion_requested_at,
-        estimatedDeletionDate: new Date(user.deletion_requested_at.getTime() + 30 * 24 * 60 * 60 * 1000),
-        note: 'Your account will be deleted within 30-45 days. You can contact support to cancel this request.'
-      }
+        estimatedDeletionDate: new Date(
+          user.deletion_requested_at.getTime() + 30 * 24 * 60 * 60 * 1000
+        ),
+        note: 'Your account will be deleted within 30-45 days. You can contact support to cancel this request.',
+      },
     })
-    
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -616,7 +628,7 @@ const cancelAccountDeletionRequest = async (req, res, next) => {
     if (!password) {
       return res.status(400).json({
         success: false,
-        message: 'Password is required to cancel deletion request'
+        message: 'Password is required to cancel deletion request',
       })
     }
 
@@ -624,14 +636,14 @@ const cancelAccountDeletionRequest = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found',
       })
     }
 
     if (!user.deletion_requested) {
       return res.status(400).json({
         success: false,
-        message: 'No deletion request found to cancel'
+        message: 'No deletion request found to cancel',
       })
     }
 
@@ -640,17 +652,19 @@ const cancelAccountDeletionRequest = async (req, res, next) => {
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid password'
+        message: 'Invalid password',
       })
     }
 
     // Check if still within cancellable period (e.g., 30 days)
-    const daysSinceRequest = (new Date() - user.deletion_requested_at) / (1000 * 60 * 60 * 24)
+    const daysSinceRequest =
+      (new Date() - user.deletion_requested_at) / (1000 * 60 * 60 * 24)
     if (daysSinceRequest > 30) {
       return res.status(400).json({
         success: false,
-        message: 'Deletion request can no longer be cancelled. Please contact support.',
-        daysSinceRequest: Math.floor(daysSinceRequest)
+        message:
+          'Deletion request can no longer be cancelled. Please contact support.',
+        daysSinceRequest: Math.floor(daysSinceRequest),
       })
     }
 
@@ -661,9 +675,8 @@ const cancelAccountDeletionRequest = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Account deletion request cancelled successfully'
+      message: 'Account deletion request cancelled successfully',
     })
-
   } catch (error) {
     handleError(error, req, res, next)
   }

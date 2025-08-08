@@ -15,13 +15,12 @@ const GetUserFeed = async (req, res, next) => {
     const skip = (page - 1) * (limit - 2)
     const resharedVideoSkip = (page - 1) * 2
 
-    const user = await User.findById(userId)
-      .populate('following', '_id')
-      .populate('community', '_id')
-      .select('following community interests viewed_videos')
+    const user = await User.findById(userId).select(
+      'following following_communities interests viewed_videos'
+    )
 
     const followingIds = user.following.map((f) => f._id)
-    const communityIds = user.community.map((c) => c._id)
+    const communityIds = user.following_communities.map((c) => c._id)
     const viewedVideoIds = user.viewed_videos || []
 
     // Get feed videos from following and communities (excluding already viewed)
@@ -290,13 +289,13 @@ const GetUserCommunities = async (req, res, next) => {
         .populate('creators', 'username profile_photo')
     } else if (type === 'joined') {
       const user = await User.findById(userId).populate({
-        path: 'community',
+        path: 'following_communities',
         populate: {
           path: 'founder',
           select: 'username profile_photo',
         },
       })
-      communities = user.community
+      communities = user.following_communities
     } else if (type === 'following') {
       const user = await User.findById(userId).populate({
         path: 'following_communities',
@@ -311,25 +310,17 @@ const GetUserCommunities = async (req, res, next) => {
         .populate('followers', 'username profile_photo')
         .populate('creators', 'username profile_photo')
 
-      const user = await User.findById(userId)
-        .populate({
-          path: 'community',
-          populate: {
-            path: 'founder',
-            select: 'username profile_photo',
-          },
-        })
-        .populate({
-          path: 'following_communities',
-          populate: {
-            path: 'founder',
-            select: 'username profile_photo',
-          },
-        })
+      const user = await User.findById(userId).populate({
+        path: 'following_communities',
+        populate: {
+          path: 'founder',
+          select: 'username profile_photo',
+        },
+      })
 
       communities = {
         created: createdCommunities,
-        joined: user.community,
+        joined: user.following_communities,
         following: user.following_communities,
       }
     }
@@ -569,7 +560,7 @@ const GetUserNotifications = async (req, res, next) => {
         videoId: video._id,
         avatar: comment.user.profile_photo,
         timeStamp: comment.createdAt,
-        is_monetized: comment.is_monetized,
+
         read: false,
         URL: `/api/v1/videos/${video._id}`,
       }))
@@ -969,8 +960,9 @@ const GetUserProfileById = async (req, res, next) => {
             (follower) => follower._id.toString() === userid.toString()
           ) || false
       ) || []
-      // creator pass details
-      const creatorPriceDetails=userDetails.creator_profile.creator_pass_price||0
+    // creator pass details
+    const creatorPriceDetails =
+      userDetails.creator_profile.creator_pass_price || 0
     const result = {
       message: 'User profile details retrieved successfully',
       user: {
@@ -1554,13 +1546,13 @@ const getUserDashboardAnalytics = async (req, res, next) => {
         .populate('creators', 'username profile_photo')
 
       const user = await User.findById(userId).populate({
-        path: 'community',
+        path: 'following_communities',
         populate: {
           path: 'founder',
           select: 'username profile_photo',
         },
       })
-      const joinedCommunities = user.community
+      const joinedCommunities = user.following_communities
       userComunities.created = createdCommunities
       userComunities.joined = joinedCommunities
       response.communities = userComunities

@@ -13,7 +13,7 @@ const commentSchema = new mongoose.Schema(
       ref: 'Comment',
       default: null,
     },
-    is_monetized: { type: Boolean, default: false },
+
     content: { type: String, required: true, trim: true, maxlength: 500 },
     likes: { type: Number, default: 0 },
     upvotes: { type: Number, default: 0 },

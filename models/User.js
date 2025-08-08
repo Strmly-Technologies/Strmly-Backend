@@ -52,13 +52,13 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
     community: {
-      //user joined communities
+      //all communities
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Community',
       default: [],
     },
     following_communities: {
-      //user following communities
+      //user following/joined communities
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'Community',
       default: [],
@@ -128,18 +128,18 @@ const userSchema = new mongoose.Schema(
     date_of_birth: {
       type: Date,
     },
-      interests: {
-        type: [String],
-        default: [],
-      },
-      interest1:{
-        type:[String],
-        default: [],
-      },
-      interest2:{
-        type:[String],
-        default: [],
-      },
+    interests: {
+      type: [String],
+      default: [],
+    },
+    interest1: {
+      type: [String],
+      default: [],
+    },
+    interest2: {
+      type: [String],
+      default: [],
+    },
     viewed_videos: {
       type: [mongoose.Schema.Types.ObjectId],
       ref: 'LongVideo',
@@ -166,7 +166,7 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
     comment_monetization_enabled: { type: Boolean, default: false },
-    video_monetization_enabled: { type: Boolean, default: false },
+
     creator_profile: {
       bank_details: {
         account_number: String,
