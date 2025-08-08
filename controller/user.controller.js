@@ -2075,4 +2075,5 @@ module.exports = {
   getUserReshares,
   getUserInterests,
   getMonetizationStatus,
+  getResharesOfOtherUser,
 }

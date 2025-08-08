@@ -31,6 +31,7 @@ const {
   getUserReshares,
   getUserInterests,
   getMonetizationStatus,
+  getResharesOfOtherUser,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
