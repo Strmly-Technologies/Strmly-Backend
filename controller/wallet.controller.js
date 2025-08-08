@@ -117,7 +117,7 @@ const createWalletLoadOrder = async (req, res, next) => {
       })
     }
 
-    const wallet = await Wallet.find({ user_id: userId })
+    const wallet = await Wallet.findOne({ user_id: userId })
     if (!wallet) {
       return res.status(404).json({
         error: 'Wallet not found',
@@ -274,7 +274,7 @@ const verifyWalletLoad = async (req, res, next) => {
       })
     }
 
-    const wallet = await Wallet.find({ user_id: userId })
+    const wallet = await Wallet.findOne({ user_id: userId })
     if (!wallet) {
       return res.status(404).json({
         success: false,
@@ -456,7 +456,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
       })
     }
 
-    const buyerWallet = await Wallet.find({ user_id: buyerId })
+    const buyerWallet = await Wallet.findOne({ user_id: buyerId })
     if (!buyerWallet) {
       return res.status(404).json({
         success: false,
@@ -464,7 +464,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
         code: 'BUYER_WALLET_NOT _FOUND',
       })
     }
-    const creatorWallet = await Wallet.find({ user_id: creatorId })
+    const creatorWallet = await Wallet.findOne({ user_id: creatorId })
     if (!creatorWallet) {
       return res.status(404).json({
         success: false,
@@ -567,7 +567,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
             balance_before: buyerBalanceBefore,
             balance_after: buyerBalanceAfter,
             content_id: seriesId,
-            content_type: 'series',
+            content_type: 'Series',
             status: 'completed',
             metadata: {
               series_title: series.title,
@@ -700,7 +700,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
           balance_before: buyerBalanceBefore,
           balance_after: buyerBalanceAfter,
           content_id: seriesId,
-          content_type: 'series',
+          content_type: 'Series',
           status: 'completed',
           metadata: {
             series_title: series.title,
@@ -933,8 +933,16 @@ const transferCommunityFee = async (req, res, next) => {
       })
     }
 
+    if (amount !== community.community_fee_amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount does not match the community fee',
+        code: 'COMMUNITY_FEE_MISMATCH',
+      })
+    }
+
     // Get wallets
-    const creatorWallet = await Wallet.find({ user_id: creatorId })
+    const creatorWallet = await Wallet.findOne({ user_id: creatorId })
     if (!creatorWallet) {
       return res.status(404).json({
         success: false,
@@ -942,7 +950,7 @@ const transferCommunityFee = async (req, res, next) => {
         code: 'CREATOR_WALLET_NOT _FOUND',
       })
     }
-    const founderWallet = await Wallet.find({ user_id: founderId })
+    const founderWallet = await Wallet.findOne({ user_id: founderId })
     if (!founderWallet) {
       return res.status(404).json({
         success: false,
@@ -1192,13 +1200,11 @@ const transferCommunityFee = async (req, res, next) => {
             'Your subscription will need to be renewed after 30 days',
         },
       })
+      // eslint-disable-next-line no-useless-catch
     } catch (transactionError) {
-      await session.abortTransaction()
       throw transactionError
     } finally {
-      if (session.inTransaction()) {
-        await session.endSession()
-      }
+      await session.endSession()
     }
   } catch (error) {
     handleError(error, req, res, next)

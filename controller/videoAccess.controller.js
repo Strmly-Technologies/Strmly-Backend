@@ -408,7 +408,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
         buyerWallet.total_spent += amount
         creatorWallet.balance += amount
         creatorWallet.total_received += amount
-     
+
         await buyerWallet.save({ session })
         await creatorWallet.save({ session })
 
@@ -438,7 +438,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
           balance_before: buyerWallet.balance + amount,
           balance_after: buyerWallet.balance,
           content_id: id,
-          content_type: 'video',
+          content_type: 'LongVideo',
           status: 'completed',
         })
 
@@ -453,7 +453,7 @@ const purchaseIndividualVideo = async (req, res, next) => {
           balance_before: creatorWallet.balance - amount,
           balance_after: creatorWallet.balance,
           content_id: id,
-          content_type: 'video',
+          content_type: 'LongVideo',
           status: 'completed',
         })
 

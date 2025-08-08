@@ -17,6 +17,12 @@ const CreateCommunity = async (req, res, next) => {
     })
   }
 
+  if (type === 'paid' && !amount) {
+    return res.status(400).json({
+      message: 'Community fee amount must be provided for paid communities',
+    })
+  }
+
   try {
     const newCommunity = new Community({
       name,

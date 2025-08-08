@@ -66,7 +66,7 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     content_type: {
       type: String,
-      enum: ['Series', 'LongVideo', 'series'],
+      enum: ['Series', 'LongVideo', 'Community', 'CreatorPass'],
     },
     transfer_id: {
       type: mongoose.Schema.Types.ObjectId,

@@ -232,7 +232,7 @@ const purchaseCreatorPassWithWallet = async (req, res, next) => {
           balance_before: userBalanceBefore,
           balance_after: userBalanceAfter,
           content_id: creatorId,
-          content_type: 'creator',
+          content_type: 'CreatorPass',
           status: 'completed',
           metadata: {
             creator_name: creator.username,
@@ -255,7 +255,7 @@ const purchaseCreatorPassWithWallet = async (req, res, next) => {
           balance_before: creatorBalanceBefore,
           balance_after: creatorBalanceAfter,
           content_id: userId,
-          content_type: 'creator_pass',
+          content_type: 'CreatorPass',
           status: 'completed',
           metadata: {
             buyer_name: req.user.username,

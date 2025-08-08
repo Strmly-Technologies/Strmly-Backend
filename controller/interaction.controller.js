@@ -765,7 +765,7 @@ const GiftComment = async (req, res, next) => {
     }
 
     // Get wallets
-    const gifterWallet = await Wallet.find({ user_id: gifterId })
+    const gifterWallet = await Wallet.findOne({ user_id: gifterId })
     if (!gifterWallet) {
       return res.status(400).json({
         success: false,
@@ -773,7 +773,7 @@ const GiftComment = async (req, res, next) => {
         code: 'GIFTER_WALLET_NOT_FOUND',
       })
     }
-    const receiverWallet = await Wallet.find({ user_id: commentAuthorId })
+    const receiverWallet = await Wallet.findOne({ user_id: commentAuthorId })
     if (!receiverWallet) {
       return res.status(400).json({
         success: false,
@@ -1041,7 +1041,7 @@ const GiftVideo = async (req, res, next) => {
     }
 
     // Get wallets
-    const gifterWallet = await Wallet.find({ user_id: gifterId })
+    const gifterWallet = await Wallet.findOne({ user_id: gifterId })
     if (!gifterWallet) {
       return res.status(400).json({
         success: false,
@@ -1049,7 +1049,7 @@ const GiftVideo = async (req, res, next) => {
         code: 'GIFTER_WALLET_NOT_FOUND',
       })
     }
-    const receiverWallet = await Wallet.find({ user_id: videoCreatorId })
+    const receiverWallet = await Wallet.findOne({ user_id: videoCreatorId })
     if (!receiverWallet) {
       return res.status(400).json({
         success: false,
@@ -1135,7 +1135,7 @@ const GiftVideo = async (req, res, next) => {
 
         receiverWallet.balance = receiverBalanceAfter
         receiverWallet.total_received += amount
-    
+
         receiverWallet.last_transaction_at = new Date()
         await receiverWallet.save({ session })
 
@@ -1220,7 +1220,7 @@ const GiftVideo = async (req, res, next) => {
           videoTitle: video.name,
 
           giftNote: 'video gift',
-          transferType: 'comment_gift',
+          transferType: 'video_gift',
         },
         gifter: {
           balanceBefore: gifterBalanceBefore,
