@@ -15,6 +15,7 @@ const seriesAnalyticsRoutes = require('./routes/seriesAnalytics.routes')
 const communityAnalyticsRoutes = require('./routes/communityAnalytics.routes')
 const recommendationRoutes= require('./routes/recommendation.routes')
 const testRoutes= require('./routes/test.routes')
+const creatorRoutes=require('./routes/creatorpass.routes')
 
 const walletRoutes = require('./routes/wallet.routes')
 const withdrawalRoutes = require('./routes/withdrawal.routes')
@@ -73,6 +74,7 @@ app.use('/api/v1/wallet', walletRoutes)
 app.use('/api/v1/withdrawal', withdrawalRoutes)
 app.use('/api/v1/webhooks', webhookRoutes)
 app.use('/api/v1/admin', adminRoutes)
+app.use('/api/v1/creator-pass', creatorRoutes)
 
 app.get('/health', (req, res) => {
   res.send('Server is healthy')
