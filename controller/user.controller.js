@@ -98,7 +98,7 @@ const GetUserFeed = async (req, res, next) => {
       .populate('user', 'username profile_photo')
       .populate({
         path: 'long_video',
-        select: 'thumbnailUrl name description _id',
+        select: 'thumbnailUrl name description _id videoResolutions',
         populate: [
           { path: 'created_by', select: 'username profile_photo _id' },
           { path: 'community', select: 'name profile_photo followers _id' },
