@@ -102,6 +102,7 @@ const uploadVideo = async (req, res, next) => {
       amount,
     } = req.body
 
+
     if (!userId) {
       console.error(' User ID not found in request')
       return res.status(400).json({ error: 'User ID is required' })
@@ -124,7 +125,7 @@ const uploadVideo = async (req, res, next) => {
         error: 'episodeNumber and seriesId required for non-standalone videos',
       })
     }
-    if ((type === 'Paid') & (!amount || amount <= 0)) {
+    if ((type === 'Paid') && (!amount || amount <= 0)) {
       console.error(
         'Amount has to be included and should be greater than 0 for paid videos'
       )
@@ -209,6 +210,7 @@ const uploadVideo = async (req, res, next) => {
       type: type || 'Free',
       series: seriesId || null,
       episode_number: episodeNumber || null,
+      amount: type === 'Paid' ? Number(amount) : 0,
       age_restriction:
         age_restriction === 'true' || age_restriction === true || false,
       Videolanguage: language || 'English',

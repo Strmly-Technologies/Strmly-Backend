@@ -1235,7 +1235,6 @@ const getWalletDetails = async (req, res, next) => {
     })
       .populate('sender_id', 'username')
       .populate('receiver_id', 'username')
-      .populate('content_id', 'title name')
       .sort({ createdAt: -1 })
       .limit(10)
       .lean()
