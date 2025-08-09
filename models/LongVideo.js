@@ -1,5 +1,19 @@
 const mongoose = require('mongoose')
 const { Schema } = mongoose
+
+const formatDuration = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '00:00:00';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  return [hours, minutes, secs]
+    .map(val => val.toString().padStart(2, '0'))
+    .join(':');
+}
+
+
 const longVideoSchema = new mongoose.Schema(
   {
     name: {
@@ -30,7 +44,17 @@ const longVideoSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-
+    duration: {
+      type: Number,
+      default: 0,
+    },
+     duration_formatted:{
+      type: String,
+      default: '00:00:00',
+      get: function () {
+        return formatDuration(this.duration)
+      },
+    },
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {
