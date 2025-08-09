@@ -9,7 +9,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
     const page = parseInt(req.query.page) || 1
-    const batchSize = parseInt(req.query.batchSize) || 5
+    const batchSize = parseInt(req.query.batchSize) || 20
 
     const user = await User.findById(userId).select(
       'interests viewed_videos following'
@@ -86,6 +86,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       'Drama',
       'Horror',
       'Sci-Fi',
+      'Sci-Fi & Fantasy',
       'Romance',
       'Documentary',
       'Thriller',
