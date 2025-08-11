@@ -36,7 +36,7 @@ const GetUserFeed = async (req, res, next) => {
         { _id: { $nin: viewedVideoIds } },
       ],
     })
-      .populate('created_by', 'username profile_photo')
+      .populate('created_by', 'username profile_photo custom_name')
       .populate('community', 'name profile_photo _id followers')
       .populate(
         'series',
@@ -171,8 +171,8 @@ const UpdateUserProfile = async (req, res, next) => {
       bio,
       date_of_birth,
       interests,
-      uniqueId,
       content_interests,
+      custom_name,
     } = req.body
     const profilePhotoFile = req.file
 
@@ -180,8 +180,8 @@ const UpdateUserProfile = async (req, res, next) => {
     if (username) updateData.username = username
     if (bio !== undefined) updateData.bio = bio
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth
-    if (uniqueId) updateData.uniqueId = uniqueId
     if (content_interests) updateData.content_interests = content_interests
+    if (custom_name) updateData.custom_name = custom_name
 
     // Parse interests from JSON string
     if (interests) {
@@ -209,16 +209,6 @@ const UpdateUserProfile = async (req, res, next) => {
       }
     }
 
-    // Check for unique uniqueId
-    if (uniqueId) {
-      const existingUserWithUniqueId = await User.findOne({
-        uniqueId,
-        _id: { $ne: userId },
-      })
-      if (existingUserWithUniqueId) {
-        return res.status(400).json({ message: 'Unique ID already taken' })
-      }
-    }
 
     // Handle profile photo upload
     if (profilePhotoFile) {
