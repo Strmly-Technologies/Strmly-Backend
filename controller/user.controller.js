@@ -1336,8 +1336,9 @@ const getUserHistory = async (req, res, next) => {
 const getUserLikedVideosInCommunity = async (req, res, next) => {
   try {
     const userId = req.user.id
-    const { communityId, page = 1, limit = 10 } = req.query
-
+    const { communityId } = req.params
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
     // Validate required parameters
     if (!communityId) {
       return res.status(400).json({ message: 'Community ID is required' })
@@ -1369,7 +1370,7 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
     const user = await User.findById(userId).populate({
       path: 'liked_videos',
       select:
-        '_id name thumbnailUrl description views likes createdAt community created_by',
+        '_id name thumbnailUrl description views likes createdAt community created_by videoResolutions',
       populate: [
         {
           path: 'created_by',
@@ -1418,6 +1419,7 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
       description: video.description,
       views: video.views,
       likes: video.likes,
+      videoResolutions: video.videoResolutions,
       created_by: {
         _id: video.created_by._id,
         username: video.created_by.username,

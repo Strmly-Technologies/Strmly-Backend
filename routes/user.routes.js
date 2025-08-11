@@ -113,7 +113,7 @@ router.post('/reshare/status', authenticateToken, GetStatusOfReshare)
 
 // Get user liked videos in a community
 router.get(
-  '/liked-videos-community',
+  '/liked-videos-community/:communityId',
   authenticateToken,
   getUserLikedVideosInCommunity
 )
