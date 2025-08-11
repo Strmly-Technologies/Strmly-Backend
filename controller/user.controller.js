@@ -38,10 +38,15 @@ const GetUserFeed = async (req, res, next) => {
     })
       .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo _id followers')
-      .populate(
-        'series',
-        'title description price genre episodes seasons total_episodes'
-      )
+      .populate({
+        path: 'series',
+        select: 'title description price genre episodes seasons total_episodes',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      })
+
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit - 2))
@@ -72,6 +77,16 @@ const GetUserFeed = async (req, res, next) => {
       })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo followers _id')
+        .populate({
+          path: 'series',
+          select:
+            'title description price genre episodes seasons total_episodes',
+          populate: {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+        })
+
         .sort({ views: -1, likes: -1 })
         .limit(3)
     }
@@ -98,10 +113,19 @@ const GetUserFeed = async (req, res, next) => {
       .populate('user', 'username profile_photo')
       .populate({
         path: 'long_video',
-        select: 'thumbnailUrl name description _id videoResolutions',
+        select: 'thumbnailUrl name description _id videoResolutions series',
         populate: [
           { path: 'created_by', select: 'username profile_photo _id' },
           { path: 'community', select: 'name profile_photo followers _id' },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
         ],
       })
 
@@ -948,19 +972,11 @@ const GetUserProfileById = async (req, res, next) => {
         (following) => following._id.toString() === userid.toString()
       ) || false
 
-    const videos = await LongVideo.find({ created_by: userId })
-    const myLikedVideos =
-      videos?.filter(
-        (video) =>
-          video.liked_by?.some(
-            (liked_user) => liked_user._id.toString() === userid.toString()
-          ) || false
-      ) || []
     const myFollowingCommunities =
       userDetails.my_communities?.filter(
         (community) =>
-          community.followers?.some(
-            (follower) => follower._id.toString() === userid.toString()
+          community.followers?._id.some(
+            (follower) => follower.toString() === userid.toString()
           ) || false
       ) || []
     // creator pass details
@@ -977,7 +993,6 @@ const GetUserProfileById = async (req, res, next) => {
         totalJoinedCommunities,
         isBeingFollowed,
         isFollowing,
-        myLikedVideos,
         myFollowingCommunities,
         creatorPriceDetails,
       },
@@ -2046,6 +2061,23 @@ const getMonetizationStatus = async (req, res, next) => {
   }
 }
 
+const GetLikedVideosInProfileById = async (req, res, next) => {
+  try {
+    const profileId = req.params.id
+    const userId = req.user.id.toString()
+    const videos = await LongVideo.find({ created_by: profileId }).lean()
+    const myLikedVideos = videos?.filter((video) =>
+      video.liked_by?.some((liked_user) => liked_user.toString() === userId)
+    )
+    return res.status(200).json({
+      message: 'User liked videos in the profile retrieved successfully',
+      data: myLikedVideos,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -2078,4 +2110,5 @@ module.exports = {
   getUserInterests,
   getMonetizationStatus,
   getResharesOfOtherUser,
+  GetLikedVideosInProfileById,
 }

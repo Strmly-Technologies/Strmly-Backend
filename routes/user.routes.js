@@ -32,6 +32,7 @@ const {
   getUserInterests,
   getMonetizationStatus,
   getResharesOfOtherUser,
+  GetLikedVideosInProfileById,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -141,6 +142,13 @@ router.get(
 )
 // Get user profile by ID
 router.get('/profile/:id', authenticateToken, GetUserProfileById)
+
+// Get user's liked videos in a profile by ID
+router.get(
+  '/profile/:id/liked-videos',
+  authenticateToken,
+  GetLikedVideosInProfileById
+)
 
 // Get user videos by ID
 router.get('/videos/:id', authenticateToken, GetUserVideosById)

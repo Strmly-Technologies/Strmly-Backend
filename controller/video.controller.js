@@ -777,10 +777,14 @@ const getTrendingVideos = async (req, res, next) => {
     let videos = await LongVideo.find({})
       .populate('created_by', 'username email profile_photo')
       .populate('community', 'name profile_photo followers')
-      .populate(
-        'series',
-        'title description total_episodes bannerUrl posterUrl _id created_by episodes'
-      )
+      .populate({
+        path: 'series',
+        select: 'title description price genre episodes seasons total_episodes',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      })
       .sort({ views: -1, likes: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))

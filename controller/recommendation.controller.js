@@ -36,12 +36,18 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
-          populate: {
-            path: 'episodes',
-            select:
-              'name episode_number season_number thumbnailUrl views likes',
-            options: { sort: { season_number: 1, episode_number: 1 } },
-          },
+          populate: [
+            {
+              path: 'episodes',
+              select:
+                'name episode_number season_number thumbnailUrl views likes',
+              options: { sort: { season_number: 1, episode_number: 1 } },
+            },
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          ],
         })
         .sort({ views: -1, likes: -1 })
         .limit(Math.ceil(batchSize * 0.7))
@@ -105,12 +111,18 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
-          populate: {
-            path: 'episodes',
-            select:
-              'name episode_number season_number thumbnailUrl views likes',
-            options: { sort: { season_number: 1, episode_number: 1 } },
-          },
+          populate: [
+            {
+              path: 'episodes',
+              select:
+                'name episode_number season_number thumbnailUrl views likes',
+              options: { sort: { season_number: 1, episode_number: 1 } },
+            },
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          ],
         })
         .sort({ views: -1, likes: -1 })
         .limit(Math.floor(batchSize * 0.3) + 1)
@@ -161,10 +173,25 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       .populate('user', 'username profile_photo')
       .populate({
         path: 'long_video',
-        select: 'name description thumbnailUrl _id videoResolutions',
+        select: 'name description thumbnailUrl _id videoResolutions series',
         populate: [
           { path: 'created_by', select: 'username profile_photo _id' },
           { path: 'community', select: 'name profile_photo followers _id' },
+          {
+            path: 'series',
+            populate: [
+              {
+                path: 'episodes',
+                select:
+                  'name episode_number season_number thumbnailUrl views likes',
+                options: { sort: { season_number: 1, episode_number: 1 } },
+              },
+              {
+                path: 'created_by',
+                select: 'username profile_photo',
+              },
+            ],
+          },
         ],
       })
 
