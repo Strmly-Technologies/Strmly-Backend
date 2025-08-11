@@ -64,7 +64,7 @@ const sanitizeString = (str, maxLength = 200) => {
 const getOrCreateWallet = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const { walletType = 'user' } = req.body
+    const walletType = req.body?.walletType || 'user'
     const validation = validateObjectId(userId, 'User ID')
     if (!validation.isValid) {
       throw new Error(validation.error)
@@ -398,23 +398,6 @@ const transferToCreatorForSeries = async (req, res, next) => {
         code: 'SERIES_NOT_PAID',
       })
     }
-    const seriesAmount = series.price
-    if (Number(seriesAmount) !== Number(amount)) {
-      // if user amount and series amount are not same
-      return res.status(400).json({
-        success: false,
-        error: 'Series price does not match the provided amount',
-        code: 'SERIES_PRICE_MISMATCH',
-      })
-    }
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Series price is not set or invalid',
-        code: 'INVALID_SERIES_PRICE',
-      })
-    }
 
     const amountValidation = validateAmount(amount, 1, 10000)
     if (!amountValidation.isValid) {
@@ -422,6 +405,15 @@ const transferToCreatorForSeries = async (req, res, next) => {
         success: false,
         error: amountValidation.error,
         code: 'INVALID_AMOUNT',
+      })
+    }
+    const seriesAmount = series.price
+    if (Number(seriesAmount) !== Number(amount)) {
+      // if user amount and series amount are not same
+      return res.status(400).json({
+        success: false,
+        error: 'Series price does not match the provided amount',
+        code: 'SERIES_PRICE_MISMATCH',
       })
     }
 
@@ -448,7 +440,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
       })
     }
 
-    if (creatorId.toString() === buyerId) {
+    if (creatorId === buyerId) {
       return res.status(400).json({
         success: false,
         error: 'You cannot buy your own series',
@@ -555,6 +547,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
           await buyerWallet.save({ session })
           series.locked_earnings += amount
           series.earned_till_date += amount
+          series.total_purchases++
           await series.save({ session })
           const buyerTransaction = new WalletTransaction({
             wallet_id: buyerWallet._id,
@@ -626,12 +619,12 @@ const transferToCreatorForSeries = async (req, res, next) => {
           },
         })
       } catch (transactionError) {
-        await session.abortTransaction()
+        if (session.inTransaction()) {
+          await session.abortTransaction()
+        }
         throw transactionError
       } finally {
-        if (session.inTransaction()) {
-          await session.endSession()
-        }
+        await session.endSession()
       }
     }
 
@@ -688,6 +681,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
         if (lockedEarnings > 0) {
           series.locked_earnings = 0
         }
+        series.total_purchases++
         await series.save({ session })
         const buyerTransaction = new WalletTransaction({
           wallet_id: buyerWallet._id,
@@ -813,12 +807,12 @@ const transferToCreatorForSeries = async (req, res, next) => {
         },
       })
     } catch (transactionError) {
-      await session.abortTransaction()
+      if (session.inTransaction()) {
+        await session.abortTransaction()
+      }
       throw transactionError
     } finally {
-      if (session.inTransaction()) {
-        await session.endSession()
-      }
+      await session.endSession()
     }
   } catch (error) {
     handleError(error, req, res, next)
