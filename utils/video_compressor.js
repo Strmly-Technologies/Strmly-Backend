@@ -2,13 +2,17 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
+
 const runFFprobe = (filePath) => {
   return new Promise((resolve, reject) => {
     const ffprobe = spawn('ffprobe', [
-      '-v', 'error',
-      '-show_entries', 'format=duration',
-      '-of', 'default=noprint_wrappers=1:nokey=1',
-      filePath
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=noprint_wrappers=1:nokey=1',
+      filePath,
     ])
 
     let output = ''
@@ -29,6 +33,18 @@ const runFFprobe = (filePath) => {
   })
 }
 
+const formatDuration = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '00:00:00'
+
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+
+  return [hours, minutes, secs]
+    .map((val) => val.toString().padStart(2, '0'))
+    .join(':')
+}
+
 const videoCompressor = (file) => {
   const fileOriginalName = file.originalname
   const fileMimeType = file.mimetype
@@ -40,13 +56,20 @@ const videoCompressor = (file) => {
 
   return new Promise((resolve, reject) => {
     const ffmpegProcess = spawn('ffmpeg', [
-      '-i', inputPath,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '23',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-movflags', 'frag_keyframe+empty_moov',
+      '-i',
+      inputPath,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'fast',
+      '-crf',
+      '23',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-movflags',
+      'frag_keyframe+empty_moov',
       outputPath,
     ])
 
@@ -60,29 +83,31 @@ const videoCompressor = (file) => {
     })
 
     ffmpegProcess.on('exit', async (code) => {
-  if (code !== 0) {
-    fs.unlinkSync(inputPath)
-    reject(new Error(`FFmpegError: exited with code ${code}`))
-    return
-  }
+      if (code !== 0) {
+        fs.unlinkSync(inputPath)
+        reject(new Error(`FFmpegError: exited with code ${code}`))
+        return
+      }
 
-  try {
-    const compressedVideoBuffer = fs.readFileSync(outputPath)
-    const duration = await runFFprobe(outputPath)
-    const durationFormatted = formatDuration(duration)
-    
-    console.log(`Video duration: ${duration} seconds (${durationFormatted})`)
+      try {
+        const compressedVideoBuffer = fs.readFileSync(outputPath)
+        const duration = await runFFprobe(outputPath)
+        const durationFormatted = formatDuration(duration)
 
-    fs.unlinkSync(inputPath)
+        console.log(
+          `Video duration: ${duration} seconds (${durationFormatted})`
+        )
 
-    resolve({
-      compressedVideoBuffer,
-      outputPath,
-      fileOriginalName,
-      fileMimeType,
-      duration,
-      durationFormatted
-    })
+        fs.unlinkSync(inputPath)
+
+        resolve({
+          compressedVideoBuffer,
+          outputPath,
+          fileOriginalName,
+          fileMimeType,
+          duration,
+          durationFormatted,
+        })
       } catch (error) {
         fs.unlinkSync(inputPath)
         if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
