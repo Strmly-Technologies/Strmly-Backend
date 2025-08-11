@@ -166,12 +166,14 @@ const uploadVideo = async (req, res, next) => {
       console.error(' User not found:', userId)
       return res.status(404).json({ error: 'User not found' })
     }
-    const {
-      compressedVideoBuffer,
-      outputPath,
-      fileOriginalName,
-      fileMimeType,
-    } = await videoCompressor(videoFile)
+   const {
+  compressedVideoBuffer,
+  outputPath,
+  fileOriginalName,
+  fileMimeType,
+  duration,
+  durationFormatted  
+} = await videoCompressor(videoFile)
 
     const videoUploadResult = await uploadVideoToS3(
       compressedVideoBuffer,
@@ -199,27 +201,28 @@ const uploadVideo = async (req, res, next) => {
       return res.status(500).json({ message: 'Failed to upload thumbnail' })
     }
     const longVideo = {
-      name: name || videoFile.originalname,
-      description: description || 'No description provided',
-      videoUrl: videoUploadResult.url,
-      created_by: userId,
-      updated_by: userId,
-      community: communityId,
-      thumbnailUrl: thumbnailUploadResult.url,
-      genre: genre || 'Action',
-      type: type || 'Free',
-      series: seriesId || null,
-      episode_number: episodeNumber || null,
-      amount: type === 'Paid' ? Number(amount) : 0,
-      age_restriction:
-        age_restriction === 'true' || age_restriction === true || false,
-      Videolanguage: language || 'English',
-      start_time: start_time ? Number(start_time) : 0,
-      display_till_time: display_till_time ? Number(display_till_time) : 0,
-      subtitles: [],
-      is_standalone: is_standalone === 'true',
-      
-    }
+  name: name || videoFile.originalname,
+  description: description || 'No description provided',
+  videoUrl: videoUploadResult.url,
+  created_by: userId,
+  updated_by: userId,
+  community: communityId,
+  thumbnailUrl: thumbnailUploadResult.url,
+  genre: genre || 'Action',
+  type: type || 'Free',
+  series: seriesId || null,
+  episode_number: episodeNumber || null,
+  amount: type === 'Paid' ? Number(amount) : 0,
+  age_restriction:
+    age_restriction === 'true' || age_restriction === true || false,
+  Videolanguage: language || 'English',
+  start_time: start_time ? Number(start_time) : 0,
+  display_till_time: display_till_time ? Number(display_till_time) : 0,
+  subtitles: [],
+  is_standalone: is_standalone === 'true',
+  duration: duration || 0,
+  duration_formatted: durationFormatted || '00:00:00'  // Add this
+}
     let savedVideo = new LongVideo(longVideo)
 
     await savedVideo.save()
@@ -231,33 +234,34 @@ const uploadVideo = async (req, res, next) => {
 
     await addVideoToQueue(savedVideo._id, videoUploadResult.url)
     res.status(200).json({
-      message: 'Video uploaded successfully',
-
-      videoUrl: videoUploadResult.url,
-      videoS3Key: videoUploadResult.key,
-      thumbnailUrl: thumbnailUploadResult.url,
-      thumbnailS3Key: thumbnailUploadResult.key,
-      videoName: videoFile.originalname,
-      fileSize: videoFile.size,
-
-      videoId: savedVideo._id,
-
-      videoData: {
-        name: savedVideo.name,
-        description: savedVideo.description,
-        genre: savedVideo.genre,
-        type: savedVideo.type,
-        language: savedVideo.language,
-        age_restriction: savedVideo.age_restriction,
-        start_time: savedVideo.start_time,
-        display_till_time: savedVideo.display_till_time,
-      },
-      nextSteps: {
-        message: 'Use videoId to add this video to a community',
-        endpoint: '/api/v1/videos/upload/community',
-        requiredFields: ['communityId', 'videoId'],
-      },
-    })
+  message: 'Video uploaded successfully',
+  videoUrl: videoUploadResult.url,
+  videoS3Key: videoUploadResult.key,
+  thumbnailUrl: thumbnailUploadResult.url,
+  thumbnailS3Key: thumbnailUploadResult.key,
+  videoName: videoFile.originalname,
+  fileSize: videoFile.size,
+  duration: duration || 0,                           
+  durationFormatted: durationFormatted || '00:00:00', 
+  videoId: savedVideo._id,
+  videoData: {
+    name: savedVideo.name,
+    description: savedVideo.description,
+    genre: savedVideo.genre,
+    type: savedVideo.type,
+    language: savedVideo.language,
+    age_restriction: savedVideo.age_restriction,
+    start_time: savedVideo.start_time,
+    display_till_time: savedVideo.display_till_time,
+    duration: savedVideo.duration || 0,                  
+    duration_formatted: savedVideo.duration_formatted || '00:00:00' 
+  },
+  nextSteps: {
+    message: 'Use videoId to add this video to a community',
+    endpoint: '/api/v1/videos/upload/community',
+    requiredFields: ['communityId', 'videoId'],
+  }
+})
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -403,12 +407,16 @@ const finaliseChunkUpload = async (req, res, next) => {
     }
 
     //compress video file
-    const {
-      compressedVideoBuffer,
-      outputPath,
-      fileOriginalName,
-      fileMimeType,
-    } = await videoCompressor(videoFile)
+    
+const {
+  compressedVideoBuffer,
+  outputPath,
+  fileOriginalName,
+  fileMimeType,
+  duration,         
+  durationFormatted 
+} = await videoCompressor(videoFile)
+
 
     //delete the fileId folder inside the uploads folder in tmp
     fs.rmSync(tempDir, { recursive: true, force: true })
@@ -440,24 +448,26 @@ const finaliseChunkUpload = async (req, res, next) => {
       return res.status(500).json({ message: 'Failed to upload thumbnail' })
     }
     const longVideo = {
-      name: name || videoFile.originalname,
-      description: description || 'No description provided',
-      videoUrl: videoUploadResult.url,
-      created_by: userId,
-      updated_by: userId,
-      community: communityId,
-      thumbnailUrl: thumbnailUploadResult.url,
-      genre: genre || 'Action',
-      type: type || 'Free',
-      series: seriesId || null,
-      age_restriction:
-        age_restriction === 'true' || age_restriction === true || false,
-      Videolanguage: language || 'English',
-      start_time: start_time ? Number(start_time) : 0,
-      display_till_time: display_till_time ? Number(display_till_time) : 0,
-      subtitles: [],
-      is_standalone: is_standalone === 'true',
-    }
+  name: name || videoFile.originalname,
+  description: description || 'No description provided',
+  videoUrl: videoUploadResult.url,
+  created_by: userId,
+  updated_by: userId,
+  community: communityId,
+  thumbnailUrl: thumbnailUploadResult.url,
+  genre: genre || 'Action',
+  type: type || 'Free',
+  series: seriesId || null,
+  age_restriction:
+    age_restriction === 'true' || age_restriction === true || false,
+  Videolanguage: language || 'English',
+  start_time: start_time ? Number(start_time) : 0,
+  display_till_time: display_till_time ? Number(display_till_time) : 0,
+  subtitles: [],
+  is_standalone: is_standalone === 'true',
+  duration: duration || 0,
+  duration_formatted: durationFormatted || '00:00:00',
+}
     let savedVideo = new LongVideo(longVideo)
 
     await savedVideo.save()
@@ -467,33 +477,33 @@ const finaliseChunkUpload = async (req, res, next) => {
     })
 
     res.status(200).json({
-      message: 'Video uploaded successfully',
-
-      videoUrl: videoUploadResult.url,
-      videoS3Key: videoUploadResult.key,
-      thumbnailUrl: thumbnailUploadResult.url,
-      thumbnailS3Key: thumbnailUploadResult.key,
-      videoName: videoFile.originalname,
-      fileSize: videoFile.size,
-
-      videoId: savedVideo._id,
-
-      videoData: {
-        name: savedVideo.name,
-        description: savedVideo.description,
-        genre: savedVideo.genre,
-        type: savedVideo.type,
-        language: savedVideo.language,
-        age_restriction: savedVideo.age_restriction,
-        start_time: savedVideo.start_time,
-        display_till_time: savedVideo.display_till_time,
-      },
-      nextSteps: {
-        message: 'Use videoId to add this video to a community',
-        endpoint: '/api/v1/videos/upload/community',
-        requiredFields: ['communityId', 'videoId'],
-      },
-    })
+  message: 'Video uploaded successfully',
+  videoUrl: videoUploadResult.url,
+  videoS3Key: videoUploadResult.key,
+  thumbnailUrl: thumbnailUploadResult.url,
+  thumbnailS3Key: thumbnailUploadResult.key,
+  videoName: videoFile.originalname,
+  fileSize: videoFile.size,
+  duration: duration, 
+  videoId: savedVideo._id,
+  videoData: {
+    name: savedVideo.name,
+    description: savedVideo.description,
+    genre: savedVideo.genre,
+    type: savedVideo.type,
+    language: savedVideo.language,
+    age_restriction: savedVideo.age_restriction,
+    start_time: savedVideo.start_time,
+    display_till_time: savedVideo.display_till_time,
+    duration: savedVideo.duration, 
+    duration_formatted: savedVideo.duration_formatted 
+  },
+  nextSteps: {
+    message: 'Use videoId to add this video to a community',
+    endpoint: '/api/v1/videos/upload/community',
+    requiredFields: ['communityId', 'videoId'],
+  }
+})
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -594,7 +604,7 @@ const searchVideos = async (req, res, next) => {
         {
           $or: [
             { name: searchRegex },
-            { description: searchRegex },
+            { description: searchRegex },      
             { genre: searchRegex },
           ],
         },

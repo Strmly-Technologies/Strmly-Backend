@@ -1,5 +1,19 @@
 const mongoose = require('mongoose')
 const { Schema } = mongoose
+
+const formatDuration = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '00:00:00';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  return [hours, minutes, secs]
+    .map(val => val.toString().padStart(2, '0'))
+    .join(':');
+}
+
+
 const longVideoSchema = new mongoose.Schema(
   {
     name: {
@@ -30,7 +44,17 @@ const longVideoSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-
+    duration: {
+      type: Number,
+      default: 0,
+    },
+     duration_formatted:{
+      type: String,
+      default: '00:00:00',
+      get: function () {
+        return formatDuration(this.duration)
+      },
+    },
     comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
     liked_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     videoUrl: {
@@ -79,17 +103,46 @@ const longVideoSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        'Action',
-        'Comedy',
-        'Drama',
-        'Horror',
-        'Sci-Fi',
-        'Romance',
-        'Documentary',
-        'Thriller',
-        'Fantasy',
-        'Animation',
-      ],
+    'Action & Adventure',
+    'Animation & Anime',
+    'Beauty & Fashion',
+    'Biography & True Story',
+    'Business & Finance',
+    'Career & Development',
+    'Comedy',
+    'Commentary & Opinion',
+    'Crime & Mystery',
+    'DIY & Crafts',
+    'Documentary',
+    'Drama',
+    'Education',
+    'Entertainment',
+    'Family & Kids',
+    'Food & Cooking',
+    'Gaming',
+    'Health & Fitness',
+    'Historical',
+    'Horror',
+    'Home & Lifestyle',
+    'International',
+    'Music',
+    'Motivation & Self-Improvement',
+    'News & Politics',
+    'Reality & Unscripted',
+    'Reviews & Unboxings',
+    'Romance',
+    'Science & Technology',
+    'Sci-Fi & Fantasy',
+    'Short Films',
+    'Spirituality & Philosophy',
+    'Sports',
+    'Talk Shows & Podcasts',
+    'Teen & Young Adult',
+    'Thriller & Suspense',
+    'Travel & Adventure',
+    'Vlog',
+    'Other'
+  ],
     },
     type: {
       type: String,
@@ -183,7 +236,6 @@ longVideoSchema.pre('save', function (next) {
   if (this.type === 'Paid' && this.amount <= 0) {
     return next(new Error('Amount has to be greater than 0 for paid videos'))
   }
-
   next()
 })
 
