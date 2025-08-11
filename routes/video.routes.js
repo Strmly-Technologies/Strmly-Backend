@@ -14,6 +14,8 @@ const {
   getVideoABSSegments,
   uploadVideoChunks,
   finaliseChunkUpload,
+  getVideoGiftingInfo,
+  getVideoTotalGifting,
 } = require('../controller/video.controller')
 const {
   checkVideoAccess,
@@ -72,6 +74,12 @@ router.get('/by-genre/:genre', authenticateToken, getVideosByGenre)
 
 // Route to increment video view count
 router.post('/:id/view', authenticateToken, incrementVideoView)
+
+// Route to get gifting info on a video by ID
+router.get('/:id/gifts', authenticateToken, getVideoGiftingInfo)
+
+// Route to get total gifting amount of a video by ID
+router.get('/:id/total-gifting', authenticateToken, getVideoTotalGifting)
 
 // Route to get related videos by video ID
 router.get('/:id/related', authenticateToken, getRelatedVideos)

@@ -10,6 +10,7 @@ const {
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Reshare = require('../models/Reshare')
+const WalletTransaction = require('../models/WalletTransaction')
 const addVideoToQueue = require('../utils/video_fingerprint_queue')
 const path = require('path')
 const os = require('os')
@@ -102,7 +103,6 @@ const uploadVideo = async (req, res, next) => {
       amount,
     } = req.body
 
-
     if (!userId) {
       console.error(' User ID not found in request')
       return res.status(400).json({ error: 'User ID is required' })
@@ -125,7 +125,7 @@ const uploadVideo = async (req, res, next) => {
         error: 'episodeNumber and seriesId required for non-standalone videos',
       })
     }
-    if ((type === 'Paid') && (!amount || amount <= 0)) {
+    if (type === 'Paid' && (!amount || amount <= 0)) {
       console.error(
         'Amount has to be included and should be greater than 0 for paid videos'
       )
@@ -166,14 +166,14 @@ const uploadVideo = async (req, res, next) => {
       console.error(' User not found:', userId)
       return res.status(404).json({ error: 'User not found' })
     }
-   const {
-  compressedVideoBuffer,
-  outputPath,
-  fileOriginalName,
-  fileMimeType,
-  duration,
-  durationFormatted  
-} = await videoCompressor(videoFile)
+    const {
+      compressedVideoBuffer,
+      outputPath,
+      fileOriginalName,
+      fileMimeType,
+      duration,
+      durationFormatted,
+    } = await videoCompressor(videoFile)
 
     const videoUploadResult = await uploadVideoToS3(
       compressedVideoBuffer,
@@ -201,28 +201,28 @@ const uploadVideo = async (req, res, next) => {
       return res.status(500).json({ message: 'Failed to upload thumbnail' })
     }
     const longVideo = {
-  name: name || videoFile.originalname,
-  description: description || 'No description provided',
-  videoUrl: videoUploadResult.url,
-  created_by: userId,
-  updated_by: userId,
-  community: communityId,
-  thumbnailUrl: thumbnailUploadResult.url,
-  genre: genre || 'Action',
-  type: type || 'Free',
-  series: seriesId || null,
-  episode_number: episodeNumber || null,
-  amount: type === 'Paid' ? Number(amount) : 0,
-  age_restriction:
-    age_restriction === 'true' || age_restriction === true || false,
-  Videolanguage: language || 'English',
-  start_time: start_time ? Number(start_time) : 0,
-  display_till_time: display_till_time ? Number(display_till_time) : 0,
-  subtitles: [],
-  is_standalone: is_standalone === 'true',
-  duration: duration || 0,
-  duration_formatted: durationFormatted || '00:00:00'  // Add this
-}
+      name: name || videoFile.originalname,
+      description: description || 'No description provided',
+      videoUrl: videoUploadResult.url,
+      created_by: userId,
+      updated_by: userId,
+      community: communityId,
+      thumbnailUrl: thumbnailUploadResult.url,
+      genre: genre || 'Action',
+      type: type || 'Free',
+      series: seriesId || null,
+      episode_number: episodeNumber || null,
+      amount: type === 'Paid' ? Number(amount) : 0,
+      age_restriction:
+        age_restriction === 'true' || age_restriction === true || false,
+      Videolanguage: language || 'English',
+      start_time: start_time ? Number(start_time) : 0,
+      display_till_time: display_till_time ? Number(display_till_time) : 0,
+      subtitles: [],
+      is_standalone: is_standalone === 'true',
+      duration: duration || 0,
+      duration_formatted: durationFormatted || '00:00:00', // Add this
+    }
     let savedVideo = new LongVideo(longVideo)
 
     await savedVideo.save()
@@ -234,34 +234,34 @@ const uploadVideo = async (req, res, next) => {
 
     await addVideoToQueue(savedVideo._id, videoUploadResult.url)
     res.status(200).json({
-  message: 'Video uploaded successfully',
-  videoUrl: videoUploadResult.url,
-  videoS3Key: videoUploadResult.key,
-  thumbnailUrl: thumbnailUploadResult.url,
-  thumbnailS3Key: thumbnailUploadResult.key,
-  videoName: videoFile.originalname,
-  fileSize: videoFile.size,
-  duration: duration || 0,                           
-  durationFormatted: durationFormatted || '00:00:00', 
-  videoId: savedVideo._id,
-  videoData: {
-    name: savedVideo.name,
-    description: savedVideo.description,
-    genre: savedVideo.genre,
-    type: savedVideo.type,
-    language: savedVideo.language,
-    age_restriction: savedVideo.age_restriction,
-    start_time: savedVideo.start_time,
-    display_till_time: savedVideo.display_till_time,
-    duration: savedVideo.duration || 0,                  
-    duration_formatted: savedVideo.duration_formatted || '00:00:00' 
-  },
-  nextSteps: {
-    message: 'Use videoId to add this video to a community',
-    endpoint: '/api/v1/videos/upload/community',
-    requiredFields: ['communityId', 'videoId'],
-  }
-})
+      message: 'Video uploaded successfully',
+      videoUrl: videoUploadResult.url,
+      videoS3Key: videoUploadResult.key,
+      thumbnailUrl: thumbnailUploadResult.url,
+      thumbnailS3Key: thumbnailUploadResult.key,
+      videoName: videoFile.originalname,
+      fileSize: videoFile.size,
+      duration: duration || 0,
+      durationFormatted: durationFormatted || '00:00:00',
+      videoId: savedVideo._id,
+      videoData: {
+        name: savedVideo.name,
+        description: savedVideo.description,
+        genre: savedVideo.genre,
+        type: savedVideo.type,
+        language: savedVideo.language,
+        age_restriction: savedVideo.age_restriction,
+        start_time: savedVideo.start_time,
+        display_till_time: savedVideo.display_till_time,
+        duration: savedVideo.duration || 0,
+        duration_formatted: savedVideo.duration_formatted || '00:00:00',
+      },
+      nextSteps: {
+        message: 'Use videoId to add this video to a community',
+        endpoint: '/api/v1/videos/upload/community',
+        requiredFields: ['communityId', 'videoId'],
+      },
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -407,16 +407,15 @@ const finaliseChunkUpload = async (req, res, next) => {
     }
 
     //compress video file
-    
-const {
-  compressedVideoBuffer,
-  outputPath,
-  fileOriginalName,
-  fileMimeType,
-  duration,         
-  durationFormatted 
-} = await videoCompressor(videoFile)
 
+    const {
+      compressedVideoBuffer,
+      outputPath,
+      fileOriginalName,
+      fileMimeType,
+      duration,
+      durationFormatted,
+    } = await videoCompressor(videoFile)
 
     //delete the fileId folder inside the uploads folder in tmp
     fs.rmSync(tempDir, { recursive: true, force: true })
@@ -448,26 +447,26 @@ const {
       return res.status(500).json({ message: 'Failed to upload thumbnail' })
     }
     const longVideo = {
-  name: name || videoFile.originalname,
-  description: description || 'No description provided',
-  videoUrl: videoUploadResult.url,
-  created_by: userId,
-  updated_by: userId,
-  community: communityId,
-  thumbnailUrl: thumbnailUploadResult.url,
-  genre: genre || 'Action',
-  type: type || 'Free',
-  series: seriesId || null,
-  age_restriction:
-    age_restriction === 'true' || age_restriction === true || false,
-  Videolanguage: language || 'English',
-  start_time: start_time ? Number(start_time) : 0,
-  display_till_time: display_till_time ? Number(display_till_time) : 0,
-  subtitles: [],
-  is_standalone: is_standalone === 'true',
-  duration: duration || 0,
-  duration_formatted: durationFormatted || '00:00:00',
-}
+      name: name || videoFile.originalname,
+      description: description || 'No description provided',
+      videoUrl: videoUploadResult.url,
+      created_by: userId,
+      updated_by: userId,
+      community: communityId,
+      thumbnailUrl: thumbnailUploadResult.url,
+      genre: genre || 'Action',
+      type: type || 'Free',
+      series: seriesId || null,
+      age_restriction:
+        age_restriction === 'true' || age_restriction === true || false,
+      Videolanguage: language || 'English',
+      start_time: start_time ? Number(start_time) : 0,
+      display_till_time: display_till_time ? Number(display_till_time) : 0,
+      subtitles: [],
+      is_standalone: is_standalone === 'true',
+      duration: duration || 0,
+      duration_formatted: durationFormatted || '00:00:00',
+    }
     let savedVideo = new LongVideo(longVideo)
 
     await savedVideo.save()
@@ -477,33 +476,33 @@ const {
     })
 
     res.status(200).json({
-  message: 'Video uploaded successfully',
-  videoUrl: videoUploadResult.url,
-  videoS3Key: videoUploadResult.key,
-  thumbnailUrl: thumbnailUploadResult.url,
-  thumbnailS3Key: thumbnailUploadResult.key,
-  videoName: videoFile.originalname,
-  fileSize: videoFile.size,
-  duration: duration, 
-  videoId: savedVideo._id,
-  videoData: {
-    name: savedVideo.name,
-    description: savedVideo.description,
-    genre: savedVideo.genre,
-    type: savedVideo.type,
-    language: savedVideo.language,
-    age_restriction: savedVideo.age_restriction,
-    start_time: savedVideo.start_time,
-    display_till_time: savedVideo.display_till_time,
-    duration: savedVideo.duration, 
-    duration_formatted: savedVideo.duration_formatted 
-  },
-  nextSteps: {
-    message: 'Use videoId to add this video to a community',
-    endpoint: '/api/v1/videos/upload/community',
-    requiredFields: ['communityId', 'videoId'],
-  }
-})
+      message: 'Video uploaded successfully',
+      videoUrl: videoUploadResult.url,
+      videoS3Key: videoUploadResult.key,
+      thumbnailUrl: thumbnailUploadResult.url,
+      thumbnailS3Key: thumbnailUploadResult.key,
+      videoName: videoFile.originalname,
+      fileSize: videoFile.size,
+      duration: duration,
+      videoId: savedVideo._id,
+      videoData: {
+        name: savedVideo.name,
+        description: savedVideo.description,
+        genre: savedVideo.genre,
+        type: savedVideo.type,
+        language: savedVideo.language,
+        age_restriction: savedVideo.age_restriction,
+        start_time: savedVideo.start_time,
+        display_till_time: savedVideo.display_till_time,
+        duration: savedVideo.duration,
+        duration_formatted: savedVideo.duration_formatted,
+      },
+      nextSteps: {
+        message: 'Use videoId to add this video to a community',
+        endpoint: '/api/v1/videos/upload/community',
+        requiredFields: ['communityId', 'videoId'],
+      },
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -604,7 +603,7 @@ const searchVideos = async (req, res, next) => {
         {
           $or: [
             { name: searchRegex },
-            { description: searchRegex },      
+            { description: searchRegex },
             { genre: searchRegex },
           ],
         },
@@ -922,6 +921,62 @@ const getRelatedVideos = async (req, res, next) => {
   }
 }
 
+const getVideoGiftingInfo = async (req, res, next) => {
+  try {
+    const { id } = req.params
+
+    let video = await LongVideo.findById(id)
+      .select('visibility hidden_reason')
+      .lean()
+
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
+      return res.status(404).json({ error: 'Video not found' })
+    }
+
+    const giftingInfo = await WalletTransaction.find({
+      content_id: id,
+      transaction_category: 'video_gift',
+    })
+      .lean()
+      .select(
+        'user_id amount currency description balance_before balance_after'
+      )
+      .populate('user_id', 'username profile_photo')
+    res.status(200).json({
+      message: 'Gifting Info retrieved successfully',
+      data: giftingInfo,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getVideoTotalGifting = async (req, res, next) => {
+  try {
+    const { id } = req.params
+
+    let video = await LongVideo.findById(id)
+      .select('visibility hidden_reason gifts')
+      .lean()
+
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
+      return res.status(404).json({ error: 'Video not found' })
+    }
+    res.status(200).json({
+      message: 'Gifting Info retrieved successfully',
+      data: video.gifts,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   uploadVideo,
   searchVideos,
@@ -937,4 +992,6 @@ module.exports = {
   getVideoABSSegments,
   uploadVideoChunks,
   finaliseChunkUpload,
+  getVideoGiftingInfo,
+  getVideoTotalGifting,
 }
