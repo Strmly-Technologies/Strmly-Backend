@@ -90,16 +90,24 @@ const getSeriesById = async (req, res, next) => {
     const { id } = req.params
 
     const series = await Series.findById(id)
-      .populate('created_by', 'username email')
-      .populate('community', 'name')
+      .populate('created_by', 'username email profile_photo')
+      .populate('community', 'name profile_photo followers')
       .populate({
         path: 'episodes',
-        select:
-          'name description thumbnailUrl season_number episode_number created_by videoUrl',
-        populate: {
-          path: 'created_by',
-          select: 'username email',
-        },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
         options: {
           sort: { season_number: 1, episode_number: 1 },
         },

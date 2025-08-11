@@ -545,23 +545,70 @@ const getCommunityVideos = async (req, res, next) => {
     let videos
 
     if (videoType === 'long') {
-      const populated = await Community.findById(communityId).populate({
-        path: 'long_videos',
-        match: { visibility: { $ne: 'hidden' } },
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
-      })
+      const populated = await Community.findById(communityId)
+        .select('_id long_videos')
+        .populate({
+          path: 'long_videos',
+          match: { visibility: { $ne: 'hidden' } },
+
+          populate: [
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+            {
+              path: 'series',
+              select:
+                'title description price genre episodes seasons total_episodes',
+              populate: {
+                path: 'created_by',
+                select: 'username profile_photo',
+              },
+            },
+            {
+              path: 'community',
+              select: 'name profile_photo followers',
+            },
+            {
+              path: 'liked_by',
+              select: 'username profile_photo',
+            },
+          ],
+        })
+
       videos = populated.long_videos
     } else if (videoType === 'series') {
-      const populated = await Community.findById(communityId).populate({
-        path: 'series',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
-      })
+      const populated = await Community.findById(communityId)
+        .select('_id series')
+        .populate({
+          path: 'series',
+          populate: [
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+            {
+              path: 'episodes',
+              populate: [
+                {
+                  path: 'created_by',
+                  select: 'username profile_photo',
+                },
+                {
+                  path: 'community',
+                  select: 'name profile_photo followers',
+                },
+                {
+                  path: 'liked_by',
+                  select: 'username profile_photo',
+                },
+              ],
+              options: {
+                sort: { season_number: 1, episode_number: 1 },
+              },
+            },
+          ],
+        })
       videos = populated.series
     } else {
       return res.status(400).json({ message: 'Invalid video type' })
@@ -596,7 +643,16 @@ const getTrendingCommunityVideos = async (req, res, next) => {
 
     const longVideos = await LongVideo.find(query)
       .populate('created_by', 'username profile_photo')
-      .populate('community', 'name profile_photo')
+      .populate('community', 'name profile_photo followers')
+      .populate({
+        path: 'series',
+        select: 'title description price genre episodes seasons total_episodes',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      })
+      .populate('liked_by', 'username profile_photo')
       .sort({ likes: -1, views: -1, createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -670,7 +726,16 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
       visibility: { $ne: 'hidden' },
     })
       .populate('created_by', 'username profile_photo')
-      .populate('community', 'name profile_photo')
+      .populate('community', 'name profile_photo followers')
+      .populate({
+        path: 'series',
+        select: 'title description price genre episodes seasons total_episodes',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      })
+      .populate('liked_by', 'username profile_photo')
       .sort(sortObject)
       .skip(skip)
       .limit(limitNum)

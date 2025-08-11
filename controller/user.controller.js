@@ -364,7 +364,9 @@ const GetUserCommunities = async (req, res, next) => {
 const GetUserVideos = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const { type = 'uploaded', page = 1, limit = 10 } = req.query
+    const type = req.query.type || 'uploaded'
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
     const skip = (page - 1) * limit
 
     let videos
@@ -372,60 +374,136 @@ const GetUserVideos = async (req, res, next) => {
     if (type === 'saved') {
       const user = await User.findById(userId).populate({
         path: 'saved_videos',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.saved_videos
     } else if (type === 'liked') {
       const user = await User.findById(userId).populate({
         path: 'liked_videos',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.liked_videos
     } else if (type === 'history') {
       const user = await User.findById(userId).populate({
-        path: 'history',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
+        path: 'viewed_videos',
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.history
-    } else if (type === 'playlist') {
+    } /* else if (type === 'playlist') {
       const user = await User.findById(userId).populate({
         path: 'playlist',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.playlist
-    } else if (type === 'reshares') {
+    }  */ else if (type === 'reshares') {
       const reshares = await Reshare.find({
         user: userId,
       })
@@ -436,16 +514,44 @@ const GetUserVideos = async (req, res, next) => {
         .populate({
           path: 'long_video',
           populate: [
-            { path: 'created_by', select: 'username profile_photo' },
-            { path: 'community', select: 'name profile_photo' },
-            { path: 'series', select: 'title description posterUrl' },
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+            {
+              path: 'series',
+              select:
+                'title description price genre episodes seasons total_episodes',
+              populate: {
+                path: 'created_by',
+                select: 'username profile_photo',
+              },
+            },
+            {
+              path: 'community',
+              select: 'name profile_photo followers',
+            },
+            {
+              path: 'liked_by',
+              select: 'username profile_photo',
+            },
           ],
         })
       videos = reshares
     } else {
       videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate('community', 'name profile_photo followers')
+        .populate({
+          path: 'series',
+          select:
+            'title description price genre episodes seasons total_episodes',
+          populate: {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+        })
+        .populate('liked_by', 'username profile_photo')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -1012,7 +1118,9 @@ const GetUserProfileById = async (req, res, next) => {
 const GetUserVideosById = async (req, res, next) => {
   try {
     const userId = req.params.id
-    const { type = 'uploaded', page = 1, limit = 10 } = req.query
+    const type = req.query.type || 'uploaded'
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
     const skip = (page - 1) * limit
 
     let videos
@@ -1020,63 +1128,184 @@ const GetUserVideosById = async (req, res, next) => {
     if (type === 'saved') {
       const user = await User.findById(userId).populate({
         path: 'saved_videos',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.saved_videos
     } else if (type === 'liked') {
       const user = await User.findById(userId).populate({
         path: 'liked_videos',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.liked_videos
     } else if (type === 'history') {
       const user = await User.findById(userId).populate({
-        path: 'history',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
+        path: 'viewed_videos',
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.history
-    } else if (type === 'playlist') {
+    } /* else if (type === 'playlist') {
       const user = await User.findById(userId).populate({
         path: 'playlist',
-        populate: {
-          path: 'created_by',
-          select: 'username profile_photo',
-        },
         options: {
           skip: skip,
           limit: parseInt(limit),
           sort: { createdAt: -1 },
         },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       videos = user.playlist
+    }  */ else if (type === 'reshares') {
+      const reshares = await Reshare.find({
+        user: userId,
+      })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('user', 'username profile_photo')
+        .populate({
+          path: 'long_video',
+          populate: [
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+            {
+              path: 'series',
+              select:
+                'title description price genre episodes seasons total_episodes',
+              populate: {
+                path: 'created_by',
+                select: 'username profile_photo',
+              },
+            },
+            {
+              path: 'community',
+              select: 'name profile_photo followers',
+            },
+            {
+              path: 'liked_by',
+              select: 'username profile_photo',
+            },
+          ],
+        })
+      videos = reshares
     } else {
       videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate('community', 'name profile_photo followers')
+        .populate({
+          path: 'series',
+          select:
+            'title description price genre episodes seasons total_episodes',
+          populate: {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+        })
+        .populate('liked_by', 'username profile_photo')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -1241,7 +1470,8 @@ const unfollowUser = async (req, res, next) => {
 const getUserHistory = async (req, res, next) => {
   try {
     const userId = req.user.id
-    const { page = 1, limit = 10 } = req.query
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
 
     // Try Redis cache first
     const redis = getRedisClient()
@@ -1297,7 +1527,16 @@ const getUserHistory = async (req, res, next) => {
       _id: { $in: paginatedVideoIds },
     })
       .populate('created_by', 'username profile_photo')
-      .select('_id name thumbnailUrl description views likes createdAt')
+      .populate('community', 'name profile_photo followers')
+      .populate({
+        path: 'series',
+        select: 'title description price genre episodes seasons total_episodes',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo',
+        },
+      })
+      .populate('liked_by', 'username profile_photo')
 
     const orderedVideos = paginatedVideoIds
       .map((videoId) =>
@@ -1325,7 +1564,7 @@ const getUserHistory = async (req, res, next) => {
 
     const result = {
       message: 'User history retrieved successfully',
-      videos: formattedVideos,
+      videos: orderedVideos,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -1384,16 +1623,27 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
     // Get user with populated liked_videos
     const user = await User.findById(userId).populate({
       path: 'liked_videos',
-      select:
-        '_id name thumbnailUrl description views likes createdAt community created_by videoResolutions',
       populate: [
         {
           path: 'created_by',
-          select: '_id username profile_photo',
+          select: 'username profile_photo',
+        },
+        {
+          path: 'series',
+          select:
+            'title description price genre episodes seasons total_episodes',
+          populate: {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
         },
         {
           path: 'community',
-          select: '_id name profile_photo',
+          select: 'name profile_photo followers',
+        },
+        {
+          path: 'liked_by',
+          select: 'username profile_photo',
         },
       ],
     })
@@ -1996,6 +2246,33 @@ const getUserReshares = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
     const reshares = await Reshare.find({ user: userId })
+      .populate('user', 'username profile_photo')
+      .populate({
+        path: 'long_video',
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
+      })
     return res.status(200).json({
       message: 'User reshares retrieved successfully',
       reshares,
@@ -2010,15 +2287,34 @@ const getResharesOfOtherUser = async (req, res, next) => {
     if (!id) {
       return res.status(400).json({ message: 'User ID is required' })
     }
-    const reshares = await Reshare.find({ user: id }).populate({
-      path: 'long_video',
-      select:
-        'name description videoUrl thumbnailUrl created_by likes views reshares createdAt',
-      populate: {
-        path: 'created_by',
-        select: 'username profile_photo',
-      },
-    })
+    const reshares = await Reshare.find({ user: id })
+      .populate('user', 'username profile_photo')
+      .populate({
+        path: 'long_video',
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+          {
+            path: 'series',
+            select:
+              'title description price genre episodes seasons total_episodes',
+            populate: {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          },
+          {
+            path: 'community',
+            select: 'name profile_photo followers',
+          },
+          {
+            path: 'liked_by',
+            select: 'username profile_photo',
+          },
+        ],
+      })
     if (!reshares || reshares.length === 0) {
       return res
         .status(404)

@@ -632,16 +632,17 @@ const getVideoById = async (req, res, next) => {
   try {
     const { id } = req.params
     let video = await LongVideo.findById(id)
-      .populate('created_by', 'username email')
-      .populate('community', 'name')
+      .populate('created_by', 'username profile_photo')
+      .populate('community', 'name profile_photo followers')
       .populate({
         path: 'series',
+        select: 'title description price genre episodes seasons total_episodes',
         populate: {
-          path: 'episodes',
-          select: 'name episode_number season_number thumbnailUrl views likes',
-          options: { sort: { season_number: 1, episode_number: 1 } },
+          path: 'created_by',
+          select: 'username profile_photo',
         },
       })
+      .populate('liked_by', 'username profile_photo')
 
     if (
       !video ||

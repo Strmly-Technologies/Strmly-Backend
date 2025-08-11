@@ -73,6 +73,7 @@ router.post('/fcm_token', authenticateToken, saveUserFCMToken)
 router.get('/communities', authenticateToken, GetUserCommunities)
 
 // Get user videos
+router.get('/videos', authenticateToken, GetUserVideos)
 
 // Get user interactions
 router.get('/interactions', authenticateToken, GetUserInteractions)
@@ -124,8 +125,6 @@ router.put('/social-media-links', authenticateToken, updateSocialMediaLinks)
 
 // Add video to user view history
 router.post('/history', authenticateToken, AddVideoToUserViewHistory)
-
-router.get('/videos', authenticateToken, GetUserVideos)
 
 // Set creator pass price
 router.put('/creator-pass-price', authenticateToken, SetCreatorPassPrice)

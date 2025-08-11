@@ -19,10 +19,10 @@ router.get('/user', authenticateToken, getUserSeries)
 router.post('/create', authenticateToken, createSeries)
 
 // Route to search for series with pagination
-router.get('/search', searchSeries)
+router.get('/search', authenticateToken, searchSeries)
 
 // Route to get all series with pagination
-router.get('/all', getAllSeries)
+router.get('/all', authenticateToken, getAllSeries)
 
 // Route to remove an episode from a series
 router.delete(
@@ -35,7 +35,7 @@ router.delete(
 router.post('/:id/episodes', authenticateToken, addEpisodeToSeries)
 
 // Route to get a series by ID
-router.get('/:id', getSeriesById)
+router.get('/:id', authenticateToken, getSeriesById)
 
 // Route to update a series by ID
 router.put('/:id', authenticateToken, updateSeries)
