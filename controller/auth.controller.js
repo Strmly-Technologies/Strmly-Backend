@@ -39,8 +39,15 @@ const RegisterNewUser = async (req, res, next) => {
     const verificationOTP = generateVerificationOTP()
     const verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
+    // generate a custom name based on username
+    const customName = username.replace(/[^a-zA-Z0-9 ]/g, '').trim()
+    .replace(/\s+/g, ' ')
+    .substring(0, 50) 
+    .trim() 
+
     const newUser = new User({
       username,
+      custom_name: customName,
       email,
       password,
       email_verification: {

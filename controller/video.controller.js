@@ -776,7 +776,7 @@ const getTrendingVideos = async (req, res, next) => {
     const followingIds = (user.following || []).map((id) => id.toString())
 
     let videos = await LongVideo.find({})
-      .populate('created_by', 'username email profile_photo')
+      .populate('created_by', 'username email profile_photo custom_name')
       .populate('community', 'name profile_photo followers')
       .populate({
         path: 'series',

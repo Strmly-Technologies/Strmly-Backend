@@ -32,7 +32,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         visibility: { $ne: 'hidden' },
       })
         .lean()
-        .populate('created_by', 'username profile_photo')
+        .populate('created_by', 'username profile_photo custom_name' )
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',

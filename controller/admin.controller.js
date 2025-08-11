@@ -431,6 +431,50 @@ const updateReportStatus=async(req,res,next)=>{
     }
 }
 
+const getTotalWalletLoad=async(req,res,next)=>{
+  try {
+    const {page = 1, limit = 100, date = ''} = req.query
+    const skip = (page - 1) * limit
+    let query = {}
+    if (date) {
+      const startDate = new Date(date)
+      const endDate = new Date(date)
+      endDate.setDate(endDate.getDate() + 1)
+      
+      query.createdAt = {
+        $gte: startDate,
+        $lt: endDate
+      }
+    }
+    query.transaction_category='wallet_load'
+    const transactions=await WalletTransaction.find(query)
+      .populate('user_id', 'username email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+    const totalTransactions = await WalletTransaction.countDocuments(query)
+    let sum=0;
+     transactions.forEach((transaction) => {
+      sum += Number(transaction.amount)
+    })
+    console.log('Total wallet load:', sum)
+
+    res.status(200).json({
+      success: true,
+      transactions,
+      totalMoney: sum,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalTransactions,
+        pages: Math.ceil(totalTransactions / limit)
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   adminLogin,
   getAdminDashboard,
@@ -442,5 +486,6 @@ module.exports = {
   getSignedUpUsersOnDate,
   getReports,
   updateReportStatus,
+  getTotalWalletLoad,
 }
              
