@@ -10,6 +10,7 @@ const {
   getSignedUpUsersOnDate,
   getReports,
   updateReportStatus,
+  getTotalWalletLoad,
 } = require('../controller/admin.controller')
 const { authenticateAdmin } = require('../middleware/adminAuth')
 
@@ -26,6 +27,7 @@ router.get('/transactions', authenticateAdmin, getTransactions)
 router.get('/payments', authenticateAdmin, getPayments)
 router.get('/creator-passes', authenticateAdmin, getCreatorPasses)
 router.get('/stats', authenticateAdmin, getStats)
+router.get('/wallet/load', authenticateAdmin, getTotalWalletLoad)
 
 router.get('/reports', authenticateAdmin, getReports)
 router.put('/report/:id', authenticateAdmin, updateReportStatus)
