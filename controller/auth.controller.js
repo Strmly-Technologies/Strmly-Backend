@@ -536,11 +536,17 @@ const verifyResetToken = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const { otp, newPassword } = req.body
+    const { otp, newPassword, confirmPassword } = req.body
 
-    if (!otp || !newPassword) {
+    if (!otp || !newPassword || !confirmPassword) {
       return res.status(400).json({
-        message: 'Token, new password, and password are required',
+        message: 'Token, new password, and password confirmation are required',
+      })
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        message: 'Passwords do not match',
       })
     }
 
