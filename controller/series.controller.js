@@ -1,6 +1,171 @@
 const Series = require('../models/Series')
 const LongVideo = require('../models/LongVideo')
+const User = require('../models/User')
+const UserAccess = require('../models/UserAccess')
 const { handleError } = require('../utils/utils')
+const { checkCreatorPassAccess } = require('../controller/creatorpass.controller')
+
+// Add checkAccess function
+const checkAccess = async (video, userId) => {
+  console.log('Checking video access for user:', userId)
+  try {
+    if (video.type === 'Free') {
+      video.access = {
+        isPlayable: true,
+        freeRange: {
+          start_time: video.start_time || 0,
+          display_till_time: video.display_till_time || 0,
+        },
+        isPurchased: true,
+        accessType: 'free',
+      }
+    } else if (video.type === 'Paid') {
+      // Check if user has creator pass access
+      const hasCreatorPass = await checkCreatorPassAccess(
+        userId,
+        video.created_by._id.toString()
+      )
+
+      if (hasCreatorPass.hasAccess) {
+        video.access = {
+          isPlayable: true,
+          freeRange: {
+            start_time: video.start_time || 0,
+            display_till_time: video.display_till_time || 0,
+          },
+          isPurchased: true,
+          accessType: 'creator_pass',
+        }
+      } else {
+        // Check if user has purchased the video
+        const hasPurchasedVideo = await UserAccess.findOne({
+          user_id: userId,
+          content_id: video._id,
+          content_type: 'video',
+          access_type: 'paid',
+        })
+
+        if (hasPurchasedVideo) {
+          video.access = {
+            isPlayable: true,
+            freeRange: {
+              start_time: video.start_time || 0,
+              display_till_time: video.display_till_time || 0,
+            },
+            isPurchased: true,
+            accessType: 'purchased',
+          }
+        } else {
+          video.access = {
+            isPlayable: false,
+            freeRange: {
+              start_time: video.start_time || 0,
+              display_till_time: video.display_till_time || 0,
+            },
+            isPurchased: false,
+            accessType: 'limited',
+            price: video.amount || 0,
+          }
+        }
+      }
+    } else {
+      // Default access for unknown type
+      video.access = {
+        isPlayable: false,
+        freeRange: {
+          start_time: video.start_time || 0,
+          display_till_time: video.display_till_time || 0,
+        },
+        isPurchased: false,
+        accessType: 'unknown',
+      }
+    }
+
+    return video
+  } catch (error) {
+    console.error('Error checking video access:', error)
+    // Return video with limited access if error occurs
+    video.access = {
+      isPlayable: false,
+      freeRange: {
+        start_time: video.start_time || 0,
+        display_till_time: video.display_till_time || 0,
+      },
+      isPurchased: false,
+      accessType: 'error',
+    }
+    return video
+  }
+}
+
+// Add checkSeriesAccess function for series objects
+const checkSeriesAccess = async (series, userId) => {
+  console.log('Checking series access for user:', userId)
+  try {
+    if (series.type === 'Free') {
+      series.access = {
+        isPlayable: true,
+        isPurchased: true,
+        accessType: 'free',
+      }
+    } else if (series.type === 'Paid') {
+      // Check if user has creator pass access
+      const hasCreatorPass = await checkCreatorPassAccess(
+        userId,
+        series.created_by._id.toString()
+      )
+
+      if (hasCreatorPass.hasAccess) {
+        series.access = {
+          isPlayable: true,
+          isPurchased: true,
+          accessType: 'creator_pass',
+        }
+      } else {
+        // Check if user has purchased the series
+        const hasPurchasedSeries = await UserAccess.findOne({
+          user_id: userId,
+          content_id: series._id,
+          content_type: 'series',
+          access_type: 'paid',
+        })
+
+        if (hasPurchasedSeries) {
+          series.access = {
+            isPlayable: true,
+            isPurchased: true,
+            accessType: 'purchased',
+          }
+        } else {
+          series.access = {
+            isPlayable: false,
+            isPurchased: false,
+            accessType: 'limited',
+            price: series.price || 0,
+          }
+        }
+      }
+    } else {
+      // Default access for unknown type
+      series.access = {
+        isPlayable: false,
+        isPurchased: false,
+        accessType: 'unknown',
+      }
+    }
+
+    return series
+  } catch (error) {
+    console.error('Error checking series access:', error)
+    // Return series with limited access if error occurs
+    series.access = {
+      isPlayable: false,
+      isPurchased: false,
+      accessType: 'error',
+    }
+    return series
+  }
+}
 
 const createSeries = async (req, res, next) => {
   try {
@@ -88,18 +253,31 @@ const createSeries = async (req, res, next) => {
 const getSeriesById = async (req, res, next) => {
   try {
     const { id } = req.params
+    const userId = req.user.id.toString()
 
     const series = await Series.findById(id)
-      .populate('created_by', 'username email')
-      .populate('community', 'name')
+      .populate('created_by', 'username email profile_photo custom_name')
+      .populate('community', 'name profile_photo followers')
       .populate({
         path: 'episodes',
-        select:
-          'name description thumbnailUrl season_number episode_number created_by videoUrl',
-        populate: {
-          path: 'created_by',
-          select: 'username email',
-        },
+        populate: [
+          {
+            path: 'created_by',
+            select: 'username email profile_photo custom_name',
+          },
+          {
+            path: 'community', 
+            select: 'name profile_photo followers'
+          },
+          {
+            path: 'series',
+            populate: {
+              path: 'episodes',
+              select: 'name episode_number season_number thumbnailUrl views likes',
+              options: { sort: { season_number: 1, episode_number: 1 } },
+            },
+          }
+        ],
         options: {
           sort: { season_number: 1, episode_number: 1 },
         },
@@ -109,9 +287,51 @@ const getSeriesById = async (req, res, next) => {
       return res.status(404).json({ error: 'Series not found' })
     }
 
+    // Convert series to plain object for modification
+    let seriesObject = series.toObject();
+    
+    // Add access information to the series itself
+    if (userId) {
+      seriesObject = await checkSeriesAccess(seriesObject, userId);
+    }
+
+    // Process episodes to add computed fields if user is logged in
+    if (userId && seriesObject.episodes && seriesObject.episodes.length > 0) {
+      const followingIds = [];
+      const user = await User.findById(userId).select('following');
+      if (user && user.following) {
+        user.following.forEach(following => followingIds.push(following.toString()));
+      }
+
+      // Process each episode
+      const episodesWithAccess = [];
+
+      for (let i = 0; i < seriesObject.episodes.length; i++) {
+        const episode = seriesObject.episodes[i];
+        
+        // Add following status
+        if (episode.created_by) {
+          episode.is_following_creator = followingIds.includes(episode.created_by._id.toString());
+        }
+
+        // Add community following status
+        if (episode.community && episode.community.followers) {
+          episode.is_following_community = episode.community.followers.some(
+            followerId => followerId.toString() === userId
+          );
+        }
+        
+        // Add access information
+        const processedEpisode = await checkAccess(episode, userId);
+        episodesWithAccess.push(processedEpisode);
+      }
+      
+      seriesObject.episodes = episodesWithAccess;
+    }
+
     res.status(200).json({
       message: 'Series retrieved successfully',
-      data: series,
+      data: seriesObject,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -449,7 +669,6 @@ const searchSeries = async (req, res, next) => {
           sort: { season_number: 1, episode_number: 1 },
         },
       })
-
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 })
@@ -490,7 +709,6 @@ const getAllSeries = async (req, res, next) => {
           sort: { season_number: 1, episode_number: 1 },
         },
       })
-
       .skip(skip)
       .limit(parseInt(limit))
       .sort({ createdAt: -1 })
@@ -521,4 +739,6 @@ module.exports = {
   removeEpisodeFromSeries,
   searchSeries,
   getAllSeries,
+  checkAccess,
+  checkSeriesAccess,
 }

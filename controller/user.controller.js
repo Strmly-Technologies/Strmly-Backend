@@ -327,11 +327,110 @@ const GetUserCommunities = async (req, res, next) => {
   }
 }
 
+const { checkCreatorPassAccess } = require('./creatorpass.controller')
+
+// Add checkAccess function
+const checkAccess = async (video, userId) => {
+  try {
+    if (video.type === 'Free') {
+      video.access = {
+        isPlayable: true,
+        freeRange: {
+          start_time: video.start_time || 0,
+          display_till_time: video.display_till_time || 0,
+        },
+        isPurchased: true,
+        accessType: 'free',
+      }
+    } else if (video.type === 'Paid') {
+      // Check if user has creator pass access
+      const hasCreatorPass = await checkCreatorPassAccess(
+        userId,
+        video.created_by._id.toString()
+      )
+
+      if (hasCreatorPass.hasAccess) {
+        video.access = {
+          isPlayable: true,
+          freeRange: {
+            start_time: video.start_time || 0,
+            display_till_time: video.display_till_time || 0,
+          },
+          isPurchased: true,
+          accessType: 'creator_pass',
+        }
+      } else {
+        // Check if user has purchased the video
+        const hasPurchasedVideo = await UserAccess.findOne({
+          user_id: userId,
+          content_id: video._id,
+          content_type: 'video',
+          access_type: 'paid',
+        })
+
+        if (hasPurchasedVideo) {
+          video.access = {
+            isPlayable: true,
+            freeRange: {
+              start_time: video.start_time || 0,
+              display_till_time: video.display_till_time || 0,
+            },
+            isPurchased: true,
+            accessType: 'purchased',
+          }
+        } else {
+          video.access = {
+            isPlayable: false,
+            freeRange: {
+              start_time: video.start_time || 0,
+              display_till_time: video.display_till_time || 0,
+            },
+            isPurchased: false,
+            accessType: 'limited',
+            price: video.amount || 0,
+          }
+        }
+      }
+    } else {
+      // Default access for unknown type
+      video.access = {
+        isPlayable: false,
+        freeRange: {
+          start_time: video.start_time || 0,
+          display_till_time: video.display_till_time || 0,
+        },
+        isPurchased: false,
+        accessType: 'unknown',
+      }
+    }
+
+    return video
+  } catch (error) {
+    console.error('Error checking video access:', error)
+    // Return video with limited access if error occurs
+    video.access = {
+      isPlayable: false,
+      freeRange: {
+        start_time: video.start_time || 0,
+        display_till_time: video.display_till_time || 0,
+      },
+      isPurchased: false,
+      accessType: 'error',
+    }
+    return video
+  }
+}
+
 const GetUserVideos = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
     const { type = 'uploaded', page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
+    const currentUserId = req.user.id.toString();
+    
+    // Get current user's following list
+    const currentUser = await User.findById(currentUserId).select('following');
+    const followingIds = currentUser?.following?.map(id => id.toString()) || [];
 
     let videos
 
@@ -410,11 +509,46 @@ const GetUserVideos = async (req, res, next) => {
       videos = reshares
     } else {
       videos = await LongVideo.find({ created_by: userId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate('created_by', 'username profile_photo custom_name')
+        .populate('community', 'name profile_photo followers')
+        .populate({
+          path: 'series',
+          populate: {
+            path: 'episodes',
+            select: 'name episode_number season_number thumbnailUrl views likes',
+            options: { sort: { season_number: 1, episode_number: 1 } },
+          },
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
+        
+      // Add computed fields and check access
+      if (videos && videos.length > 0) {
+        const processedVideos = [];
+        
+        for (let i = 0; i < videos.length; i++) {
+          const videoObj = videos[i].toObject();
+          
+          // Add following status
+          if (videos[i].created_by) {
+            videoObj.is_following_creator = followingIds.includes(videos[i].created_by._id.toString());
+          }
+          
+          // Add community following status
+          if (videos[i].community && videos[i].community.followers) {
+            videoObj.is_following_community = videos[i].community.followers.some(
+              followerId => followerId.toString() === currentUserId
+            );
+          }
+          
+          // Add access information
+          const processedVideo = await checkAccess(videoObj, currentUserId);
+          processedVideos.push(processedVideo);
+        }
+        
+        videos = processedVideos;
+      }
     }
     res.status(200).json({
       message: 'User videos retrieved successfully',
@@ -868,8 +1002,10 @@ const getUserProfileDetails = async (req, res, next) => {
 
     const result = {
       message: 'User profile details retrieved successfully',
+      custom_name: userDetails.custom_name,
       user: {
         username: userDetails.username,
+        custom_name: userDetails.custom_name,
         profile_photo: userDetails.profile_photo,
         totalFollowers,
         totalFollowing,
@@ -989,6 +1125,11 @@ const GetUserVideosById = async (req, res, next) => {
     const userId = req.params.id
     const { type = 'uploaded', page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
+    const currentUserId = req.user.id.toString();
+    
+    // Get current user's following list
+    const currentUser = await User.findById(currentUserId).select('following');
+    const followingIds = currentUser?.following?.map(id => id.toString()) || [];
 
     let videos
 
@@ -1050,11 +1191,46 @@ const GetUserVideosById = async (req, res, next) => {
       videos = user.playlist
     } else {
       videos = await LongVideo.find({ created_by: userId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
+        .populate('created_by', 'username profile_photo custom_name')
+        .populate('community', 'name profile_photo followers')
+        .populate({
+          path: 'series',
+          populate: {
+            path: 'episodes',
+            select: 'name episode_number season_number thumbnailUrl views likes',
+            options: { sort: { season_number: 1, episode_number: 1 } },
+          },
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
+        
+      // Add computed fields and check access
+      if (videos && videos.length > 0) {
+        const processedVideos = [];
+        
+        for (let i = 0; i < videos.length; i++) {
+          const videoObj = videos[i].toObject();
+          
+          // Add following status
+          if (videos[i].created_by) {
+            videoObj.is_following_creator = followingIds.includes(videos[i].created_by._id.toString());
+          }
+          
+          // Add community following status
+          if (videos[i].community && videos[i].community.followers) {
+            videoObj.is_following_community = videos[i].community.followers.some(
+              followerId => followerId.toString() === currentUserId
+            );
+          }
+          
+          // Add access information
+          const processedVideo = await checkAccess(videoObj, currentUserId);
+          processedVideos.push(processedVideo);
+        }
+        
+        videos = processedVideos;
+      }
     }
 
     res.status(200).json({
@@ -2065,6 +2241,7 @@ module.exports = {
   GetStatusOfReshare,
   AddVideoToUserViewHistory,
   getUserReshares,
+  checkAccess,
   getUserInterests,
   getMonetizationStatus,
   getResharesOfOtherUser,

@@ -35,7 +35,7 @@ router.delete(
 router.post('/:id/episodes', authenticateToken, addEpisodeToSeries)
 
 // Route to get a series by ID
-router.get('/:id', getSeriesById)
+router.get('/:id',authenticateToken, getSeriesById)
 
 // Route to update a series by ID
 router.put('/:id', authenticateToken, updateSeries)
