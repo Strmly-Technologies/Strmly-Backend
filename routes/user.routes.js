@@ -33,6 +33,8 @@ const {
   getMonetizationStatus,
   getResharesOfOtherUser,
   GetLikedVideosInProfileById,
+  HasCommunityAccess,
+  HasUserAccess,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -154,6 +156,16 @@ router.get('/videos/:id', authenticateToken, GetUserVideosById)
 
 // Check if user has creator pass for specific creator
 router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass)
+
+// Check if user has community access using community-id
+router.get(
+  '/has-community-access/:communityId',
+  authenticateToken,
+  HasCommunityAccess
+)
+
+// Check if user has asset access using asset-id
+router.get('/has-user-access/:assetId', authenticateToken, HasUserAccess)
 
 router.get('/reshares/:id', authenticateToken, getResharesOfOtherUser)
 

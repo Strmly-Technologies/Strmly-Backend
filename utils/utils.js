@@ -2,6 +2,9 @@ const multer = require('multer')
 const { s3 } = require('../config/AWS')
 const { v4: uuidv4 } = require('uuid')
 const { spawn } = require('child_process')
+const { checkAccess } = require('../controller/recommendation.controller')
+const Reshare = require('../models/Reshare')
+const User = require('../models/User')
 const fs = require('fs')
 const path = require('path')
 const {
@@ -496,6 +499,38 @@ const generateVideoThumbnail = (videoPath) => {
   })
 }
 
+const addDetailsToVideoObject = async (videoObject, userId) => {
+  const user = await User.findById(userId).select(
+    'following following_communities'
+  )
+  const is_liked_video = videoObject.liked_by?.some(
+    (user) => user._id?.toString() === userId
+  )
+  videoObject.is_liked_video = is_liked_video
+
+  const is_following_creator =
+    user.following?.some(
+      (user) => user.toString() === videoObject.created_by?._id?.toString()
+    ) || false
+
+  videoObject.is_following_creator = is_following_creator
+
+  const is_following_community =
+    user.following_communities?.some(
+      (community) =>
+        community.toString() === videoObject.community?._id?.toString()
+    ) || false
+  videoObject.is_following_community = is_following_community
+  videoObject = await checkAccess(videoObject, userId)
+
+  const reshare = await Reshare.findOne({
+    user: userId,
+    long_video: videoObject._id.toString(),
+  })
+  videoObject.is_reshared =
+    reshare && Object.keys(reshare).length > 0 ? true : false
+}
+
 module.exports = {
   handleMulterError,
   validateVideoFormData,
@@ -508,4 +543,5 @@ module.exports = {
   communityProfilePhotoUpload,
   generateVideoThumbnail,
   getFileFromS3Url,
+  addDetailsToVideoObject,
 }

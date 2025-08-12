@@ -2,6 +2,7 @@ const Community = require('../models/Community')
 const CommunityAccess = require('../models/CommunityAccess')
 const LongVideo = require('../models/LongVideo')
 const User = require('../models/User')
+const { addDetailsToVideoObject } = require('../utils/utils')
 const { handleError, uploadImageToS3 } = require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
@@ -530,8 +531,9 @@ const getCommunityProfileDetails = async (req, res, next) => {
 }
 const getCommunityVideos = async (req, res, next) => {
   try {
+    const userId = req.user.id.toString()
     const communityId = req.params.id
-    const { videoType } = req.query
+    const { videoType = 'long' } = req.query
 
     if (!communityId) {
       return res.status(400).json({ message: 'Community ID is required' })
@@ -546,6 +548,7 @@ const getCommunityVideos = async (req, res, next) => {
 
     if (videoType === 'long') {
       const populated = await Community.findById(communityId)
+        .lean()
         .select('_id long_videos')
         .populate({
           path: 'long_videos',
@@ -577,8 +580,12 @@ const getCommunityVideos = async (req, res, next) => {
         })
 
       videos = populated.long_videos
+      for (let i = 0; i < videos.length; i++) {
+        await addDetailsToVideoObject(videos[i], userId)
+      }
     } else if (videoType === 'series') {
       const populated = await Community.findById(communityId)
+        .lean()
         .select('_id series')
         .populate({
           path: 'series',
@@ -610,6 +617,11 @@ const getCommunityVideos = async (req, res, next) => {
           ],
         })
       videos = populated.series
+      for (let i = 0; i < videos.length; i++) {
+        for (let j = 0; j < videos[i].episodes?.length; j++) {
+          await addDetailsToVideoObject(videos[i].episodes?.[j], userId)
+        }
+      }
     } else {
       return res.status(400).json({ message: 'Invalid video type' })
     }

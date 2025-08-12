@@ -7,6 +7,7 @@ const {
   uploadImageToS3,
   getFileFromS3Url,
 } = require('../utils/utils')
+const { addDetailsToVideoObject } = require('../utils/utils')
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const Reshare = require('../models/Reshare')
@@ -16,6 +17,7 @@ const path = require('path')
 const os = require('os')
 const videoCompressor = require('../utils/video_compressor')
 const { generateVideoABSSegments } = require('../utils/ABS')
+
 const fs = require('fs')
 
 const uploadVideoToCommunity = async (req, res, next) => {
@@ -630,8 +632,10 @@ const searchVideos = async (req, res, next) => {
 
 const getVideoById = async (req, res, next) => {
   try {
+    const userId = req.user.id.toString()
     const { id } = req.params
     let video = await LongVideo.findById(id)
+      .lean()
       .populate('created_by', 'username profile_photo')
       .populate('community', 'name profile_photo followers')
       .populate({
@@ -651,13 +655,11 @@ const getVideoById = async (req, res, next) => {
       return res.status(404).json({ error: 'Video not found' })
     }
 
+    await addDetailsToVideoObject(video, userId)
+
     res.status(200).json({
       message: 'Video retrieved successfully',
-      data: {
-        ...video.toObject(),
-        start_time: video.start_time,
-        display_till_time: video.display_till_time,
-      },
+      video,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -773,9 +775,8 @@ const getTrendingVideos = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    const followingIds = (user.following || []).map((id) => id.toString())
-
-    let videos = await LongVideo.find({})
+    const videos = await LongVideo.find({})
+      .lean()
       .populate('created_by', 'username email profile_photo custom_name')
       .populate('community', 'name profile_photo followers')
       .populate({
@@ -789,36 +790,9 @@ const getTrendingVideos = async (req, res, next) => {
       .sort({ views: -1, likes: -1, createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-    const userReshares = await Reshare.find({ user: userId }).select(
-      'long_video'
-    )
-    videos = videos.map((video) => {
-      video = video.toObject()
-      const community = video.community
-      if (community && community.followers) {
-        const isFollowing = community.followers.some(
-          (followerId) => followerId.toString() === userId
-        )
-        video.community = {
-          ...community,
-          is_following_community: isFollowing,
-        }
-      }
-      video.is_reshared = userReshares.some(
-        (reshare) => reshare.long_video.toString() === video._id.toString()
-      )
-      if (
-        video.created_by &&
-        followingIds.includes(video.created_by._id.toString())
-      ) {
-        video.is_following_creator = true
-      } else {
-        video.is_following_creator = false
-      }
-      video.start_time = video.start_time || 0
-      video.display_till_time = video.display_till_time || 0
-      return video
-    })
+    for (let i = 0; i < videos.length; i++) {
+      await addDetailsToVideoObject(videos[i], userId)
+    }
     let total = await LongVideo.countDocuments()
 
     res.status(200).json({
