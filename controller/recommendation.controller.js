@@ -107,7 +107,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         visibility: { $ne: 'hidden' },
       })
         .lean()
-        .populate('created_by', 'username profile_photo')
+        .populate('created_by', 'username profile_photo custom_name')
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
@@ -170,12 +170,15 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
       .limit(2)
-      .populate('user', 'username profile_photo')
+      .populate('user', 'username profile_photo custom_name')
       .populate({
         path: 'long_video',
         select: 'name description thumbnailUrl _id videoResolutions series',
         populate: [
-          { path: 'created_by', select: 'username profile_photo _id' },
+          {
+            path: 'created_by',
+            select: 'username profile_photo _id custom_name',
+          },
           { path: 'community', select: 'name profile_photo followers _id' },
           {
             path: 'series',

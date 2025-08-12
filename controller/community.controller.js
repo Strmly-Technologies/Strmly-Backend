@@ -557,7 +557,7 @@ const getCommunityVideos = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -565,7 +565,7 @@ const getCommunityVideos = async (req, res, next) => {
                 'title description price genre episodes seasons total_episodes',
               populate: {
                 path: 'created_by',
-                select: 'username profile_photo',
+                select: 'username profile_photo custom_name',
               },
             },
             {
@@ -592,14 +592,14 @@ const getCommunityVideos = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'episodes',
               populate: [
                 {
                   path: 'created_by',
-                  select: 'username profile_photo',
+                  select: 'username profile_photo custom_name',
                 },
                 {
                   path: 'community',
@@ -654,7 +654,7 @@ const getTrendingCommunityVideos = async (req, res, next) => {
     let trendingVideos = []
 
     const longVideos = await LongVideo.find(query)
-      .populate('created_by', 'username profile_photo')
+      .populate('created_by', 'username profile_photo custom_name')
       .populate('community', 'name profile_photo followers')
       .populate({
         path: 'series',

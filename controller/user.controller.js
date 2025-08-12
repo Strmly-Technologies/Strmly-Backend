@@ -39,7 +39,7 @@ const GetUserFeed = async (req, res, next) => {
       ],
     })
       .lean()
-      .populate('created_by', 'username profile_photo')
+      .populate('created_by', 'username profile_photo custom_name')
       .populate('community', 'name profile_photo followers')
       .populate({
         path: 'series',
@@ -70,7 +70,7 @@ const GetUserFeed = async (req, res, next) => {
         created_by: { $nin: followingIds }, // Exclude videos from followed users
       })
         .lean()
-        .populate('created_by', 'username profile_photo')
+        .populate('created_by', 'username profile_photo custom_name')
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
@@ -98,7 +98,7 @@ const GetUserFeed = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .skip(resharedVideoSkip)
       .limit(2)
-      .populate('user', 'username profile_photo')
+      .populate('user', 'username profile_photo custom_name')
       .populate({
         path: 'long_video',
         populate: [
@@ -359,7 +359,7 @@ const GetUserVideos = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -398,7 +398,7 @@ const GetUserVideos = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -436,7 +436,7 @@ const GetUserVideos = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -502,13 +502,13 @@ const GetUserVideos = async (req, res, next) => {
         .skip(skip)
         .lean()
         .limit(parseInt(limit))
-        .populate('user', 'username profile_photo')
+        .populate('user', 'username profile_photo custom_name')
         .populate({
           path: 'long_video',
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -536,7 +536,7 @@ const GetUserVideos = async (req, res, next) => {
     } else {
       videos = await LongVideo.find({ created_by: userId })
         .lean()
-        .populate('created_by', 'username profile_photo')
+        .populate('created_by', 'username profile_photo custom_name')
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
@@ -1137,7 +1137,7 @@ const GetUserVideosById = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -1175,7 +1175,7 @@ const GetUserVideosById = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -1213,7 +1213,7 @@ const GetUserVideosById = async (req, res, next) => {
           populate: [
             {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
             {
               path: 'series',
@@ -1279,7 +1279,7 @@ const GetUserVideosById = async (req, res, next) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
-        .populate('user', 'username profile_photo')
+        .populate('user', 'username profile_photo custom_name')
         .populate({
           path: 'long_video',
           populate: [
@@ -1293,7 +1293,7 @@ const GetUserVideosById = async (req, res, next) => {
                 'title description price genre episodes seasons total_episodes',
               populate: {
                 path: 'created_by',
-                select: 'username profile_photo',
+                select: 'username profile_photo custom_name',
               },
             },
             {
@@ -1313,7 +1313,7 @@ const GetUserVideosById = async (req, res, next) => {
     } else {
       videos = await LongVideo.find({ created_by: userId })
         .lean()
-        .populate('created_by', 'username profile_photo')
+        .populate('created_by', 'username profile_photo custom_name')
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
@@ -1549,7 +1549,7 @@ const getUserHistory = async (req, res, next) => {
       _id: { $in: paginatedVideoIds },
     })
       .lean()
-      .populate('created_by', 'username profile_photo')
+      .populate('created_by', 'username profile_photo custom_name')
       .populate('community', 'name profile_photo followers')
       .populate({
         path: 'series',
@@ -1654,7 +1654,7 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
         populate: [
           {
             path: 'created_by',
-            select: 'username profile_photo _id',
+            select: 'username profile_photo _id custom_name',
           },
           {
             path: 'series',
@@ -1662,7 +1662,7 @@ const getUserLikedVideosInCommunity = async (req, res, next) => {
               'title description price genre episodes seasons total_episodes _id',
             populate: {
               path: 'created_by',
-              select: 'username profile_photo',
+              select: 'username profile_photo custom_name',
             },
           },
           {
@@ -2278,13 +2278,13 @@ const getUserReshares = async (req, res, next) => {
     const userId = req.user.id.toString()
     const reshares = await Reshare.find({ user: userId })
       .lean()
-      .populate('user', 'username profile_photo')
+      .populate('user', 'username profile_photo custom_name')
       .populate({
         path: 'long_video',
         populate: [
           {
             path: 'created_by',
-            select: 'username profile_photo',
+            select: 'username profile_photo custom_name',
           },
           {
             path: 'series',
@@ -2325,13 +2325,13 @@ const getResharesOfOtherUser = async (req, res, next) => {
     }
     const reshares = await Reshare.find({ user: id })
       .lean()
-      .populate('user', 'username profile_photo')
+      .populate('user', 'username profile_photo custom_name')
       .populate({
         path: 'long_video',
         populate: [
           {
             path: 'created_by',
-            select: 'username profile_photo',
+            select: 'username profile_photo custom_name',
           },
           {
             path: 'series',

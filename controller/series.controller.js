@@ -92,14 +92,14 @@ const getSeriesById = async (req, res, next) => {
     const userId = req.user.id.toString()
     const series = await Series.findById(id)
       .lean()
-      .populate('created_by', 'username email profile_photo')
+      .populate('created_by', 'username email profile_photo custom_name')
       .populate('community', 'name profile_photo followers')
       .populate({
         path: 'episodes',
         populate: [
           {
             path: 'created_by',
-            select: 'username profile_photo',
+            select: 'username profile_photo custom_name',
           },
           {
             path: 'community',
