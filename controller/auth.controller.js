@@ -40,10 +40,12 @@ const RegisterNewUser = async (req, res, next) => {
     const verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
     // generate a custom name based on username
-    const customName = username.replace(/[^a-zA-Z0-9 ]/g, '').trim()
-    .replace(/\s+/g, ' ')
-    .substring(0, 50) 
-    .trim() 
+    const customName = username
+      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .substring(0, 50)
+      .trim()
 
     const newUser = new User({
       username,
@@ -502,7 +504,7 @@ const verifyResetToken = async (req, res, next) => {
       })
     }
 
-   const otpValidation = validateAndSanitize.otp(otp)
+    const otpValidation = validateAndSanitize.otp(otp)
     if (!otpValidation.isValid) {
       return res.status(400).json({
         message: otpValidation.error,
@@ -534,17 +536,11 @@ const verifyResetToken = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const { otp, newPassword, confirmPassword } = req.body
+    const { otp, newPassword } = req.body
 
-    if (!otp || !newPassword || !confirmPassword) {
+    if (!otp || !newPassword) {
       return res.status(400).json({
-        message: 'Token, new password, and password confirmation are required',
-      })
-    }
-
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({
-        message: 'Passwords do not match',
+        message: 'Token, new password, and password are required',
       })
     }
 
