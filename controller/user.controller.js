@@ -994,7 +994,7 @@ const getUserProfileDetails = async (req, res, next) => {
     console.log(`🔄 Profile cache MISS for user: ${userId} - fetching fresh`)
 
     const userDetails = await User.findById(userId).select(
-      'username profile_photo followers following my_communities interests onboarding_completed creator_profile social_media_links '
+      'username profile_photo followers following my_communities interests onboarding_completed creator_profile social_media_links custom_name'
     )
 
     if (!userDetails) {
