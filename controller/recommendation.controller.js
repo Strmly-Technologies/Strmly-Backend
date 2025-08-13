@@ -79,6 +79,17 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
         // Check access and add access field
         video = await checkAccess(video, userId)
+        const creatorPassDetails = await User.findById(
+          video.created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+        console.log(creatorPassDetails)
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          video.creatorPassDetails = creatorPassDetails
+        }
         interestedVideos[i] = video
       }
 
@@ -154,6 +165,17 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
         // Check access and add access field
         video = await checkAccess(video, userId)
+        const creatorPassDetails = await User.findById(
+          video.created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+        console.log(creatorPassDetails)
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          video.creatorPassDetails = creatorPassDetails
+        }
         randomVideos[i] = video
       }
 
@@ -224,6 +246,17 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
         // Check access and add access field
         video = await checkAccess(video, userId)
+        const creatorPassDetails = await User.findById(
+          video.created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+        console.log(creatorPassDetails)
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          video.creatorPassDetails = creatorPassDetails
+        }
         resharedVideos[i].long_video = video
       }
     }
