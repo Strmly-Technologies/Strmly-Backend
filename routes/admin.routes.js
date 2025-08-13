@@ -13,6 +13,7 @@ const {
   getTotalWalletLoad,
   getWithdrawals,
   processManualWithdrawal,
+  getTransactionById,
 } = require('../controller/admin.controller')
 const { authenticateAdmin } = require('../middleware/adminAuth')
 
@@ -34,5 +35,6 @@ router.get('/reports', authenticateAdmin, getReports)
 router.put('/report/:id', authenticateAdmin, updateReportStatus)
 router.get('/withdrawals', authenticateAdmin, getWithdrawals)
 router.post('/withdrawals/:id/process', authenticateAdmin, processManualWithdrawal)
+router.get('/transaction/:id',authenticateAdmin,getTransactionById)
 
 module.exports = router

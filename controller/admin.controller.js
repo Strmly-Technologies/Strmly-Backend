@@ -461,7 +461,6 @@ const getTotalWalletLoad=async(req,res,next)=>{
      transactions.forEach((transaction) => {
       sum += Number(transaction.amount)
     })
-    console.log('Total wallet load:', sum)
 
     res.status(200).json({
       success: true,
@@ -743,6 +742,27 @@ Strmly Team`
   }
 }
 
+const getTransactionById=async(req,res,next)=>{
+  const { id } = req.params
+  try{
+    const transaction = await WalletTransaction.findById(id)
+      .populate('user_id', 'username email')
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction not found'
+      })
+    }
+    res.status(200).json({
+      success: true,
+      transaction
+    })
+  }
+  catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 
 
 module.exports = {
@@ -759,4 +779,5 @@ module.exports = {
   getTotalWalletLoad,
   getWithdrawals,
   processManualWithdrawal,
+  getTransactionById
 }
