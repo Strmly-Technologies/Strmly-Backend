@@ -88,6 +88,9 @@ function showSection(sectionName) {
         case 'creator-passes':
             loadCreatorPasses();
             break;
+        case 'overview':
+            loadFinancialOverview();
+            break;
     }
 }
 
@@ -358,6 +361,126 @@ function renderCreatorPassesTable(passes) {
 
     html += '</tbody></table>';
     document.getElementById('creatorPassesContent').innerHTML = html;
+}
+
+async function loadFinancialOverview(timeframe = 'all') {
+    try {
+        document.getElementById('financialOverviewContent').innerHTML = '<div class="loading">Loading financial overview...</div>';
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/financial-overview?timeframe=${timeframe}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            renderFinancialOverview(data.financialData, data.timeframe);
+        }
+    } catch (error) {
+        document.getElementById('financialOverviewContent').innerHTML = '<div class="error">Error loading financial overview</div>';
+    }
+}
+
+function renderFinancialOverview(financialData, timeframe) {
+    const formatCurrency = (amount) => `₹${amount.toLocaleString()}`;
+    
+    let html = `
+        <div class="financial-overview">
+            <div class="overview-header">
+                <h3>Financial Overview ${timeframe !== 'all' ? `(${timeframe})` : '(All Time)'}</h3>
+                <div class="timeframe-selector">
+                    <select onchange="loadFinancialOverview(this.value)">
+                        <option value="all" ${timeframe === 'all' ? 'selected' : ''}>All Time</option>
+                        <option value="7d" ${timeframe === '7d' ? 'selected' : ''}>Last 7 Days</option>
+                        <option value="30d" ${timeframe === '30d' ? 'selected' : ''}>Last 30 Days</option>
+                        <option value="90d" ${timeframe === '90d' ? 'selected' : ''}>Last 90 Days</option>
+                        <option value="1y" ${timeframe === '1y' ? 'selected' : ''}>Last Year</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="financial-grid">
+                <div class="financial-card">
+                    <h4>💝 Gifting Activity</h4>
+                    <div class="metric-row">
+                        <span>Video Gifts:</span>
+                        <span>${formatCurrency(financialData.gifting.videoGifting.amount)} (${financialData.gifting.videoGifting.count})</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Comment Gifts:</span>
+                        <span>${formatCurrency(financialData.gifting.commentGifting.amount)} (${financialData.gifting.commentGifting.count})</span>
+                    </div>
+                    <div class="metric-total">
+                        <strong>Total Gifting: ${formatCurrency(financialData.gifting.totalGifting)}</strong>
+                    </div>
+                </div>
+
+                <div class="financial-card">
+                    <h4>💰 Monetization</h4>
+                    <div class="metric-row">
+                        <span>Content Sales:</span>
+                        <span>${formatCurrency(financialData.monetization.contentSales.amount)} (${financialData.monetization.contentSales.count})</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Creator Passes:</span>
+                        <span>${formatCurrency(financialData.monetization.creatorPasses.amount)} (${financialData.monetization.creatorPasses.count})</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Community Fees:</span>
+                        <span>${formatCurrency(financialData.monetization.communityFees.amount)} (${financialData.monetization.communityFees.count})</span>
+                    </div>
+                    <div class="metric-total">
+                        <strong>Total Monetization: ${formatCurrency(financialData.monetization.totalMonetization)}</strong>
+                    </div>
+                </div>
+
+                <div class="financial-card">
+                    <h4>🏦 Withdrawals</h4>
+                    <div class="metric-row">
+                        <span>Pending Requests:</span>
+                        <span>${formatCurrency(financialData.withdrawals.pendingRequests.amount)} (${financialData.withdrawals.pendingRequests.count})</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Completed:</span>
+                        <span>${formatCurrency(financialData.withdrawals.completedWithdrawals.amount)} (${financialData.withdrawals.completedWithdrawals.count})</span>
+                    </div>
+                </div>
+
+                <div class="financial-card">
+                    <h4>💳 Wallet Activity</h4>
+                    <div class="metric-row">
+                        <span>Total Loaded:</span>
+                        <span>${formatCurrency(financialData.walletActivity.totalLoaded.amount)} (${financialData.walletActivity.totalLoaded.count})</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="platform-metrics">
+                <h4>📊 Platform Metrics</h4>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-label">Total Revenue:</span>
+                        <span class="metric-value">${formatCurrency(financialData.platformMetrics.totalRevenue)}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Withdrawal Rate:</span>
+                        <span class="metric-value">${financialData.platformMetrics.withdrawalRate}%</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Net Platform Balance:</span>
+                        <span class="metric-value">${formatCurrency(financialData.platformMetrics.netPlatformBalance)}</span>
+                    </div>
+                </div>
+                
+                <div class="avg-transaction-values">
+                    <h5>Average Transaction Values:</h5>
+                    <div class="avg-metrics">
+                        <span>Gifting: ${formatCurrency(financialData.platformMetrics.avgTransactionValue.gifting)}</span>
+                        <span>Content Sales: ${formatCurrency(financialData.platformMetrics.avgTransactionValue.contentSales)}</span>
+                        <span>Creator Passes: ${formatCurrency(financialData.platformMetrics.avgTransactionValue.creatorPasses)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('financialOverviewContent').innerHTML = html;
 }
 
 async function searchUsers() {

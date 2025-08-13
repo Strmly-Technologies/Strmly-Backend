@@ -129,6 +129,38 @@ const setupCreatorBankAccount = async (req, res, next) => {
   }
 }
 
+// update creatorUpi
+const createOrUpdateUPI=async(req,res,next)=>{
+  try {
+    const {upi_id}=req.body
+    const userId = req.user.id.toString()
+    if (!upi_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'UPI ID is required',
+        required: ['upi_id'],
+        code: 'MISSING_REQUIRED_FIELDS',
+      })
+    }
+    const existingUser = await User.findById(userId)
+  
+    const updatedUser = await User.findByIdAndUpdate(userId, {
+      'creator_profile.upi_id': upi_id,
+      'creator_profile.withdrawal_enabled': true,
+      'creator_profile.bank_verified': false,
+    }, { new: true })
+    res.status(200).json({
+      success: true,
+      message: 'UPI ID updated successfully',
+      upiId: updatedUser.creator_profile.upi_id,
+      note: 'You can now withdraw money from your wallet to this UPI ID',
+    })  
+  } catch (error) {
+    handleError(error, req, res, next)
+    
+  }
+}
+
 //upi fund account id should have the same contact id as bank account
 const setupCreatorUPI = async (req, res, next) => {
   try {
@@ -216,4 +248,5 @@ const setupCreatorUPI = async (req, res, next) => {
 module.exports = {
   setupCreatorBankAccount,
   setupCreatorUPI,
+  createOrUpdateUPI
 }

@@ -498,17 +498,22 @@ const createManualWithdrawalRequest = async (req, res, next) => {
         code: 'CREATOR_NOT_FOUND',
       })
     }
-
-    // Check if either bank or UPI is setup
-    if (!creator.creator_profile?.fund_account_id && !creator.creator_profile?.upi_fund_account_id) {
+    if(creator.creator_profile?.withdrawal_enabled !== true) {
       return res.status(400).json({
         success: false,
-        error: 'No payout method setup. Please add bank details or UPI ID first.',
-        action: 'setup_payout_method',
-        code: 'PAYOUT_METHOD_NOT_SETUP',
+        error: 'Withdrawal is not enabled for your account. Please contact support.',
+        code: 'WITHDRAWAL_NOT_ENABLED',
       })
     }
-
+    if(!creator.creator_profile?.upi_id){
+      return res.status(400).json({
+        success: false,
+        error: 'UPI ID not setup. Please add your UPI ID first.',
+        action: 'setup_UPI_ID',
+        code: 'UPI_ID_NOT_SETUP',
+      })
+    }
+  
     const wallet = await Wallet.findOne({ user_id: creatorId })
     if (!wallet) {
       return res.status(404).json({
@@ -551,7 +556,7 @@ const createManualWithdrawalRequest = async (req, res, next) => {
           wallet_id: wallet._id,
           amount: amount,
           currency: 'INR',
-          fund_account_id: creator.creator_profile.fund_account_id || creator.creator_profile.upi_fund_account_id,
+          fund_account_id: null, // Manual withdrawal does not use fund account
           status: 'pending',
           bank_details: creator.creator_profile.bank_details,
           upi_id: creator.creator_profile.upi_id || null,

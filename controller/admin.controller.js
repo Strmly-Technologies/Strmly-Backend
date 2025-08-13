@@ -11,6 +11,7 @@ const path = require('path')
 const Withdrawal = require('../models/Withdrawal')
 const Wallet = require('../models/Wallet')
 const { sendEmail } = require('../utils/email')
+const WalletTransfer = require('../models/WalletTransfer')
 
 const adminLogin = async (req, res, next) => {
   try {
@@ -619,7 +620,7 @@ const processManualWithdrawal = async (req, res, next) => {
       // Update related wallet transaction
       await WalletTransaction.updateMany(
         { 'metadata.withdrawal_id': withdrawal._id },
-        { status: 'completed' }
+        { status: 'processed' }
       )
 
       // Send success email to user
@@ -741,6 +742,8 @@ Strmly Team`
     handleError(error, req, res, next)
   }
 }
+
+
 
 module.exports = {
   adminLogin,

@@ -30,7 +30,7 @@ const withdrawalSchema = new mongoose.Schema(
     },
     fund_account_id: {
       type: String,
-      required: true,
+      required: false,
     },
 
     // Withdrawal status

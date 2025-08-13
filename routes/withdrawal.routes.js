@@ -9,6 +9,7 @@ const {
 const {
   setupCreatorBankAccount,
   setupCreatorUPI,
+  createOrUpdateUPI,
 } = require('../controller/creator.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -37,6 +38,13 @@ router.post(
   bankSetupRateLimiter,
   validateUPISetup,
   setupCreatorUPI
+)
+
+router.post(
+  '/create-or-update-upi',
+  authenticateToken,
+  bankSetupRateLimiter,
+  createOrUpdateUPI
 )
 
 // Create withdrawal request
