@@ -167,7 +167,7 @@ const findVideoDuplicates = async (videoId) => {
     }
     const videos = await LongVideo.find({
       _id: { $ne: videoId },
-    }).select('fingerprint _id')
+    }).select('fingerprint _id videoUrl')
 
     const duplicates = []
 
@@ -187,4 +187,10 @@ const findVideoDuplicates = async (videoId) => {
     throw e
   }
 }
-module.exports = { fingerprintVideo, findVideoDuplicates }
+module.exports = {
+  fingerprintVideo,
+  findVideoDuplicates,
+  cleanup,
+  createDirs,
+  saveFileBuffer,
+}
