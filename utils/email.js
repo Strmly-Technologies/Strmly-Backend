@@ -260,6 +260,24 @@ const generatePasswordResetToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
+const sendEmail = async (to, subject, text) => {
+  try {
+    const transporter = createTransporter();
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to,
+      subject,
+      text,
+    };
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully');
+    return { success: true }
+  } catch (error) {
+    console.error('Email send error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 module.exports = {
     sendVerificationEmail,
     sendWelcomeEmail,
@@ -269,5 +287,6 @@ module.exports = {
     generatePasswordResetToken,
     sendAccountDeletionRequestEmail,
     sendDeletionRequestEmailToUser,
+    sendEmail
 }
-  
+

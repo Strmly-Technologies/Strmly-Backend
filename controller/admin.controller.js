@@ -8,6 +8,9 @@ const Series = require('../models/Series')
 const { handleError } = require('../utils/utils')
 const { generateAdminToken, ADMIN_CREDENTIALS } = require('../middleware/adminAuth')
 const path = require('path')
+const Withdrawal = require('../models/Withdrawal')
+const Wallet = require('../models/Wallet')
+const { sendEmail } = require('../utils/email')
 
 const adminLogin = async (req, res, next) => {
   try {
@@ -475,6 +478,270 @@ const getTotalWalletLoad=async(req,res,next)=>{
   }
 }
 
+const getWithdrawals = async (req, res, next) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 50, 
+      status = 'all', 
+      manual = 'all',
+      search = '' 
+    } = req.query
+    
+    const skip = (page - 1) * limit
+
+    let query = {}
+    
+    // Filter by status
+    if (status !== 'all') {
+      query.status = status
+    }
+    
+    // Filter by manual withdrawals
+    if (manual === 'true') {
+      query.internal_notes = { $regex: 'MANUAL_WITHDRAWAL', $options: 'i' }
+    } else if (manual === 'false') {
+      query.internal_notes = { $not: { $regex: 'MANUAL_WITHDRAWAL', $options: 'i' } }
+    }
+
+    // Search by creator username or reference ID
+    if (search) {
+      const users = await User.find({
+        username: { $regex: search, $options: 'i' }
+      }).select('_id')
+      
+      const userIds = users.map(user => user._id)
+      query = {
+        ...query,
+        $or: [
+          { creator_id: { $in: userIds } },
+          { reference_id: { $regex: search, $options: 'i' } }
+        ]
+      }
+    }
+
+    const withdrawals = await Withdrawal.find(query)
+      .populate('creator_id', 'username email creator_profile.bank_details creator_profile.upi_id')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+
+    const totalWithdrawals = await Withdrawal.countDocuments(query)
+
+    const withdrawalsWithDetails = withdrawals.map(withdrawal => ({
+      id: withdrawal._id,
+      referenceId: withdrawal.reference_id,
+      creator: {
+        id: withdrawal.creator_id._id,
+        username: withdrawal.creator_id.username,
+        email: withdrawal.creator_id.email,
+      },
+      amount: withdrawal.amount,
+      finalAmount: withdrawal.final_amount,
+      platformFee: withdrawal.platform_fee,
+      status: withdrawal.status,
+      manual: /MANUAL_WITHDRAWAL/i.test(withdrawal.internal_notes || ''),
+      payoutMethod: withdrawal.upi_id ? 'UPI' : 'Bank Account',
+      bankDetails: withdrawal.bank_details ? {
+        accountNumber: withdrawal.bank_details.account_number?.slice(-4),
+        ifscCode: withdrawal.bank_details.ifsc_code,
+        beneficiaryName: withdrawal.bank_details.beneficiary_name,
+      } : null,
+      upiId: withdrawal.upi_id,
+      requestedAt: withdrawal.requested_at,
+      processedAt: withdrawal.processed_at,
+      utr: withdrawal.utr,
+      failureReason: withdrawal.failure_reason,
+      notes: withdrawal.internal_notes,
+    }))
+
+    res.status(200).json({
+      success: true,
+      withdrawals: withdrawalsWithDetails,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalWithdrawals,
+        pages: Math.ceil(totalWithdrawals / limit)
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const processManualWithdrawal = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const { action = 'process', utr, adminNotes } = req.body
+
+    if (!['process', 'fail'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Action must be 'process' or 'fail'"
+      })
+    }
+
+    const withdrawal = await Withdrawal.findById(id).populate('creator_id', 'username email')
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        message: 'Withdrawal not found'
+      })
+    }
+
+    // Check if it's a manual withdrawal
+    if (!/MANUAL_WITHDRAWAL/i.test(withdrawal.internal_notes || '')) {
+      return res.status(400).json({
+        success: false,
+        message: 'This is not a manual withdrawal request'
+      })
+    }
+
+    if (!['pending', 'processing'].includes(withdrawal.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Withdrawal is not in a processable state'
+      })
+    }
+
+    if (action === 'process') {
+      // Mark as processed
+      withdrawal.status = 'processed'
+      withdrawal.processed_at = new Date()
+      if (utr) withdrawal.utr = utr
+      
+      const updatedNotes = `${withdrawal.internal_notes}\n[ADMIN_PROCESSED] ${adminNotes || 'Manually processed by admin'}`.trim()
+      withdrawal.internal_notes = updatedNotes
+      
+      await withdrawal.save()
+
+      // Update related wallet transaction
+      await WalletTransaction.updateMany(
+        { 'metadata.withdrawal_id': withdrawal._id },
+        { status: 'completed' }
+      )
+
+      // Send success email to user
+      try {
+        await sendEmail(
+          withdrawal.creator_id.email,
+          'Withdrawal Processed Successfully',
+          `Hi ${withdrawal.creator_id.username},
+
+Your withdrawal request has been processed successfully!
+
+Reference ID: ${withdrawal.reference_id}
+Amount: ₹${withdrawal.final_amount}
+${utr ? `UTR/Transaction ID: ${utr}` : ''}
+
+The money has been transferred to your registered account.
+
+Regards,
+Strmly Team`
+        )
+      } catch (emailError) {
+        console.error('Email send failed:', emailError.message)
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Withdrawal marked as processed successfully',
+        withdrawal: {
+          id: withdrawal._id,
+          status: withdrawal.status,
+          processedAt: withdrawal.processed_at,
+          utr: withdrawal.utr,
+        }
+      })
+
+    } else if (action === 'fail') {
+      // Mark as failed and refund
+      withdrawal.status = 'failed'
+      withdrawal.failure_reason = adminNotes || 'Marked as failed by admin'
+      
+      const updatedNotes = `${withdrawal.internal_notes}\n[ADMIN_FAILED] ${adminNotes || 'Manually failed by admin'}`.trim()
+      withdrawal.internal_notes = updatedNotes
+      
+      await withdrawal.save()
+
+      // Refund the wallet
+      const wallet = await Wallet.findById(withdrawal.wallet_id)
+      if (wallet) {
+        const balanceBefore = wallet.balance
+        wallet.balance += withdrawal.amount
+        wallet.total_withdrawn -= withdrawal.amount
+        await wallet.save()
+
+        // Create refund transaction
+        const refundTransaction = new WalletTransaction({
+          wallet_id: wallet._id,
+          user_id: withdrawal.creator_id,
+          transaction_type: 'credit',
+          transaction_category: 'refund',
+          amount: withdrawal.amount,
+          currency: 'INR',
+          description: `Refund for failed withdrawal: ${withdrawal.reference_id}`,
+          balance_before: balanceBefore,
+          balance_after: wallet.balance,
+          status: 'completed',
+          metadata: {
+            withdrawal_id: withdrawal._id,
+            manual: true,
+            refund_reason: 'manual_withdrawal_failed',
+            admin_notes: adminNotes,
+          },
+        })
+
+        await refundTransaction.save()
+      }
+
+      // Update original wallet transaction
+      await WalletTransaction.updateMany(
+        { 'metadata.withdrawal_id': withdrawal._id },
+        { status: 'failed' }
+      )
+
+      // Send failure email to user
+      try {
+        await sendEmail(
+          withdrawal.creator_id.email,
+          'Withdrawal Request Failed - Amount Refunded',
+          `Hi ${withdrawal.creator_id.username},
+
+Unfortunately, your withdrawal request could not be processed and has been marked as failed.
+
+Reference ID: ${withdrawal.reference_id}
+Amount: ₹${withdrawal.amount}
+Reason: ${withdrawal.failure_reason}
+
+The full amount has been refunded back to your wallet and is available for use.
+
+If you have any questions, please contact our support team.
+
+Regards,
+Strmly Team`
+        )
+      } catch (emailError) {
+        console.error('Email send failed:', emailError.message)
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Withdrawal marked as failed and amount refunded to wallet',
+        withdrawal: {
+          id: withdrawal._id,
+          status: withdrawal.status,
+          failureReason: withdrawal.failure_reason,
+        }
+      })
+    }
+
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   adminLogin,
   getAdminDashboard,
@@ -487,5 +754,6 @@ module.exports = {
   getReports,
   updateReportStatus,
   getTotalWalletLoad,
+  getWithdrawals,
+  processManualWithdrawal,
 }
-             

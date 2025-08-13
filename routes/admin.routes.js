@@ -11,6 +11,8 @@ const {
   getReports,
   updateReportStatus,
   getTotalWalletLoad,
+  getWithdrawals,
+  processManualWithdrawal,
 } = require('../controller/admin.controller')
 const { authenticateAdmin } = require('../middleware/adminAuth')
 
@@ -31,6 +33,7 @@ router.get('/wallet/load', authenticateAdmin, getTotalWalletLoad)
 
 router.get('/reports', authenticateAdmin, getReports)
 router.put('/report/:id', authenticateAdmin, updateReportStatus)
+router.get('/withdrawals', authenticateAdmin, getWithdrawals)
+router.post('/withdrawals/:id/process', authenticateAdmin, processManualWithdrawal)
 
-module.exports = router
 module.exports = router

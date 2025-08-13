@@ -4,6 +4,7 @@ const {
   getWithdrawalHistory,
   checkWithdrawalStatus,
   createUPIWithdrawalRequest,
+  createManualWithdrawalRequest,
 } = require('../controller/withdrawal.controller')
 const {
   setupCreatorBankAccount,
@@ -54,6 +55,15 @@ router.post(
   withdrawalRateLimiter,
   validateWithdrawal,
   createUPIWithdrawalRequest
+)
+
+// Manual withdrawal request (temporary - no Razorpay)
+router.post(
+  '/manual/create',
+  authenticateToken,
+  withdrawalRateLimiter,
+  validateWithdrawal,
+  createManualWithdrawalRequest
 )
 
 // Get withdrawal history
