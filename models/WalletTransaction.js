@@ -103,6 +103,10 @@ const walletTransactionSchema = new mongoose.Schema(
       video_title: String,
       community_name: String,
       founder_name: String,
+      withdrawal_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Withdrawal',
+      },
     },
   },
   { timestamps: true }

@@ -4,10 +4,12 @@ const {
   getWithdrawalHistory,
   checkWithdrawalStatus,
   createUPIWithdrawalRequest,
+  createManualWithdrawalRequest,
 } = require('../controller/withdrawal.controller')
 const {
   setupCreatorBankAccount,
   setupCreatorUPI,
+  createOrUpdateUPI,
 } = require('../controller/creator.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -38,6 +40,13 @@ router.post(
   setupCreatorUPI
 )
 
+router.post(
+  '/create-or-update-upi',
+  authenticateToken,
+  bankSetupRateLimiter,
+  createOrUpdateUPI
+)
+
 // Create withdrawal request
 router.post(
   '/create',
@@ -54,6 +63,15 @@ router.post(
   withdrawalRateLimiter,
   validateWithdrawal,
   createUPIWithdrawalRequest
+)
+
+// Manual withdrawal request (temporary - no Razorpay)
+router.post(
+  '/manual/create',
+  authenticateToken,
+  withdrawalRateLimiter,
+  validateWithdrawal,
+  createManualWithdrawalRequest
 )
 
 // Get withdrawal history

@@ -5,6 +5,7 @@ const Withdrawal = require('../models/Withdrawal')
 const WalletTransaction = require('../models/WalletTransaction')
 const User = require('../models/User')
 const { handleError } = require('../utils/utils')
+const { sendEmail } = require('../utils/email')
 
 const MIN_WITHDRAWAL_AMOUNT = 100
 const MAX_WITHDRAWAL_AMOUNT = 100000
@@ -467,6 +468,192 @@ const createUPIWithdrawalRequest = async (req, res, next) => {
   }
 }
 
+const createManualWithdrawalRequest = async (req, res, next) => {
+  try {
+    const { amount, notes } = req.body
+    const creatorId = req.user.id
+
+    const amountValidation = validateAmount(amount)
+    if (!amountValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error,
+        code: 'INVALID_AMOUNT',
+      })
+    }
+
+    if (notes && notes.length > MAX_NOTES_LENGTH) {
+      return res.status(400).json({
+        success: false,
+        error: `Notes must be less than ${MAX_NOTES_LENGTH} characters`,
+        code: 'INVALID_NOTES_LENGTH',
+      })
+    }
+
+    const creator = await User.findById(creatorId)
+    if (!creator) {
+      return res.status(404).json({
+        success: false,
+        error: 'Creator not found',
+        code: 'CREATOR_NOT_FOUND',
+      })
+    }
+    if(creator.creator_profile?.withdrawal_enabled !== true) {
+      return res.status(400).json({
+        success: false,
+        error: 'Withdrawal is not enabled for your account. Please contact support.',
+        code: 'WITHDRAWAL_NOT_ENABLED',
+      })
+    }
+    if(!creator.creator_profile?.upi_id){
+      return res.status(400).json({
+        success: false,
+        error: 'UPI ID not setup. Please add your UPI ID first.',
+        action: 'setup_UPI_ID',
+        code: 'UPI_ID_NOT_SETUP',
+      })
+    }
+  
+    const wallet = await Wallet.findOne({ user_id: creatorId })
+    if (!wallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'Wallet not found',
+        code: 'WALLET_NOT_FOUND',
+      })
+    }
+
+    if (wallet.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: 'Wallet is not active',
+        code: 'WALLET_INACTIVE',
+      })
+    }
+
+    if (wallet.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient wallet balance',
+        currentBalance: wallet.balance,
+        requestedAmount: amount,
+        shortfall: amount - wallet.balance,
+        code: 'INSUFFICIENT_BALANCE',
+      })
+    }
+
+    const platformFee = Math.round(amount * (PLATFORM_FEE_PERCENTAGE / 100))
+    const finalAmount = amount - platformFee
+    const referenceId = generateReferenceId(creatorId)
+
+    const session = await mongoose.startSession()
+
+    try {
+      let withdrawal
+      await session.withTransaction(async () => {
+        withdrawal = new Withdrawal({
+          creator_id: creatorId,
+          wallet_id: wallet._id,
+          amount: amount,
+          currency: 'INR',
+          fund_account_id: null, // Manual withdrawal does not use fund account
+          status: 'pending',
+          bank_details: creator.creator_profile.bank_details,
+          upi_id: creator.creator_profile.upi_id || null,
+          wallet_balance_before: wallet.balance,
+          wallet_balance_after: wallet.balance - amount,
+          platform_fee: platformFee,
+          final_amount: finalAmount,
+          reference_id: referenceId,
+          internal_notes: `[MANUAL_WITHDRAWAL] ${notes || ''}`.trim(),
+          requested_at: new Date(),
+        })
+
+        await withdrawal.save({ session })
+
+        wallet.balance -= amount
+        wallet.total_withdrawn += amount
+        wallet.last_transaction_at = new Date()
+        await wallet.save({ session })
+
+        const walletTransaction = new WalletTransaction({
+          wallet_id: wallet._id,
+          user_id: creatorId,
+          transaction_type: 'debit',
+          transaction_category: 'withdrawal_request',
+          amount: amount,
+          currency: 'INR',
+          description: `Manual withdrawal request: ₹${amount} (processing in 7 days)`,
+          balance_before: wallet.balance + amount,
+          balance_after: wallet.balance,
+          status: 'pending',
+          metadata: {
+            withdrawal_id: withdrawal._id,
+            reference_id: referenceId,
+            manual: true,
+            platform_fee: platformFee,
+            bank_account: creator.creator_profile.bank_details?.account_number?.slice(-4),
+          },
+        })
+
+        await walletTransaction.save({ session })
+      })
+
+      // Send notification email to user
+      try {
+        await sendEmail(
+          creator.email,
+          'Withdrawal Request Received - Processing in 7 Days',
+          `Hi ${creator.username},
+
+We have received your withdrawal request of ₹${amount} (Reference: ${referenceId}).
+
+Your request will be processed manually within 7 business days.
+Amount after platform fee: ₹${finalAmount}
+
+We will send you another email once the money has been transferred to your account.
+
+Regards,
+Strmly Team`
+        )
+      } catch (emailError) {
+        console.error('Email send failed (non-blocking):', emailError.message)
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Manual withdrawal request submitted successfully. Processing will take up to 7 business days.',
+        withdrawal: {
+          id: withdrawal._id,
+          referenceId: withdrawal.reference_id,
+          amount: withdrawal.amount,
+          finalAmount: withdrawal.final_amount,
+          platformFee: withdrawal.platform_fee,
+          status: withdrawal.status,
+          requestedAt: withdrawal.requested_at,
+          manual: true,
+        },
+        wallet: {
+          balanceBefore: withdrawal.wallet_balance_before,
+          balanceAfter: withdrawal.wallet_balance_after,
+          currentBalance: wallet.balance,
+        },
+        timeline: {
+          estimatedDelivery: '7 business days',
+          trackingInfo: `Manual processing - Reference: ${withdrawal.reference_id}`,
+        },
+      })
+    } catch (error) {
+      await session.abortTransaction()
+      throw error
+    } finally {
+      await session.endSession()
+    }
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 const getWithdrawalHistory = async (req, res, next) => {
   try {
     const creatorId = req.user.id
@@ -686,4 +873,5 @@ module.exports = {
   createUPIWithdrawalRequest,
   getWithdrawalHistory,
   checkWithdrawalStatus,
+  createManualWithdrawalRequest,
 }
