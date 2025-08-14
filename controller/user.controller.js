@@ -911,7 +911,7 @@ const UpdateUserInterests = async (req, res, next) => {
     } else {
       user.interests = interests
     }
-
+    user.onboarding_completed = true
     await user.save()
 
     res.status(200).json({
@@ -920,6 +920,7 @@ const UpdateUserInterests = async (req, res, next) => {
         interests: user.interests,
         interest1: user.interest1,
         interest2: user.interest2,
+        is_onboarded: true,
       },
     })
   } catch (error) {

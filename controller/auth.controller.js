@@ -272,6 +272,7 @@ const LoginUserWithEmail = async (req, res, next) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        is_onboarded: user.onboarding_completed,
       },
     })
   } catch (error) {
@@ -316,6 +317,7 @@ const LoginUserWithUsername = async (req, res, next) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        is_onboarded: user.onboarding_completed,
       },
     })
   } catch (error) {
@@ -398,6 +400,7 @@ const LoginUserWithGoogle = async (req, res, next) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        is_onboarded: user.onboarding_completed,
       },
     })
   } catch (error) {
