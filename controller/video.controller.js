@@ -10,9 +10,9 @@ const {
 const { addDetailsToVideoObject } = require('../utils/utils')
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
+const addVideoToStream = require('../utils/video_queue')
 const Reshare = require('../models/Reshare')
 const WalletTransaction = require('../models/WalletTransaction')
-const addVideoToQueue = require('../utils/video_fingerprint_queue')
 const path = require('path')
 const os = require('os')
 const videoCompressor = require('../utils/video_compressor')
@@ -233,8 +233,24 @@ const uploadVideo = async (req, res, next) => {
       $push: { long_videos: savedVideo._id },
       $addToSet: { creators: userId },
     })
-
-    await addVideoToQueue(savedVideo._id, videoUploadResult.url)
+    await addVideoToStream(
+      savedVideo._id,
+      videoUploadResult.url,
+      userId,
+      'nsfw_detection'
+    )
+    await addVideoToStream(
+      savedVideo._id,
+      videoUploadResult.url,
+      userId,
+      'video_fingerprint'
+    )
+    await addVideoToStream(
+      savedVideo._id,
+      videoUploadResult.url,
+      userId,
+      'audio_fingerprint'
+    )
     res.status(200).json({
       message: 'Video uploaded successfully',
       videoUrl: videoUploadResult.url,
