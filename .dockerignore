@@ -1,0 +1,39 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.nyc_output
+coverage
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary files
+utils/tmp/*
+utils/uploads/*
+utils/out/*
+utils/audio_uploads/*
+utils/audio_output/*
+
+# Log files
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
