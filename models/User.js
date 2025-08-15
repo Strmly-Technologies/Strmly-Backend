@@ -354,54 +354,6 @@ userSchema.methods.isDeactivated = function () {
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next()
-    const genres= [
-    // General Categories
-    'Action & Adventure',
-    'Animation & Anime',
-    'Beauty & Fashion',
-    'Biography & True Story',
-    'Business & Finance',
-    'Career & Development',
-    'Comedy',
-    'Commentary & Opinion',
-    'Crime & Mystery',
-    'DIY & Crafts',
-    'Documentary',
-    'Drama',
-    'Education',
-    'Entertainment',
-    'Family & Kids',
-    'Food & Cooking',
-    'Gaming',
-    'Health & Fitness',
-    'Historical',
-    'Horror',
-    'Home & Lifestyle',
-    'International',
-    'Music',
-    'Motivation & Self-Improvement',
-    'News & Politics',
-    'Reality & Unscripted',
-    'Reviews & Unboxings',
-    'Romance',
-    'Science & Technology',
-    'Sci-Fi & Fantasy',
-    'Short Films',
-    'Spirituality & Philosophy',
-    'Sports',
-    'Talk Shows & Podcasts',
-    'Teen & Young Adult',
-    'Thriller & Suspense',
-    'Travel & Adventure',
-    'Vlog',
-    'Other'
-  ]
-  if(this.interest1 && !genres.includes(this.interest1)) {
-    return next(new Error('Invalid interest1 genre'))
-  }
-  if(this.interest2 && !genres.includes(this.interest2)) {
-    return next(new Error('Invalid interest2 genre'))
-  }
   try {
     const salt = await bcrypt.genSalt(10)
     this.password = await bcrypt.hash(this.password, salt)
