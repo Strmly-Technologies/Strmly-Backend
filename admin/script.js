@@ -437,8 +437,16 @@ function renderFinancialOverview(financialData, timeframe) {
                         <span>${formatCurrency(financialData.withdrawals.pendingRequests.amount)} (${financialData.withdrawals.pendingRequests.count})</span>
                     </div>
                     <div class="metric-row">
-                        <span>Completed:</span>
-                        <span>${formatCurrency(financialData.withdrawals.completedWithdrawals.amount)} (${financialData.withdrawals.completedWithdrawals.count})</span>
+                        <span>Total Requested:</span>
+                        <span>${formatCurrency(financialData.withdrawals.completedWithdrawals.totalRequested || financialData.withdrawals.completedWithdrawals.amount)} (${financialData.withdrawals.completedWithdrawals.count})</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Sent to Creators:</span>
+                        <span>${formatCurrency(financialData.withdrawals.completedWithdrawals.amount)} (after fees)</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Platform Fees:</span>
+                        <span>${formatCurrency(financialData.withdrawals.completedWithdrawals.platformFees || 0)}</span>
                     </div>
                 </div>
 
@@ -457,6 +465,14 @@ function renderFinancialOverview(financialData, timeframe) {
                     <div class="metric-item">
                         <span class="metric-label">Total Revenue:</span>
                         <span class="metric-value">${formatCurrency(financialData.platformMetrics.totalRevenue)}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Money Out (to creators):</span>
+                        <span class="metric-value">${formatCurrency(financialData.platformMetrics.totalMoneyOut || financialData.withdrawals.completedWithdrawals.amount)}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Platform Fees Collected:</span>
+                        <span class="metric-value">${formatCurrency(financialData.platformMetrics.totalPlatformFees || 0)}</span>
                     </div>
                     <div class="metric-item">
                         <span class="metric-label">Withdrawal Rate:</span>
