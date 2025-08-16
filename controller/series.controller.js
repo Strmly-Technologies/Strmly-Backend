@@ -22,30 +22,22 @@ const createSeries = async (req, res, next) => {
       promisedEpisodesCount,
     } = req.body
 
-    if (
-      !title ||
-      !description ||
-      !genre ||
-      !language ||
-      !type ||
-      !promisedEpisodesCount
-    ) {
+    if (!title || !description || !genre || !language || !type) {
       return res.status(400).json({
-        error:
-          'Required fields: title, description, genre, language, type, promisedEpisodesCount',
-      })
-    }
-    if (promisedEpisodesCount < 2) {
-      return res.status(400).json({
-        error:
-          'You must promise atleast 2 episodes to the viewers of your series',
+        error: 'Required fields: title, description, genre, language, type',
       })
     }
     // Validate price based on type
     if (type === 'Paid') {
-      if (!price || price <= 0) {
+      if (
+        !price ||
+        price <= 0 ||
+        !promisedEpisodesCount ||
+        promisedEpisodesCount < 2
+      ) {
         return res.status(400).json({
-          error: 'Paid series must have a price greater than 0',
+          error:
+            'Paid series must have a price greater than 0 and promised_episode_count of atleast 2',
         })
       }
       if (price > 10000) {
@@ -72,7 +64,7 @@ const createSeries = async (req, res, next) => {
       created_by: userId,
       updated_by: userId,
       community: communityId,
-      promised_episode_count: promisedEpisodesCount,
+      promised_episode_count: type === 'Paid' ? promisedEpisodesCount : 0,
     })
 
     await series.save()
@@ -178,6 +170,7 @@ const updateSeries = async (req, res, next) => {
       seasons,
       price,
       type,
+      promisedEpisodeCount,
     } = req.body
 
     const series = await Series.findById(id)
@@ -210,18 +203,31 @@ const updateSeries = async (req, res, next) => {
             error: 'Paid series must have a price greater than 0',
           })
         }
+        if (!promisedEpisodeCount || promisedEpisodeCount < 2) {
+          return res.status(400).json({
+            error: 'Paid series must have a promisedEpisodeCount of atleast  2',
+          })
+        }
         updateData.price = price
+        updateData.promised_episode_count = promisedEpisodeCount
       } else {
         updateData.price = 0
+        updateData.promised_episode_count = 0
       }
-    } else if (price !== undefined) {
+    } else if (price !== undefined && promisedEpisodeCount !== undefined) {
       if (series.type === 'Paid') {
         if (price <= 0) {
           return res.status(400).json({
             error: 'Paid series must have a price greater than 0',
           })
         }
+        if (promisedEpisodeCount < 2) {
+          return res.status(400).json({
+            error: 'Paid series must have a promisedEpisodeCount of atleast  2',
+          })
+        }
         updateData.price = price
+        updateData.promised_episode_count = promisedEpisodeCount
       }
     }
 

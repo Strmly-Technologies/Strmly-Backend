@@ -10,8 +10,7 @@ const seriesSchema = new mongoose.Schema(
     },
     promised_episode_count: {
       type: Number,
-      required: true,
-      min: 2,
+      default: 0,
     },
     locked_earnings: {
       type: Number,
@@ -216,8 +215,18 @@ const seriesSchema = new mongoose.Schema(
 seriesSchema.pre('save', function (next) {
   if (this.type === 'Free') {
     this.price = 0
-  } else if (this.type === 'Paid' && (!this.price || this.price <= 0)) {
-    return next(new Error('Paid series must have a price greater than 0'))
+  } else if (
+    this.type === 'Paid' &&
+    (!this.price ||
+      this.price <= 0 ||
+      !this.promised_episode_count ||
+      this.promised_episode_count < 2)
+  ) {
+    return next(
+      new Error(
+        'Paid series must have a price greater than 0 and promised_episode_count of atleast 2'
+      )
+    )
   }
   next()
 })
