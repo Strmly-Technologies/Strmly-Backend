@@ -162,17 +162,8 @@ const updateSeries = async (req, res, next) => {
   try {
     const { id } = req.params
     const userId = req.user.id.toString()
-    const {
-      title,
-      description,
-      posterUrl,
-      bannerUrl,
-      status,
-      seasons,
-      price,
-      type,
-      promisedEpisodeCount,
-    } = req.body
+    const { title, description, posterUrl, bannerUrl, status, seasons, type } =
+      req.body
 
     const series = await Series.findById(id)
     if (!series) {
@@ -195,41 +186,11 @@ const updateSeries = async (req, res, next) => {
       updated_by: userId,
     }
 
-    // Handle price and type updates
-    if (type !== undefined) {
+    // Handle type update
+    if (type && type === 'Free') {
       updateData.type = type
-      if (type === 'Paid') {
-        if (!price || price <= 0) {
-          return res.status(400).json({
-            error: 'Paid series must have a price greater than 0',
-          })
-        }
-        if (!promisedEpisodeCount || promisedEpisodeCount < 2) {
-          return res.status(400).json({
-            error: 'Paid series must have a promisedEpisodeCount of atleast  2',
-          })
-        }
-        updateData.price = price
-        updateData.promised_episode_count = promisedEpisodeCount
-      } else {
-        updateData.price = 0
-        updateData.promised_episode_count = 0
-      }
-    } else if (price !== undefined && promisedEpisodeCount !== undefined) {
-      if (series.type === 'Paid') {
-        if (price <= 0) {
-          return res.status(400).json({
-            error: 'Paid series must have a price greater than 0',
-          })
-        }
-        if (promisedEpisodeCount < 2) {
-          return res.status(400).json({
-            error: 'Paid series must have a promisedEpisodeCount of atleast  2',
-          })
-        }
-        updateData.price = price
-        updateData.promised_episode_count = promisedEpisodeCount
-      }
+      updateData.price = 0
+      updateData.promised_episode_count = 0
     }
 
     const updatedSeries = await Series.findByIdAndUpdate(id, updateData, {

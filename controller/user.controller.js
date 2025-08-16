@@ -891,12 +891,18 @@ const GetUserNotifications = async (req, res, next) => {
 const UpdateUserInterests = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const { interests, type } = req.body
+    const { interest1, interest2 } = req.body
 
-    if (!Array.isArray(interests) || interests.length === 0) {
+    if (!Array.isArray(interest1) || interest1.length === 0) {
       return res
         .status(400)
-        .json({ message: 'Interests must be a non-empty array' })
+        .json({ message: 'interest1 must be a non-empty array' })
+    }
+
+    if (!Array.isArray(interest2) || interest2.length === 0) {
+      return res
+        .status(400)
+        .json({ message: 'interest2 must be a non-empty array' })
     }
 
     const user = await User.findById(userId)
@@ -904,13 +910,12 @@ const UpdateUserInterests = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    if (type === 'interest1') {
-      user.interest1 = interests
-    } else if (type === 'interest2') {
-      user.interest2 = interests
-    } else {
-      user.interests = interests
-    }
+    user.interest1 = interest1
+
+    user.interest2 = interest2
+
+    user.interests = new Array()
+    user.interests.push(...interest1, ...interest2)
     user.onboarding_completed = true
     await user.save()
 
@@ -2310,9 +2315,24 @@ const getUserReshares = async (req, res, next) => {
       await addDetailsToVideoObject(reshares[i].long_video, userId)
     }
 
+    const enriched_reshares = reshares?.map((r) => {
+      if (!r.long_video) return r
+      const { _id, ...videoFields } = r.long_video
+      const { long_video, ...rest } = r
+      return {
+        ...rest,
+        long_video_id: _id,
+        ...videoFields,
+      }
+    })
+    if (!enriched_reshares || enriched_reshares.length === 0) {
+      return res
+        .status(404)
+        .json({ message: 'No reshares found for this user' })
+    }
     return res.status(200).json({
       message: 'User reshares retrieved successfully',
-      reshares,
+      enriched_reshares,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -2356,14 +2376,24 @@ const getResharesOfOtherUser = async (req, res, next) => {
     for (let i = 0; i < reshares.length; i++) {
       await addDetailsToVideoObject(reshares[i].long_video, id)
     }
-    if (!reshares || reshares.length === 0) {
+    const enriched_reshares = reshares?.map((r) => {
+      if (!r.long_video) return r
+      const { _id, ...videoFields } = r.long_video
+      const { long_video, ...rest } = r
+      return {
+        ...rest,
+        long_video_id: _id,
+        ...videoFields,
+      }
+    })
+    if (!enriched_reshares || enriched_reshares.length === 0) {
       return res
         .status(404)
         .json({ message: 'No reshares found for this user' })
     }
     return res.status(200).json({
       message: 'User reshares retrieved successfully',
-      reshares,
+      enriched_reshares,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -2373,10 +2403,14 @@ const getResharesOfOtherUser = async (req, res, next) => {
 const getUserInterests = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
-    const user = await User.findById(userId).select('interests')
+    const user = await User.findById(userId).select(
+      'interests interest1 interest2'
+    )
     return res.status(200).json({
       message: 'User interests retrieved successfully',
-      user_interests: user.interests,
+      interest1: user.interest1,
+      interest2: user.interest2,
+      interests: user.interests,
     })
   } catch (error) {
     handleError(error, req, res, next)

@@ -2,6 +2,7 @@ const Community = require('../models/Community')
 const CommunityAccess = require('../models/CommunityAccess')
 const LongVideo = require('../models/LongVideo')
 const User = require('../models/User')
+const WalletTransaction = require('../models/WalletTransaction')
 const { addDetailsToVideoObject } = require('../utils/utils')
 const { handleError, uploadImageToS3 } = require('../utils/utils')
 
@@ -357,6 +358,7 @@ const getCommunityById = async (req, res, next) => {
   const communityId = req.params.id
   try {
     const community = await Community.findById(communityId)
+      .lean()
       .populate('founder', 'username profile_photo')
       .populate('followers', 'username profile_photo')
       .populate('creators', 'username profile_photo')
@@ -397,6 +399,21 @@ const getCommunityById = async (req, res, next) => {
         daysRemaining: community.canUpload.daysRemaining,
       }
     }
+
+    const CommunityTransactions = await WalletTransaction.find({
+      transaction_category: {
+        $in: ['community_fee', 'community_fee_received'],
+      },
+      content_id: communityId,
+    })
+      .sort({ createdAt: -1 })
+      .lean()
+      .select(
+        'wallet_id user_id transaction_type transaction_category amount description transfer_id status metadata'
+      )
+      .populate('user_id', 'username profile_photo')
+
+    community.transaction_history = CommunityTransactions
     return res.status(200).json(community)
   } catch (error) {
     handleError(error, req, res, next)

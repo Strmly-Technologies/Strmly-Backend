@@ -86,7 +86,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           .select(
             'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
           )
-        console.log(creatorPassDetails)
+
         if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
           video.creatorPassDetails = creatorPassDetails
         }
@@ -172,7 +172,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           .select(
             'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
           )
-        console.log(creatorPassDetails)
+
         if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
           video.creatorPassDetails = creatorPassDetails
         }
@@ -253,7 +253,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
           .select(
             'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
           )
-        console.log(creatorPassDetails)
+
         if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
           video.creatorPassDetails = creatorPassDetails
         }
