@@ -9,6 +9,7 @@ const {
   searchSeries,
   getAllSeries,
   getUserSeries,
+  unlockFunds,
 } = require('../controller/series.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -23,6 +24,9 @@ router.get('/search', authenticateToken, searchSeries)
 
 // Route to get all series with pagination
 router.get('/all', authenticateToken, getAllSeries)
+
+// Route to unlock funds
+router.post('/unlock-funds', authenticateToken, unlockFunds)
 
 // Route to remove an episode from a series
 router.delete(
