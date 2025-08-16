@@ -234,20 +234,20 @@ const uploadVideo = async (req, res, next) => {
       $addToSet: { creators: userId },
     })
     await addVideoToStream(
-      savedVideo._id,
-      videoUploadResult.url,
+      savedVideo._id.toString(),
+      videoUploadResult.key,
       userId,
       'nsfw_detection'
     )
     await addVideoToStream(
-      savedVideo._id,
-      videoUploadResult.url,
+      savedVideo._id.toString(),
+      videoUploadResult.key,
       userId,
       'video_fingerprint'
     )
     await addVideoToStream(
-      savedVideo._id,
-      videoUploadResult.url,
+      savedVideo._id.toString(),
+      videoUploadResult.key,
       userId,
       'audio_fingerprint'
     )

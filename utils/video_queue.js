@@ -12,8 +12,8 @@ const ALLOWED_TYPES = new Set([
  * Add a video processing event to the Redis Stream.
  * Trims stream to ~100k entries to avoid unbounded growth.
  */
-const addVideoToStream = async (videoId, videoUrl, userId, type) => {
-  if (!videoId || !videoUrl || !type || !userId) {
+const addVideoToStream = async (videoId, videoKey, userId, type) => {
+  if (!videoId || !videoKey || !type || !userId) {
     throw new Error('videoId, videoUrl, type and userId are required')
   }
   if (!ALLOWED_TYPES.has(type)) {
@@ -25,20 +25,21 @@ const addVideoToStream = async (videoId, videoUrl, userId, type) => {
   try {
     // XADD STREAM MAXLEN ~ 100000 * field value ...
     await RedisClient().xadd(
-      STREAM_KEY,
+      STREAM_KEY, // key
       'MAXLEN',
-      '~',
-      '100000',
-      '*',
+      '~', // optional trim policy
+      '100000', // count
+      '*', // id (auto-generate)
       'videoId',
       String(videoId),
       'videoUrl',
-      String(videoUrl),
+      String(videoKey),
       'userId',
       userId != null ? String(userId) : '',
       'type',
       type
     )
+
     console.log(`✅ Enqueued ${type} for ${videoId} → "${STREAM_KEY}"`)
   } catch (err) {
     console.error(`❌ Failed to enqueue: ${err.message}`)
