@@ -39,7 +39,6 @@ const addVideoToStream = async (videoId, videoKey, userId, type) => {
       'type',
       type
     )
-
     console.log(`✅ Enqueued ${type} for ${videoId} → "${STREAM_KEY}"`)
   } catch (err) {
     console.error(`❌ Failed to enqueue: ${err.message}`)
