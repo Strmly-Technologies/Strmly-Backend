@@ -14,6 +14,8 @@ const {
   getWithdrawals,
   processManualWithdrawal,
   getTransactionById,
+  getUserTransactions,
+  getFinancialOverview,
 } = require('../controller/admin.controller')
 const { authenticateAdmin } = require('../middleware/adminAuth')
 
@@ -36,5 +38,8 @@ router.put('/report/:id', authenticateAdmin, updateReportStatus)
 router.get('/withdrawals', authenticateAdmin, getWithdrawals)
 router.post('/withdrawals/:id/process', authenticateAdmin, processManualWithdrawal)
 router.get('/transaction/:id',authenticateAdmin,getTransactionById)
+router.get('/user/transactions/:userId', authenticateAdmin, getUserTransactions)
+router.get('/financial-overview', authenticateAdmin, getFinancialOverview)
+
 
 module.exports = router
