@@ -16,6 +16,11 @@ const autoNSFWSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    action_taken: {
+      type: String,
+      enum: ['ignored', 'removed', 'hidden'],
+      default: 'none',
+    },
   },
   {
     timestamps: true,

@@ -91,6 +91,15 @@ function showSection(sectionName) {
         case 'overview':
             loadFinancialOverview();
             break;
+        case 'auto-nsfw':
+            loadAutoNSFWViolations();
+            break;
+        case 'auto-copyright':
+            loadAutoCopyrightViolations();
+            break;
+        case 'moderation-stats':
+            loadContentModerationStats();
+            break;
     }
 }
 
@@ -527,4 +536,335 @@ async function searchCreatorPasses() {
     } catch (error) {
         document.getElementById('creatorPassesContent').innerHTML = '<div class="error">Error searching creator passes</div>';
     }
+}
+
+async function loadAutoNSFWViolations(page = 1) {
+    try {
+        document.getElementById('autoNSFWContent').innerHTML = '<div class="loading">Loading NSFW violations...</div>';
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/auto-nsfw-violations?page=${page}&limit=20`);
+        const data = await response.json();
+        
+        if (data.success) {
+            renderAutoNSFWTable(data.violations, data.pagination, data.statistics);
+        }
+    } catch (error) {
+        document.getElementById('autoNSFWContent').innerHTML = '<div class="error">Error loading NSFW violations</div>';
+    }
+}
+
+async function loadAutoCopyrightViolations(page = 1) {
+    try {
+        document.getElementById('autoCopyrightContent').innerHTML = '<div class="loading">Loading copyright violations...</div>';
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/auto-copyright-violations?page=${page}&limit=20`);
+        const data = await response.json();
+        
+        if (data.success) {
+            renderAutoCopyrightTable(data.violations, data.pagination, data.statistics);
+        }
+    } catch (error) {
+        document.getElementById('autoCopyrightContent').innerHTML = '<div class="error">Error loading copyright violations</div>';
+    }
+}
+
+async function loadContentModerationStats() {
+    try {
+        document.getElementById('moderationStatsContent').innerHTML = '<div class="loading">Loading moderation statistics...</div>';
+        const response = await makeAuthenticatedRequest('/api/v1/admin/content-moderation-stats?timeframe=30d');
+        const data = await response.json();
+        
+        if (data.success) {
+            renderModerationStats(data.statistics, data.timeframe);
+        }
+    } catch (error) {
+        document.getElementById('moderationStatsContent').innerHTML = '<div class="error">Error loading moderation stats</div>';
+    }
+}
+
+function renderAutoNSFWTable(violations, pagination, statistics) {
+    if (!violations || violations.length === 0) {
+        document.getElementById('autoNSFWContent').innerHTML = '<p>No NSFW violations found.</p>';
+        return;
+    }
+
+    let html = `
+        <div class="moderation-header">
+            <h3>Auto NSFW Violations (${statistics.totalViolations} total)</h3>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Video</th>
+                    <th>Owner</th>
+                    <th>Views</th>
+                    <th>Detected At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    violations.forEach(violation => {
+        html += '<tr>';
+        html += `<td>
+            <div class="video-info">
+                <img src="${violation.video.thumbnailUrl || '/placeholder.jpg'}" alt="Thumbnail" style="width: 60px; height: 40px; object-fit: cover;">
+                <div>
+                    <div class="video-title">${violation.video.name}</div>
+                    <div class="video-id">ID: ${violation.video.id}</div>
+                </div>
+            </div>
+        </td>`;
+        html += `<td>
+            <div class="user-info">
+                <img src="${violation.owner.profilePhoto || '/default-avatar.png'}" alt="Avatar" style="width: 30px; height: 30px; border-radius: 50%;">
+                <div>
+                    <div>${violation.owner.username}</div>
+                    <div class="user-email">${violation.owner.email}</div>
+                </div>
+            </div>
+        </td>`;
+        html += `<td>${violation.video.views}</td>`;
+        html += `<td>${new Date(violation.detectedAt).toLocaleString()}</td>`;
+        html += `<td>
+            <button onclick="viewVideoDetails('${violation.video.id}')" class="btn-small">View</button>
+            <button onclick="viewUserViolations('${violation.owner.id}')" class="btn-small">User History</button>
+        </td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    
+    // Add pagination
+    if (pagination.pages > 1) {
+        html += `<div class="pagination">
+            ${pagination.page > 1 ? `<button onclick="loadAutoNSFWViolations(${pagination.page - 1})">Previous</button>` : ''}
+            <span>Page ${pagination.page} of ${pagination.pages}</span>
+            ${pagination.page < pagination.pages ? `<button onclick="loadAutoNSFWViolations(${pagination.page + 1})">Next</button>` : ''}
+        </div>`;
+    }
+
+    document.getElementById('autoNSFWContent').innerHTML = html;
+}
+
+function renderAutoCopyrightTable(violations, pagination, statistics) {
+    if (!violations || violations.length === 0) {
+        document.getElementById('autoCopyrightContent').innerHTML = '<p>No copyright violations found.</p>';
+        return;
+    }
+
+    let html = `
+        <div class="moderation-header">
+            <h3>Auto Copyright Violations (${statistics.totalViolations} total)</h3>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Flagged Video</th>
+                    <th>Owner</th>
+                    <th>Matched Video</th>
+                    <th>Type</th>
+                    <th>Detected At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    violations.forEach(violation => {
+        html += '<tr>';
+        html += `<td>
+            <div class="video-info">
+                <img src="${violation.flaggedVideo.thumbnailUrl || '/placeholder.jpg'}" alt="Thumbnail" style="width: 60px; height: 40px; object-fit: cover;">
+                <div>
+                    <div class="video-title">${violation.flaggedVideo.name}</div>
+                    <div class="video-views">${violation.flaggedVideo.views} views</div>
+                </div>
+            </div>
+        </td>`;
+        html += `<td>
+            <div class="user-info">
+                <img src="${violation.flaggedVideoOwner.profilePhoto || '/default-avatar.png'}" alt="Avatar" style="width: 30px; height: 30px; border-radius: 50%;">
+                <div>
+                    <div>${violation.flaggedVideoOwner.username}</div>
+                </div>
+            </div>
+        </td>`;
+        html += `<td>
+            <div class="video-info">
+                <img src="${violation.matchedVideo.thumbnailUrl || '/placeholder.jpg'}" alt="Thumbnail" style="width: 60px; height: 40px; object-fit: cover;">
+                <div>
+                    <div class="video-title">${violation.matchedVideo.name}</div>
+                    <div class="video-views">${violation.matchedVideo.views} views</div>
+                </div>
+            </div>
+        </td>`;
+        html += `<td><span class="fingerprint-type ${violation.fingerprintType}">${violation.fingerprintType}</span></td>`;
+        html += `<td>${new Date(violation.detectedAt).toLocaleString()}</td>`;
+        html += `<td>
+            <button onclick="compareVideos('${violation.flaggedVideo.id}', '${violation.matchedVideo.id}')" class="btn-small">Compare</button>
+            <button onclick="viewUserViolations('${violation.flaggedVideoOwner.id}')" class="btn-small">User History</button>
+        </td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    
+    // Add pagination
+    if (pagination.pages > 1) {
+        html += `<div class="pagination">
+            ${pagination.page > 1 ? `<button onclick="loadAutoCopyrightViolations(${pagination.page - 1})">Previous</button>` : ''}
+            <span>Page ${pagination.page} of ${pagination.pages}</span>
+            ${pagination.page < pagination.pages ? `<button onclick="loadAutoCopyrightViolations(${pagination.page + 1})">Next</button>` : ''}
+        </div>`;
+    }
+
+    document.getElementById('autoCopyrightContent').innerHTML = html;
+}
+
+function renderModerationStats(statistics, timeframe) {
+    const { overview, trends, copyrightByType, topViolatingUsers } = statistics;
+    
+    let html = `
+        <div class="moderation-overview">
+            <h3>Content Moderation Overview (${timeframe})</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>🔞 NSFW Violations</h4>
+                    <div class="stat-number">${overview.totalNSFWViolations}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>©️ Copyright Violations</h4>
+                    <div class="stat-number">${overview.totalCopyrightViolations}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>📊 Total Violations</h4>
+                    <div class="stat-number">${overview.totalViolations}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="moderation-details">
+            <div class="copyright-types">
+                <h4>Copyright Violations by Type</h4>
+                <div class="type-stats">
+                    <div>Video Fingerprint: ${copyrightByType.video_fingerprint || 0}</div>
+                    <div>Audio Fingerprint: ${copyrightByType.audio_fingerprint || 0}</div>
+                </div>
+            </div>
+
+            <div class="top-violators">
+                <h4>Top Violating Users</h4>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>NSFW</th>
+                            <th>Copyright</th>
+                            <th>Total</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    topViolatingUsers.forEach(user => {
+        html += '<tr>';
+        html += `<td>
+            <div class="user-info">
+                <img src="${user.profilePhoto || '/default-avatar.png'}" alt="Avatar" style="width: 30px; height: 30px; border-radius: 50%;">
+                <div>
+                    <div>${user.username}</div>
+                    <div class="user-email">${user.email}</div>
+                </div>
+            </div>
+        </td>`;
+        html += `<td>${user.nsfwViolations}</td>`;
+        html += `<td>${user.copyrightViolations}</td>`;
+        html += `<td><strong>${user.totalViolations}</strong></td>`;
+        html += `<td>
+            <button onclick="viewUserViolations('${user.id}')" class="btn-small">View Details</button>
+        </td>`;
+        html += '</tr>';
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('moderationStatsContent').innerHTML = html;
+}
+
+async function viewUserViolations(userId) {
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/user/${userId}/violations`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create a modal or new section to show user violation details
+            showUserViolationModal(data);
+        }
+    } catch (error) {
+        alert('Error loading user violations');
+    }
+}
+
+function showUserViolationModal(data) {
+    const { user, violations, statistics } = data;
+    
+    const modalHtml = `
+        <div class="modal-overlay" onclick="closeModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h3>Violations for ${user.username}</h3>
+                    <button onclick="closeModal()" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="user-violation-stats">
+                        <div>NSFW Violations: ${statistics.totalNSFWViolations}</div>
+                        <div>Copyright Violations: ${statistics.totalCopyrightViolations}</div>
+                        <div>Total: ${statistics.totalViolations}</div>
+                    </div>
+                    <div class="violations-list">
+                        <h4>Recent Violations</h4>
+                        ${violations.nsfw.map(v => `
+                            <div class="violation-item">
+                                <span class="violation-type nsfw">NSFW</span>
+                                <span>${v.video?.name || 'Deleted Video'}</span>
+                                <span>${new Date(v.detectedAt).toLocaleDateString()}</span>
+                            </div>
+                        `).join('')}
+                        ${violations.copyright.map(v => `
+                            <div class="violation-item">
+                                <span class="violation-type copyright">Copyright (${v.fingerprintType})</span>
+                                <span>${v.flaggedVideo?.name || 'Deleted Video'}</span>
+                                <span>${new Date(v.detectedAt).toLocaleDateString()}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeModal() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function viewVideoDetails(videoId) {
+    // Implement video details view
+    alert(`View video details for ID: ${videoId}`);
+}
+
+function compareVideos(flaggedId, matchedId) {
+    // Implement video comparison view
+    alert(`Compare videos: ${flaggedId} vs ${matchedId}`);
 }

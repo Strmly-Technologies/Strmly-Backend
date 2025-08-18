@@ -12,6 +12,8 @@ const Withdrawal = require('../models/Withdrawal')
 const Wallet = require('../models/Wallet')
 const { sendEmail } = require('../utils/email')
 const WalletTransfer = require('../models/WalletTransfer')
+const AutoNSFW = require('../models/AutoNSFW')
+const AutoCopyright = require('../models/AutoCopyright')
 
 const adminLogin = async (req, res, next) => {
   try {
@@ -1116,6 +1118,518 @@ const getFinancialOverview = async (req, res, next) => {
   }
 }
 
+const getAutoNSFWViolations = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50, startDate, endDate } = req.query
+    const skip = (page - 1) * limit
+
+    let query = {}
+    
+    // Date filtering
+    if (startDate && endDate) {
+      query.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      }
+    } else if (startDate) {
+      query.createdAt = { $gte: new Date(startDate) }
+    } else if (endDate) {
+      query.createdAt = { $lte: new Date(endDate) }
+    }
+
+    const violations = await AutoNSFW.find(query)
+      .populate('flagged_video_id', 'name description thumbnailUrl views createdAt')
+      .populate('flagged_video_owner', 'username email profile_photo')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+
+    const totalViolations = await AutoNSFW.countDocuments(query)
+
+    // Get statistics
+    const stats = await AutoNSFW.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: -1 } },
+      { $limit: 30 }
+    ])
+
+    const violationsWithDetails = violations.map(violation => ({
+      id: violation._id,
+      video: {
+        id: violation.flagged_video_id?._id,
+        name: violation.flagged_video_id?.name || 'Deleted Video',
+        description: violation.flagged_video_id?.description,
+        thumbnailUrl: violation.flagged_video_id?.thumbnailUrl,
+        views: violation.flagged_video_id?.views || 0,
+        uploadedAt: violation.flagged_video_id?.createdAt
+      },
+      owner: {
+        id: violation.flagged_video_owner?._id,
+        username: violation.flagged_video_owner?.username || 'Unknown User',
+        email: violation.flagged_video_owner?.email,
+        profilePhoto: violation.flagged_video_owner?.profile_photo
+      },
+      flaggedVideoUrl: violation.flagged_video_url,
+      detectedAt: violation.createdAt
+    }))
+
+    res.status(200).json({
+      success: true,
+      message: 'Auto NSFW violations retrieved successfully',
+      violations: violationsWithDetails,
+      statistics: {
+        totalViolations: totalViolations,
+        dailyStats: stats,
+        currentPage: violationsWithDetails.length
+      },
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalViolations,
+        pages: Math.ceil(totalViolations / limit),
+        hasMore: skip + violationsWithDetails.length < totalViolations
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getAutoCopyrightViolations = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50, fingerprintType = 'all', startDate, endDate } = req.query
+    const skip = (page - 1) * limit
+
+    let query = {}
+    
+    // Filter by fingerprint type
+    if (fingerprintType !== 'all') {
+      query.fingerprint_type = fingerprintType
+    }
+    
+    // Date filtering
+    if (startDate && endDate) {
+      query.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      }
+    } else if (startDate) {
+      query.createdAt = { $gte: new Date(startDate) }
+    } else if (endDate) {
+      query.createdAt = { $lte: new Date(endDate) }
+    }
+
+    const violations = await AutoCopyright.find(query)
+      .populate('flagged_video_id', 'name description thumbnailUrl views createdAt')
+      .populate('flagged_video_owner', 'username email profile_photo')
+      .populate('matched_video_id', 'name description thumbnailUrl views createdAt created_by')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+
+    const totalViolations = await AutoCopyright.countDocuments(query)
+
+    // Get statistics
+    const stats = await AutoCopyright.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            type: "$fingerprint_type"
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.date": -1 } },
+      { $limit: 60 }
+    ])
+
+    const violationsWithDetails = violations.map(violation => ({
+      id: violation._id,
+      flaggedVideo: {
+        id: violation.flagged_video_id?._id,
+        name: violation.flagged_video_id?.name || 'Deleted Video',
+        description: violation.flagged_video_id?.description,
+        thumbnailUrl: violation.flagged_video_id?.thumbnailUrl,
+        views: violation.flagged_video_id?.views || 0,
+        uploadedAt: violation.flagged_video_id?.createdAt,
+        videoUrl: violation.flagged_video_url,
+        fingerprint: violation.flagged_video_fingerprint
+      },
+      flaggedVideoOwner: {
+        id: violation.flagged_video_owner?._id,
+        username: violation.flagged_video_owner?.username || 'Unknown User',
+        email: violation.flagged_video_owner?.email,
+        profilePhoto: violation.flagged_video_owner?.profile_photo
+      },
+      matchedVideo: {
+        id: violation.matched_video_id?._id,
+        name: violation.matched_video_id?.name || 'Deleted Video',
+        description: violation.matched_video_id?.description,
+        thumbnailUrl: violation.matched_video_id?.thumbnailUrl,
+        views: violation.matched_video_id?.views || 0,
+        uploadedAt: violation.matched_video_id?.createdAt,
+        videoUrl: violation.matched_video_url,
+        fingerprint: violation.matched_video_fingerprint,
+        createdBy: violation.matched_video_id?.created_by
+      },
+      fingerprintType: violation.fingerprint_type,
+      detectedAt: violation.createdAt
+    }))
+
+    res.status(200).json({
+      success: true,
+      message: 'Auto copyright violations retrieved successfully',
+      violations: violationsWithDetails,
+      statistics: {
+        totalViolations: totalViolations,
+        typeStats: stats,
+        currentPage: violationsWithDetails.length
+      },
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalViolations,
+        pages: Math.ceil(totalViolations / limit),
+        hasMore: skip + violationsWithDetails.length < totalViolations
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getContentModerationStats = async (req, res, next) => {
+  try {
+    const { timeframe = '30d' } = req.query
+    
+    let dateFilter = {}
+    const now = new Date()
+    
+    switch (timeframe) {
+      case '7d':
+        dateFilter = { $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) }
+        break
+      case '30d':
+        dateFilter = { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) }
+        break
+      case '90d':
+        dateFilter = { $gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) }
+        break
+      case '1y':
+        dateFilter = { $gte: new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()) }
+        break
+    }
+
+    const [
+      totalNSFWViolations,
+      totalCopyrightViolations,
+      recentNSFW,
+      recentCopyright,
+      copyrightByType,
+      topViolatingUsers
+    ] = await Promise.all([
+      // Total NSFW violations
+      AutoNSFW.countDocuments(dateFilter ? { createdAt: dateFilter } : {}),
+      
+      // Total Copyright violations
+      AutoCopyright.countDocuments(dateFilter ? { createdAt: dateFilter } : {}),
+      
+      // Recent NSFW trend
+      AutoNSFW.aggregate([
+        { $match: dateFilter ? { createdAt: dateFilter } : {} },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      
+      // Recent Copyright trend
+      AutoCopyright.aggregate([
+        { $match: dateFilter ? { createdAt: dateFilter } : {} },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      
+      // Copyright violations by type
+      AutoCopyright.aggregate([
+        { $match: dateFilter ? { createdAt: dateFilter } : {} },
+        {
+          $group: {
+            _id: "$fingerprint_type",
+            count: { $sum: 1 }
+          }
+        }
+      ]),
+      
+      // Top violating users
+      AutoNSFW.aggregate([
+        { $match: dateFilter ? { createdAt: dateFilter } : {} },
+        {
+          $group: {
+            _id: "$flagged_video_owner",
+            nsfwCount: { $sum: 1 }
+          }
+        },
+        {
+          $lookup: {
+            from: "autocopyrights",
+            let: { userId: "$_id" },
+            pipeline: [
+              { 
+                $match: { 
+                  $expr: { $eq: ["$flagged_video_owner", "$$userId"] },
+                  ...(dateFilter ? { createdAt: dateFilter } : {})
+                }
+              },
+              { $count: "count" }
+            ],
+            as: "copyrightViolations"
+          }
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "user"
+          }
+        },
+        {
+          $project: {
+            user: { $arrayElemAt: ["$user", 0] },
+            nsfwCount: 1,
+            copyrightCount: { 
+              $ifNull: [{ $arrayElemAt: ["$copyrightViolations.count", 0] }, 0] 
+            },
+            totalViolations: { 
+              $add: ["$nsfwCount", { $ifNull: [{ $arrayElemAt: ["$copyrightViolations.count", 0] }, 0] }] 
+            }
+          }
+        },
+        { $sort: { totalViolations: -1 } },
+        { $limit: 10 }
+      ])
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Content moderation statistics retrieved successfully',
+      timeframe,
+      statistics: {
+        overview: {
+          totalNSFWViolations,
+          totalCopyrightViolations,
+          totalViolations: totalNSFWViolations + totalCopyrightViolations
+        },
+        trends: {
+          nsfw: recentNSFW,
+          copyright: recentCopyright
+        },
+        copyrightByType: copyrightByType.reduce((acc, item) => {
+          acc[item._id] = item.count
+          return acc
+        }, {}),
+        topViolatingUsers: topViolatingUsers.map(user => ({
+          id: user._id,
+          username: user.user?.username || 'Unknown User',
+          email: user.user?.email,
+          profilePhoto: user.user?.profile_photo,
+          nsfwViolations: user.nsfwCount,
+          copyrightViolations: user.copyrightCount,
+          totalViolations: user.totalViolations
+        }))
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getViolationsByUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params
+    const { page = 1, limit = 20 } = req.query
+    const skip = (page - 1) * limit
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      })
+    }
+
+    const [user, nsfwViolations, copyrightViolations] = await Promise.all([
+      User.findById(userId).select('username email profile_photo createdAt'),
+      
+      AutoNSFW.find({ flagged_video_owner: userId })
+        .populate('flagged_video_id', 'name thumbnailUrl createdAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+        
+      AutoCopyright.find({ flagged_video_owner: userId })
+        .populate('flagged_video_id', 'name thumbnailUrl createdAt')
+        .populate('matched_video_id', 'name created_by')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+    ])
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      })
+    }
+
+    const [totalNSFW, totalCopyright] = await Promise.all([
+      AutoNSFW.countDocuments({ flagged_video_owner: userId }),
+      AutoCopyright.countDocuments({ flagged_video_owner: userId })
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'User violations retrieved successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        profilePhoto: user.profile_photo,
+        joinedAt: user.createdAt
+      },
+      violations: {
+        nsfw: nsfwViolations.map(v => ({
+          id: v._id,
+          video: v.flagged_video_id,
+          detectedAt: v.createdAt,
+          type: 'nsfw'
+        })),
+        copyright: copyrightViolations.map(v => ({
+          id: v._id,
+          flaggedVideo: v.flagged_video_id,
+          matchedVideo: v.matched_video_id,
+          fingerprintType: v.fingerprint_type,
+          detectedAt: v.createdAt,
+          type: 'copyright'
+        }))
+      },
+      statistics: {
+        totalNSFWViolations: totalNSFW,
+        totalCopyrightViolations: totalCopyright,
+        totalViolations: totalNSFW + totalCopyright
+      },
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        hasMore: (nsfwViolations.length + copyrightViolations.length) === parseInt(limit)
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const DeleteCopyVideo = async (req, res, next) => {
+  const { videoId, type } = req.params
+
+  if (type !== 'copy' && type !== 'nsfw') {
+    return res.status(400).json({ message: 'Invalid type parameter, must be copy or nsfw' })
+  }
+
+  try {
+    const video = await LongVideo.findById(videoId)
+    if (!video || (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')) {
+      return res.status(404).json({ message: 'Video not found' })
+    }
+
+    
+
+    await Community.updateMany(
+      { long_videos: videoId },
+      { $pull: { long_videos: videoId } }
+    )
+
+    await User.updateMany(
+      {
+        $or: [
+          { saved_videos: videoId },
+          { playlist: videoId },
+          { history: videoId },
+          { liked_videos: videoId },
+          { video_frame: videoId },
+        ],
+      },
+      {
+        $pull: {
+          saved_videos: videoId,
+          playlist: videoId,
+          history: videoId,
+          liked_videos: videoId,
+          video_frame: videoId,
+        },
+      }
+    )
+
+    await LongVideo.findByIdAndDelete(videoId)
+
+    const model = type === 'copy' ? AutoCopyright : AutoNSFW
+
+    const response = await model.updateMany(
+      { flagged_video_id: videoId },
+      { $set: { action_taken: 'removed' } }
+    )
+
+    if (response.matchedCount === 0) {
+      return res.status(404).json({ message: 'No violations found for this video' })
+    }
+
+    res.status(200).json({ message: 'Long video deleted successfully' })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const ignoreVideo=async(req,res,next)=>{
+  const { videoId,type } = req.params
+  if(type!=='copy' && type!=='nsfw'){
+    return res.status(400).json({ message: 'Invalid type parameter either copy or nsfw' })
+  }
+  try {
+    const model = type === 'copy' ? AutoCopyright : AutoNSFW
+    const violation = await model.findOne({ flagged_video_id: videoId})
+    
+    if (!violation) {
+      return res.status(404).json({ message: 'Violation not found for this video' })
+    }
+
+    // Mark the violation as ignored
+    violation.action_taken = 'ignored'
+    await violation.save()
+
+    res.status(200).json({ message: 'Violation marked as ignored successfully' })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+
+}
 
 module.exports = {
   adminLogin,
@@ -1133,5 +1647,11 @@ module.exports = {
   processManualWithdrawal,
   getTransactionById,
   getUserTransactions,
-  getFinancialOverview, 
+  getFinancialOverview,
+  getAutoNSFWViolations,
+  getAutoCopyrightViolations,
+  getContentModerationStats,
+  getViolationsByUser,
+  DeleteCopyVideo,
+  ignoreVideo,
 }

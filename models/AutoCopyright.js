@@ -38,6 +38,11 @@ const autoCopyrightSchema = new mongoose.Schema(
       enum: ['video_fingerprint', 'audio_fingerprint'],
       required: true,
     },
+    action_taken:{
+      type:String,
+      enum: ['ignored', 'removed', 'hidden'],
+      default: 'none',
+    }
   },
   {
     timestamps: true,
