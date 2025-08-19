@@ -37,7 +37,7 @@ validateEnv()
 const app = express()
 
 const corsOptions = {
-  origin: ['http://localhost:3000', 'https://strmly.com','http://localhost:3001'],
+  origin: ['http://localhost:3000', 'https://strmly.com','http://localhost:3001','https://strmly-admin-panel.vercel.app', 'https://admin.strmly.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
