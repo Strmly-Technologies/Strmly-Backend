@@ -1178,7 +1178,8 @@ const getAutoNSFWViolations = async (req, res, next) => {
         profilePhoto: violation.flagged_video_owner?.profile_photo
       },
       flaggedVideoUrl: violation.flagged_video_url,
-      detectedAt: violation.createdAt
+      detectedAt: violation.createdAt,
+      actionTaken: violation.action_taken,
     }))
 
     res.status(200).json({
@@ -1283,7 +1284,9 @@ const getAutoCopyrightViolations = async (req, res, next) => {
         createdBy: violation.matched_video_id?.created_by
       },
       fingerprintType: violation.fingerprint_type,
-      detectedAt: violation.createdAt
+      detectedAt: violation.createdAt,
+      actionTaken: violation.action_taken,
+
     }))
 
     res.status(200).json({
