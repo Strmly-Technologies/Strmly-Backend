@@ -270,6 +270,36 @@ const getCreatorPasses = async (req, res, next) => {
   }
 }
 
+const getCommentGiftings = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50 } = req.query
+    const skip = (page - 1) * limit
+    let query = {}
+    query.transaction_category = 'comment_gift'
+    const commentGiftings = await WalletTransaction.find(query)
+      .populate('user_id', 'username email')
+      .populate('metadata.comment_id', 'content video_id')
+      .populate('metadata.video_id', 'name thumbnailUrl')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+    const totalGiftings = await WalletTransaction.countDocuments(query)
+    res.status(200).json({
+      success: true,
+      commentGiftings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalGiftings,
+        pages: Math.ceil(totalGiftings / limit)
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+   
+
 const getStats = async (req, res, next) => {
   try {
     const [
@@ -1178,8 +1208,7 @@ const getAutoNSFWViolations = async (req, res, next) => {
         profilePhoto: violation.flagged_video_owner?.profile_photo
       },
       flaggedVideoUrl: violation.flagged_video_url,
-      detectedAt: violation.createdAt,
-      actionTaken: violation.action_taken,
+      detectedAt: violation.createdAt
     }))
 
     res.status(200).json({
@@ -1284,9 +1313,7 @@ const getAutoCopyrightViolations = async (req, res, next) => {
         createdBy: violation.matched_video_id?.created_by
       },
       fingerprintType: violation.fingerprint_type,
-      detectedAt: violation.createdAt,
-      actionTaken: violation.action_taken,
-
+      detectedAt: violation.createdAt
     }))
 
     res.status(200).json({
@@ -1657,4 +1684,12 @@ module.exports = {
   getViolationsByUser,
   DeleteCopyVideo,
   ignoreVideo,
+  getFinancialOverview,
+  getAutoNSFWViolations,
+  getAutoCopyrightViolations,
+  getContentModerationStats,
+  getViolationsByUser,
+  DeleteCopyVideo,
+  ignoreVideo,
+  getCommentGiftings,
 }
