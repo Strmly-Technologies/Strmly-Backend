@@ -115,37 +115,6 @@ const getSeriesById = async (req, res, next) => {
     for (let i = 0; i < series.episodes.length; i++) {
       await addDetailsToVideoObject(series.episodes[i], userId)
     }
-
-    // Calculate and update analytics based on current episodes
-    if (series.episodes && series.episodes.length > 0) {
-      const totalViews = series.episodes.reduce((sum, episode) => sum + (episode.views || 0), 0)
-      const totalLikes = series.episodes.reduce((sum, episode) => sum + (episode.likes || 0), 0)
-      const totalShares = series.episodes.reduce((sum, episode) => sum + (episode.shares || 0), 0)
-
-      // Update the series analytics if they don't match current totals
-      if (!series.analytics) {
-        series.analytics = {}
-      }
-      
-      if (series.analytics.total_views !== totalViews || 
-          series.analytics.total_likes !== totalLikes || 
-          series.analytics.total_shares !== totalShares) {
-        
-        // Update the database
-        await Series.findByIdAndUpdate(id, {
-          'analytics.total_views': totalViews,
-          'analytics.total_likes': totalLikes,
-          'analytics.total_shares': totalShares,
-          'analytics.last_analytics_update': new Date()
-        })
-
-        // Update the response data
-        series.analytics.total_views = totalViews
-        series.analytics.total_likes = totalLikes
-        series.analytics.total_shares = totalShares
-      }
-    }
-
     res.status(200).json({
       message: 'Series retrieved successfully',
       data: series,
@@ -160,36 +129,8 @@ const getUserSeries = async (req, res, next) => {
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required' })
   }
-  
   try {
-    // Ensure userId is a valid ObjectId
-    const mongoose = require('mongoose')
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: 'Invalid user ID format' })
-    }
-
-    console.log('🔍 Fetching series for user:', userId);
-    
-    // First get all series for debugging
-    const allSeries = await Series.find({ created_by: userId });
-    console.log('🔍 All series for user (before filtering):', allSeries.map(s => ({ 
-      id: s._id, 
-      title: s.title, 
-      visibility: s.visibility, 
-      hidden_reason: s.hidden_reason 
-    })));
-    
-    const series = await Series.find({ 
-      created_by: userId,
-      $and: [
-        {
-          $or: [
-            { visibility: { $exists: false } },
-            { visibility: { $ne: 'hidden' } }
-          ]
-        }
-      ]
-    })
+    const series = await Series.find({ created_by: userId })
       .populate('created_by', 'username email profile_photo')
       .populate('community', 'name profile_photo')
       .populate({
@@ -204,18 +145,12 @@ const getUserSeries = async (req, res, next) => {
           sort: { season_number: 1, episode_number: 1 },
         },
       })
-    
-    console.log('📊 Found series count:', series.length);
-    console.log('📊 Series visibility status:', series.map(s => ({ 
-      id: s._id, 
-      title: s.title, 
-      visibility: s.visibility, 
-      hidden_reason: s.hidden_reason 
-    })));
 
-    // Return empty array instead of 404 when no series found
+    if (!series || series.length === 0) {
+      return res.status(404).json({ error: 'No series found for this user' })
+    }
     res.status(200).json({
-      message: series.length > 0 ? 'User series retrieved successfully' : 'No series found for this user',
+      message: 'User series retrieved successfully',
       data: series,
     })
   } catch (error) {
@@ -303,37 +238,10 @@ const deleteSeries = async (req, res, next) => {
       }
     )
 
-    console.log('🗑️ Marking series as deleted:', id);
-    console.log('🗑️ Series before deletion:', { 
-      id: series._id, 
-      title: series.title, 
-      visibility: series.visibility 
-    });
-    
-    // Use findByIdAndUpdate for atomic operation
-    const updatedSeries = await Series.findByIdAndUpdate(
-      id,
-      {
-        visibility: 'hidden',
-        hidden_reason: 'series_deleted',
-        hidden_at: new Date()
-      },
-      { new: true }
-    );
-    
-    console.log('✅ Series marked as deleted:', { 
-      id: updatedSeries._id, 
-      visibility: updatedSeries.visibility, 
-      hidden_reason: updatedSeries.hidden_reason 
-    });
-
-    // Verify the deletion by fetching the series again
-    const verificationSeries = await Series.findById(id);
-    console.log('🔍 Verification - Series after deletion:', {
-      id: verificationSeries._id,
-      visibility: verificationSeries.visibility,
-      hidden_reason: verificationSeries.hidden_reason
-    });
+    series.visibility = 'hidden'
+    series.hidden_reason = 'series_deleted'
+    series.hidden_at = new Date()
+    await series.save()
 
     res.status(200).json({
       message: 'Series deleted successfully',
@@ -429,12 +337,7 @@ const addEpisodeToSeries = async (req, res, next) => {
 const removeEpisodeFromSeries = async (req, res, next) => {
   try {
     const { seriesId, episodeId } = req.params
-    const userId = req.user.id.toString() // Convert to string for proper comparison
-
-    console.log('🔍 Episode deletion authorization check:');
-    console.log('  - User ID:', userId);
-    console.log('  - Series ID:', seriesId);
-    console.log('  - Episode ID:', episodeId);
+    const userId = req.user.id.toString()
 
     const series = await Series.findById(seriesId)
     if (
@@ -444,9 +347,6 @@ const removeEpisodeFromSeries = async (req, res, next) => {
     ) {
       return res.status(404).json({ error: 'Series not found' })
     }
-
-    console.log('  - Series creator ID:', series.created_by.toString());
-    console.log('  - Authorization match:', series.created_by.toString() === userId);
 
     if (series.created_by.toString() !== userId) {
       return res
@@ -479,13 +379,7 @@ const removeEpisodeFromSeries = async (req, res, next) => {
 
     await Series.findByIdAndUpdate(seriesId, {
       $pull: { episodes: episodeId },
-      $inc: { 
-        total_episodes: -1,
-        'analytics.total_views': -(video.views || 0),
-        'analytics.total_likes': -(video.likes || 0),
-        'analytics.total_shares': -(video.shares || 0),
-      },
-      $set: { 'analytics.last_analytics_update': new Date() },
+      $inc: { total_episodes: -1 },
     })
 
     res.status(200).json({
@@ -685,48 +579,6 @@ const unlockFunds = async (req, res, next) => {
   }
 }
 
-const recalculateSeriesAnalytics = async (req, res, next) => {
-  try {
-    const { id } = req.params
-    const userId = req.user.id.toString()
-
-    const series = await Series.findById(id).populate('episodes')
-    if (!series) {
-      return res.status(404).json({ error: 'Series not found' })
-    }
-
-    if (series.created_by.toString() !== userId) {
-      return res
-        .status(403)
-        .json({ error: 'Not authorized to modify this series' })
-    }
-
-    // Calculate totals from episodes
-    const totalViews = series.episodes.reduce((sum, episode) => sum + (episode.views || 0), 0)
-    const totalLikes = series.episodes.reduce((sum, episode) => sum + (episode.likes || 0), 0)
-    const totalShares = series.episodes.reduce((sum, episode) => sum + (episode.shares || 0), 0)
-
-    // Update the series analytics
-    await Series.findByIdAndUpdate(id, {
-      'analytics.total_views': totalViews,
-      'analytics.total_likes': totalLikes,
-      'analytics.total_shares': totalShares,
-      'analytics.last_analytics_update': new Date()
-    })
-
-    res.status(200).json({
-      message: 'Series analytics recalculated successfully',
-      data: {
-        total_views: totalViews,
-        total_likes: totalLikes,
-        total_shares: totalShares
-      }
-    })
-  } catch (error) {
-    handleError(error, req, res, next)
-  }
-}
-
 module.exports = {
   getUserSeries,
   createSeries,
@@ -738,5 +590,4 @@ module.exports = {
   searchSeries,
   getAllSeries,
   unlockFunds,
-  recalculateSeriesAnalytics,
 }

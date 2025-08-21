@@ -73,7 +73,7 @@ const initializeWorker = async () => {
           await sendPushNotification(
             notificationData.fcmToken,
             socketNotification.title,
-            socketNotification.message,
+            socketNotification.display,
             socketNotification
           )
           // Emit notification to specific user via WebSocket

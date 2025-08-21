@@ -10,7 +10,6 @@ const {
   getAllSeries,
   getUserSeries,
   unlockFunds,
-  recalculateSeriesAnalytics,
 } = require('../controller/series.controller')
 const { authenticateToken } = require('../middleware/auth')
 
@@ -38,9 +37,6 @@ router.delete(
 
 // Route to add an episode to a series
 router.post('/:id/episodes', authenticateToken, addEpisodeToSeries)
-
-// Route to recalculate series analytics
-router.post('/:id/recalculate-analytics', authenticateToken, recalculateSeriesAnalytics)
 
 // Route to get a series by ID
 router.get('/:id', authenticateToken, getSeriesById)

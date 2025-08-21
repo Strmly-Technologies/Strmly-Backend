@@ -21,26 +21,19 @@ const getCommunityAnalytics = async (req, res, next) => {
       })
     }
 
-    // Check if user is founder or community member
-    const isFounder = community.founder._id.toString() === userId.toString()
-    const isMember = (community.followers && community.followers.includes(userId)) || 
-                     (community.creators && community.creators.includes(userId))
-    
-    if (!isFounder && !isMember) {
+    // Check if user is founder or has permission to view analytics
+    if (community.founder._id.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: 'Only community members can view analytics',
+        message: 'Only community founder can view analytics',
       })
     }
 
-    // Restrict sensitive data for non-founders
-    const canViewRevenue = isFounder
+    // Get total followers count
+    const totalFollowers = community.followers.length
 
-    // Get total followers count with null safety
-    const totalFollowers = community.followers ? community.followers.length : 0
-
-    // Get total creators count with null safety
-    const totalCreators = community.creators ? community.creators.length : 0
+    // Get total creators count
+    const totalCreators = community.creators.length
 
     // Combine queries into a single aggregation pipeline
     const [longVideoStats, seriesStats] = await Promise.all([
@@ -211,7 +204,7 @@ const getCommunityAnalytics = async (req, res, next) => {
               ? Math.round(videoStats.totalLikes / totalLongVideos)
               : 0,
         },
-        earnings: canViewRevenue ? {
+        earnings: {
           communityFees: {
             totalEarned: feeEarnings.totalEarned,
             totalCollected: feeEarnings.totalFeeCollected,
@@ -226,19 +219,6 @@ const getCommunityAnalytics = async (req, res, next) => {
             feeEarnings.totalEarned + contentStats.totalContentEarnings,
           totalRevenue:
             feeEarnings.totalFeeCollected + contentStats.totalContentRevenue,
-        } : {
-          communityFees: {
-            totalEarned: 0,
-            totalCollected: 0,
-            totalTransactions: 0,
-          },
-          contentSales: {
-            totalEarnings: 0,
-            totalRevenue: 0,
-            totalSales: 0,
-          },
-          totalEarnings: 0,
-          totalRevenue: 0,
         },
         growth: monthlyGrowth,
         topPerforming: {
@@ -268,7 +248,7 @@ const getMonthlyGrowthData = async (communityId) => {
 
     // Get followers growth
     const community = await Community.findById(communityId)
-    const currentFollowers = community && community.followers ? community.followers.length : 0
+    const currentFollowers = community.followers.length
 
     // Get content growth
     const thisMonthVideos = await LongVideo.countDocuments({
@@ -387,14 +367,10 @@ const getCommunityEngagementStats = async (req, res, next) => {
       })
     }
 
-    const isFounder = community.founder.toString() === userId.toString()
-    const isMember = (community.followers && community.followers.includes(userId)) || 
-                     (community.creators && community.creators.includes(userId))
-    
-    if (!isFounder && !isMember) {
+    if (community.founder.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: 'Only community members can view engagement stats',
+        message: 'Only community founder can view engagement stats',
       })
     }
 
@@ -482,9 +458,7 @@ const getCommunityRevenueBreakdown = async (req, res, next) => {
       })
     }
 
-    const isFounder = community.founder.toString() === userId.toString()
-    
-    if (!isFounder) {
+    if (community.founder.toString() !== userId) {
       return res.status(403).json({
         success: false,
         message: 'Only community founder can view revenue breakdown',

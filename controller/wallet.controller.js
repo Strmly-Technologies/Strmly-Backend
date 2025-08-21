@@ -1224,8 +1224,6 @@ const getWalletDetails = async (req, res, next) => {
         code: 'WALLET_NOT_FOUND',
       })
     }
-
-    // Get recent transfers without populate first
     const recentTransfers = await WalletTransfer.find({
       $or: [{ sender_id: userId }, { receiver_id: userId }],
     })
@@ -1234,39 +1232,6 @@ const getWalletDetails = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .limit(10)
       .lean()
-
-    // Manually populate content_id based on content_type
-    for (let transfer of recentTransfers) {
-      if (transfer.content_id && transfer.content_type) {
-        try {
-          let contentModel
-          switch (transfer.content_type.toLowerCase()) {
-            case 'series':
-              contentModel = Series
-              break
-            case 'community':
-              contentModel = Community
-              break
-            case 'video':
-              // Assuming you have a Video model
-              // contentModel = Video
-              break
-            default:
-              continue
-          }
-          
-          if (contentModel) {
-            const content = await contentModel.findById(transfer.content_id)
-              .select('title name')
-              .lean()
-            transfer.content_details = content
-          }
-        } catch (populateError) {
-          console.log(`Error populating content for ${transfer.content_type}:`, populateError.message)
-          transfer.content_details = null
-        }
-      }
-    }
 
     const recentTransactions = await WalletTransaction.find({
       user_id: userId,
@@ -1302,7 +1267,7 @@ const getWalletDetails = async (req, res, next) => {
         from: transfer.sender_id.username,
         to: transfer.receiver_id.username,
         purpose: transfer.transfer_type,
-        contentTitle: transfer.content_details?.title || transfer.content_details?.name || 'Unknown Content',
+        contentTitle: transfer.content_id?.title || transfer.content_id?.name,
         description: transfer.description,
         date: transfer.createdAt,
         status: transfer.status,

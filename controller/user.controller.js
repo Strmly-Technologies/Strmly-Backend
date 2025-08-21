@@ -1,13 +1,13 @@
 const User = require('../models/User')
 const Community = require('../models/Community')
 const LongVideo = require('../models/LongVideo')
-const Comment = require('../models/Comment')
 const { handleError, uploadImageToS3 } = require('../utils/utils')
 const UserAccess = require('../models/UserAccess')
 const CommunityAccess = require('../models/CommunityAccess')
 const Reshare = require('../models/Reshare')
 const { getRedisClient } = require('../config/redis')
 const CreatorPass = require('../models/CreatorPass')
+const Comment = require('../models/Comment')
 const Series = require('../models/Series')
 const { addDetailsToVideoObject } = require('../utils/utils')
 const GetUserFeed = async (req, res, next) => {
@@ -51,13 +51,6 @@ const GetUserFeed = async (req, res, next) => {
       })
       .populate('liked_by', 'username profile_photo')
 
-      .populate('created_by', 'username profile_photo')
-      .populate('community', 'name profile_photo _id followers')
-      .populate('comments', '_id content user createdAt')
-      .populate(
-        'series',
-        'title description price genre episodes seasons total_episodes'
-      )
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit - 2))
@@ -90,9 +83,6 @@ const GetUserFeed = async (req, res, next) => {
         })
         .populate('liked_by', 'username profile_photo')
 
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo followers _id')
-        .populate('comments', '_id content user createdAt')
         .sort({ views: -1, likes: -1 })
         .limit(3)
     }
@@ -191,11 +181,8 @@ const UpdateUserProfile = async (req, res, next) => {
       bio,
       date_of_birth,
       interests,
-      interest1,
-      interest2,
       content_interests,
       custom_name,
-      gender,
     } = req.body
     const profilePhotoFile = req.file
 
@@ -205,7 +192,6 @@ const UpdateUserProfile = async (req, res, next) => {
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth
     if (content_interests) updateData.content_interests = content_interests
     if (custom_name) updateData.custom_name = custom_name
-    if (gender) updateData.gender = gender
 
     // Parse interests from JSON string
     if (interests) {
@@ -219,36 +205,6 @@ const UpdateUserProfile = async (req, res, next) => {
         return res
           .status(400)
           .json({ message: 'Invalid interests format. Must be a JSON array.' })
-      }
-    }
-
-    // Parse interest1 (YouTube interests) from JSON string
-    if (interest1) {
-      try {
-        const parsedInterest1 = JSON.parse(interest1)
-        if (Array.isArray(parsedInterest1)) {
-          updateData.interest1 = parsedInterest1
-        }
-      } catch (error) {
-        console.error(error)
-        return res
-          .status(400)
-          .json({ message: 'Invalid interest1 format. Must be a JSON array.' })
-      }
-    }
-
-    // Parse interest2 (Netflix interests) from JSON string
-    if (interest2) {
-      try {
-        const parsedInterest2 = JSON.parse(interest2)
-        if (Array.isArray(parsedInterest2)) {
-          updateData.interest2 = parsedInterest2
-        }
-      } catch (error) {
-        console.error(error)
-        return res
-          .status(400)
-          .json({ message: 'Invalid interest2 format. Must be a JSON array.' })
       }
     }
 
@@ -579,9 +535,6 @@ const GetUserVideos = async (req, res, next) => {
       }
     } else {
       videos = await LongVideo.find({ created_by: userId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .populate('comments', '_id content user createdAt')
         .lean()
         .populate('created_by', 'username profile_photo custom_name')
         .populate('community', 'name profile_photo followers')
@@ -626,9 +579,8 @@ const GetUserInteractions = async (req, res, next) => {
     if (type === 'all' || type === 'likes') {
       const user = await User.findById(userId).populate({
         path: 'liked_videos',
-        select: 'name thumbnailUrl created_by views likes',
+        select: 'name thumbnailUrl creator views likes',
         populate: {
-          path: 'created_by',
           path: 'created_by',
           select: 'username profile_photo',
         },
@@ -640,15 +592,15 @@ const GetUserInteractions = async (req, res, next) => {
       const commentedVideos = await LongVideo.find({
         'comments.user': userId,
       })
-        .select('name thumbnailUrl created_by comments')
-        .populate('created_by', 'username profile_photo')
+        .select('name thumbnailUrl creator comments')
+        .populate('creator', 'username profile_photo')
 
       const userComments = commentedVideos.map((video) => ({
         video: {
           _id: video._id,
           name: video.name,
           thumbnailUrl: video.thumbnailUrl,
-          creator: video.created_by,
+          creator: video.creator,
         },
         comments: video.comments.filter(
           (comment) => comment.user.toString() === userId.toString()
@@ -673,7 +625,7 @@ const GetUserEarnings = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
 
-    const userVideos = await LongVideo.find({ created_by: userId }).select(
+    const userVideos = await LongVideo.find({ creator: userId }).select(
       'name views likes shares'
     )
 
@@ -726,7 +678,7 @@ const GetUserNotifications = async (req, res, next) => {
 
     const notifications = []
 
-    const userLongVideos = await LongVideo.find({ created_by: userId })
+    const userLongVideos = await LongVideo.find({ creator: userId })
       .populate('comments.user', 'username profile_photo')
       .populate('liked_by', 'username profile_photo')
       .select('_id name comments liked_by')
@@ -1031,7 +983,7 @@ const GetUserFollowing = async (req, res, next) => {
 
 const getUserProfileDetails = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
+    const userId = req.user.id
     const redis = getRedisClient()
     const cacheKey = `user_profile:${userId}`
 
@@ -1366,9 +1318,6 @@ const GetUserVideosById = async (req, res, next) => {
       }
     } else {
       videos = await LongVideo.find({ created_by: userId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .populate('comments', '_id content user createdAt')
         .lean()
         .populate('created_by', 'username profile_photo custom_name')
         .populate('community', 'name profile_photo followers')
@@ -1406,7 +1355,7 @@ const GetUserVideosById = async (req, res, next) => {
 
 const SetCreatorPassPrice = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
+    const userId = req.user.id
     const { price } = req.body
 
     await User.findByIdAndUpdate(userId, {
@@ -1424,7 +1373,7 @@ const SetCreatorPassPrice = async (req, res, next) => {
 
 const HasCreatorPass = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
+    const userId = req.user.id
     const { creatorId } = req.params
 
     const access = await UserAccess.findOne({
@@ -1548,7 +1497,6 @@ const unfollowUser = async (req, res, next) => {
 
 const getUserHistory = async (req, res, next) => {
   try {
-
     const userId = req.user.id.toString()
     const page = parseInt(req.query.page) || 1
     const limit = parseInt(req.query.limit) || 10
@@ -1606,9 +1554,6 @@ const getUserHistory = async (req, res, next) => {
     const viewedVideos = await LongVideo.find({
       _id: { $in: paginatedVideoIds },
     })
-      .populate('created_by', 'username profile_photo')
-      .populate('comments', '_id content user createdAt')
-      .select('_id name thumbnailUrl videoUrl description views likes createdAt comments duration genre type language age_restriction visibility gifts shares amount episode_number season_number start_time display_till_time')
       .lean()
       .populate('created_by', 'username profile_photo custom_name')
       .populate('community', 'name profile_photo followers')
@@ -1633,48 +1578,19 @@ const getUserHistory = async (req, res, next) => {
     for (let i = 0; i < orderedVideos.length; i++) {
       await addDetailsToVideoObject(orderedVideos[i], userId)
     }
-    // Format the response - include all fields needed for video player
+    // Format the response
     const formattedVideos = orderedVideos.map((video) => ({
       _id: video._id,
       name: video.name,
       thumbnailUrl: video.thumbnailUrl,
-      videoUrl: video.videoUrl, // Essential for video player
       description: video.description,
       views: video.views,
       likes: video.likes,
-      duration: video.duration,
-      genre: video.genre,
-      type: video.type,
-      language: video.language,
-      age_restriction: video.age_restriction,
-      visibility: video.visibility,
-      gifts: video.gifts || 0,
-      shares: video.shares || 0,
-      amount: video.amount || 0,
-      episode_number: video.episode_number,
-      season_number: video.season_number,
-      start_time: video.start_time || 0,
-      display_till_time: video.display_till_time || 0,
-      is_monetized: video.type === 'Paid' || video.amount > 0,
-      // Add access field for video player
-      access: {
-        isPlayable: true,
-        freeRange: {
-          start_time: video.start_time || 0,
-          display_till_time: video.display_till_time || 0
-        },
-        isPurchased: true, // User has viewed it, so they have access
-        accessType: video.type === 'Paid' ? 'paid' : 'free',
-        price: video.amount || 0
-      },
       created_by: {
         _id: video.created_by._id,
         username: video.created_by.username,
         profile_photo: video.created_by.profile_photo,
       },
-      community: video.community,
-      series: video.series,
-      comments: video.comments,
       createdAt: video.createdAt,
     }))
 
@@ -1705,9 +1621,6 @@ const getUserHistory = async (req, res, next) => {
 
 const getUserLikedVideosInCommunity = async (req, res, next) => {
   try {
-
-
-
     const userId = req.user.id.toString()
     const { communityId } = req.params
     const page = parseInt(req.query.page) || 1
@@ -1925,6 +1838,10 @@ const updateSocialMediaLinks = async (req, res, next) => {
 const getUserDashboardAnalytics = async (req, res, next) => {
   const userId = req.user.id.toString()
   const group = req.query.group
+    ? Array.isArray(req.query.group)
+      ? req.query.group
+      : [req.query.group]
+    : null
   const response = {}
 
   try {
@@ -1955,7 +1872,6 @@ const getUserDashboardAnalytics = async (req, res, next) => {
       const videos = await LongVideo.find({ created_by: userId })
         .populate('created_by', 'username profile_photo')
         .populate('community', 'name profile_photo')
-        .populate('comments', '_id content user createdAt')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -2009,7 +1925,7 @@ const getUserDashboardAnalytics = async (req, res, next) => {
       //video likes
       const user = await User.findById(userId).populate({
         path: 'liked_videos',
-        select: 'name thumbnailUrl created_by views likes',
+        select: 'name thumbnailUrl creator views likes',
         populate: {
           path: 'created_by',
           select: 'username profile_photo',
@@ -2148,8 +2064,7 @@ const getUserDashboardAnalytics = async (req, res, next) => {
             _id: { $in: paginatedVideoIds },
           })
             .populate('created_by', 'username profile_photo')
-            .populate('comments', '_id content user createdAt')
-            .select('_id name thumbnailUrl videoUrl description views likes createdAt comments duration genre type language age_restriction visibility gifts shares amount episode_number season_number start_time display_till_time')
+            .select('_id name thumbnailUrl description views likes createdAt')
 
           const orderedVideos = paginatedVideoIds
             .map((videoId) =>
@@ -2159,40 +2074,14 @@ const getUserDashboardAnalytics = async (req, res, next) => {
             )
             .filter(Boolean) // Remove any null/undefined entries
 
-          // Format the response - include all fields needed for video player
+          // Format the response
           const formattedVideos = orderedVideos.map((video) => ({
             _id: video._id,
             name: video.name,
             thumbnailUrl: video.thumbnailUrl,
-            videoUrl: video.videoUrl, // Essential for video player
             description: video.description,
             views: video.views,
             likes: video.likes,
-            duration: video.duration,
-            genre: video.genre,
-            type: video.type,
-            language: video.language,
-            age_restriction: video.age_restriction,
-            visibility: video.visibility,
-            gifts: video.gifts || 0,
-            shares: video.shares || 0,
-            amount: video.amount || 0,
-            episode_number: video.episode_number,
-            season_number: video.season_number,
-            start_time: video.start_time || 0,
-            display_till_time: video.display_till_time || 0,
-            is_monetized: video.type === 'Paid' || video.amount > 0,
-            // Add access field for video player
-            access: {
-              isPlayable: true,
-              freeRange: {
-                start_time: video.start_time || 0,
-                display_till_time: video.display_till_time || 0
-              },
-              isPurchased: true, // User has viewed it, so they have access
-              accessType: video.type === 'Paid' ? 'paid' : 'free',
-              price: video.amount || 0
-            },
             created_by: {
               _id: video.created_by._id,
               username: video.created_by.username,

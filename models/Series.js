@@ -187,25 +187,25 @@ const seriesSchema = new mongoose.Schema(
         type: Date,
         default: Date.now,
       },
-    },
-    visibility: {
-      type: String,
-      enum: ['public', 'private', 'hidden'],
-      default: 'public',
-    },
-    hidden_reason: {
-      type: String,
-      enum: [
-        'account_deactivated',
-        'user_request',
-        'admin_action',
-        'series_deleted',
-      ],
-      default: null,
-    },
-    hidden_at: {
-      type: Date,
-      default: null,
+      visibility: {
+        type: String,
+        enum: ['public', 'private', 'hidden'],
+        default: 'public',
+      },
+      hidden_reason: {
+        type: String,
+        enum: [
+          'account_deactivated',
+          'user_request',
+          'admin_action',
+          'series_deleted',
+        ],
+        default: null,
+      },
+      hidden_at: {
+        type: Date,
+        default: null,
+      },
     },
   },
   { timestamps: true }

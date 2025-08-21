@@ -107,7 +107,6 @@ const longVideoSchema = new mongoose.Schema(
       required: true,
       enum: [
         'Action & Adventure',
-        'Action',
         'Animation & Anime',
         'Beauty & Fashion',
         'Biography & True Story',
@@ -224,16 +223,12 @@ longVideoSchema.index({ name: 'text', description: 'text' })
 
 longVideoSchema.pre('save', function (next) {
   if (!this.is_standalone) {
-    if (!this.series) {
+    if (!this.series || !this.episode_number) {
       return next(
         new Error(
-          'Series is required for non-standalone videos'
+          'Series and episode number are required for non-standalone videos'
         )
       )
-    }
-    // If episode_number is not set, it will be set later by the controller
-    if (!this.episode_number) {
-      console.log('⚠️ Episode number not set yet, will be updated later')
     }
   } else {
     this.series = null
