@@ -504,7 +504,7 @@ const addDetailsToVideoObject = async (videoObject, userId) => {
     'following following_communities'
   )
   const is_liked_video = videoObject.liked_by?.some(
-    (user) => user._id?.toString() === userId
+    (like) => like.user && like.user._id?.toString() === userId
   )
   videoObject.is_liked_video = is_liked_video
 
@@ -529,6 +529,23 @@ const addDetailsToVideoObject = async (videoObject, userId) => {
   })
   videoObject.is_reshared =
     reshare && Object.keys(reshare).length > 0 ? true : false
+
+  // Ensure videoResolutions is properly formatted for client
+  if (videoObject.videoResolutions) {
+    // Make sure variants is an object if it's a Map
+    if (videoObject.videoResolutions.variants instanceof Map) {
+      videoObject.videoResolutions.variants = Object.fromEntries(videoObject.videoResolutions.variants);
+    }
+    
+    // If variants is missing or empty but there's a master URL, create a default entry
+    if (!videoObject.videoResolutions.variants || Object.keys(videoObject.videoResolutions.variants).length === 0) {
+      if (videoObject.videoResolutions.master && videoObject.videoResolutions.master.url) {
+        videoObject.videoResolutions.variants = {
+          "default": videoObject.videoResolutions.master.url
+        };
+      }
+    }
+  }
 }
 
 module.exports = {

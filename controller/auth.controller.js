@@ -1,9 +1,9 @@
 const User = require('../models/User')
+const Wallet = require('../models/Wallet')
 const {
   generateVerificationOTP,
   sendVerificationEmail,
   sendWelcomeEmail,
-  generatePasswordResetToken,
   sendPasswordResetEmail,
   sendPasswordResetConfirmationEmail,
 } = require('../utils/email')
@@ -61,6 +61,16 @@ const RegisterNewUser = async (req, res, next) => {
     })
 
     await newUser.save()
+
+    const newWallet = new Wallet({
+      user_id: newUser._id,
+      balance: 0,
+      currency: 'INR',
+      wallet_type: 'user',
+      status: 'active',
+      total_loaded: 0,
+    })
+    await newWallet.save()
 
     const emailResult = await sendVerificationEmail(
       email,
@@ -317,6 +327,8 @@ const LoginUserWithUsername = async (req, res, next) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        isCommentMonetizationEnabled: user.isCommentMonetizationEnabled,
+        upiId:user.creator_profile?.upi_id || null,
         is_onboarded: user.onboarding_completed,
       },
     })
@@ -355,6 +367,17 @@ const RegisterUserWithGoogle = async (req, res, next) => {
     }
 
     await newUser.save()
+
+    // Create wallet for the Google user
+    const newWallet = new Wallet({
+      user_id: newUser._id,
+      balance: 0,
+      currency: 'INR',
+      wallet_type: 'user',
+      status: 'active',
+      total_loaded: 0,
+    })
+    await newWallet.save()
 
     const token = generateToken(newUser._id)
 
@@ -650,6 +673,7 @@ const generatePasswordResetOTP = () => {
 
 module.exports = {
   RegisterNewUser,
+      RefreshToken,
   LoginUserWithEmail,
   LoginUserWithUsername,
   LogoutUser,

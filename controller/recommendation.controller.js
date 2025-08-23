@@ -90,6 +90,12 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
           video.creatorPassDetails = creatorPassDetails
         }
+        // check if user has liked the video
+        if (video.liked_by && video.liked_by.length > 0) {
+          video.is_liked_video = video.liked_by.some(
+            (like) => like.user && like.user._id?.toString() === userId
+          )
+        }
         interestedVideos[i] = video
       }
 
@@ -176,6 +182,11 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
         if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
           video.creatorPassDetails = creatorPassDetails
         }
+        if (video.liked_by && video.liked_by.length > 0) {
+          video.is_liked_video = video.liked_by.some(
+            (like) => like.user && like.user._id?.toString() === userId
+          )
+        }
         randomVideos[i] = video
       }
 
@@ -256,6 +267,11 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
         if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
           video.creatorPassDetails = creatorPassDetails
+        }
+        if (video.liked_by && video.liked_by.length > 0) {
+          video.is_liked_video = video.liked_by.some(
+            (like) => like.user && like.user._id?.toString() === userId
+          )
         }
         resharedVideos[i].long_video = video
       }

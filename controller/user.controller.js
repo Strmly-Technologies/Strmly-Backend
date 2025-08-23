@@ -156,7 +156,7 @@ const GetUserProfile = async (req, res, next) => {
       .populate('following', 'username profile_photo')
       .populate('my_communities', 'name profile_photo')
       .select(
-        '-password -saved_items -saved_videos -saved_series -playlist -history -liked_videos -video_frame'
+        '-password -saved_items -saved_videos -saved_series -playlist -history  -video_frame'
       )
 
     if (!user) {
@@ -2436,13 +2436,16 @@ const GetLikedVideosInProfileById = async (req, res, next) => {
   try {
     const profileId = req.params.id
     const userId = req.user.id.toString()
-    const videos = await LongVideo.find({ created_by: profileId }).lean()
-    const myLikedVideos = videos?.filter((video) =>
-      video.liked_by?.some((liked_user) => liked_user.toString() === userId)
-    )
+    // in latest liked order
+    const videos = await LongVideo.find({ created_by: profileId, 'liked_by.user': userId }).lean();
+    videos.sort((a, b) => {
+  const aLike = a.liked_by.find(like => like.user.toString() === userId);
+  const bLike = b.liked_by.find(like => like.user.toString() === userId);
+  return new Date(bLike.likedAt) - new Date(aLike.likedAt);
+});
     return res.status(200).json({
       message: 'User liked videos in the profile retrieved successfully',
-      data: myLikedVideos,
+      data: videos,
     })
   } catch (error) {
     handleError(error, req, res, next)

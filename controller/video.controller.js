@@ -537,7 +537,6 @@ const createVideoABSSegments = async (req, res, next) => {
     }
 
     const video = await LongVideo.findById(videoId)
-
     if (
       !video ||
       (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
@@ -548,15 +547,27 @@ const createVideoABSSegments = async (req, res, next) => {
     const videoFile = await getFileFromS3Url(videoUrl)
 
     const videoSegmentUrls = await generateVideoABSSegments(videoFile, videoId)
+    
+    // Format the videoResolutions properly
+    const formattedResolutions = {
+      master: { url: videoUrl },
+      variants: {}
+    }
+    
+    // Convert the segments object to the proper format
+    Object.entries(videoSegmentUrls).forEach(([resolution, data]) => {
+      formattedResolutions.variants[resolution] = data.url;
+    });
+
     await LongVideo.findOneAndUpdate(
       { _id: videoId },
-      { $set: { videoResolutions: videoSegmentUrls } },
+      { $set: { videoResolutions: formattedResolutions } },
       { new: true }
     )
 
     res.status(200).json({
       message: 'Segments created successfully',
-      segments: videoSegmentUrls,
+      segments: formattedResolutions
     })
   } catch (error) {
     handleError(error, req, res, next)

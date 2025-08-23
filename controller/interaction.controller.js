@@ -191,97 +191,84 @@ const statusOfUserFollower = async (req, res, next) => {
 }
 
 const LikeVideo = async (req, res, next) => {
-  const { videoId } = req.body
-  const userId = req.user.id.toString()
+  const { videoId } = req.body;
+  const userId = req.user.id;
 
   if (!videoId) {
-    return res
-      .status(400)
-      .json({ message: 'Video ID and video type are required' })
+    return res.status(400).json({ message: 'Video ID is required' });
   }
 
   try {
-    const video = await LongVideo.findById(videoId)
+    const video = await LongVideo.findById(videoId);
 
-    if (
-      !video ||
-      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
-    ) {
-      return res.status(404).json({ message: 'Video not found' })
+    if (!video || (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')) {
+      return res.status(404).json({ message: 'Video not found' });
     }
 
-    const hasLiked = video.liked_by.includes(userId)
+    // Check if user has already liked - FIX: Convert ObjectId to string for comparison
+    const hasLiked = video.liked_by.some(like => like.user && like.user.toString() === userId.toString());
 
     if (hasLiked) {
-      // Unlike the video
-      const updatedVideo = await LongVideo.findOneAndUpdate(
-        { _id: videoId },
+      // Unlike - FIX: Add 'new' keyword before mongoose.Types.ObjectId
+      const updatedVideo = await LongVideo.findByIdAndUpdate(
+        videoId,
         {
-          $pull: { liked_by: userId },
-          $inc: { likes: -1 },
+          $pull: { liked_by: { user: new mongoose.Types.ObjectId(userId) } },
+          $inc: { likes: -1 }
         },
         { new: true }
-      )
+      );
 
-      await LongVideo.updateOne(
-        { _id: videoId, likes: { $lt: 0 } },
-        { $set: { likes: 0 } }
-      )
+      // Ensure likes don't go negative
+      if (updatedVideo.likes < 0) updatedVideo.likes = 0;
+      await updatedVideo.save();
 
-      await User.updateOne(
-        { _id: userId },
-        {
-          $pull: { liked_videos: videoId },
-        }
-      )
-      res.status(200).json({
+      await User.updateOne({ _id: userId }, { $pull: { liked_videos: videoId } });
+
+      return res.status(200).json({
         message: 'Video unliked successfully',
         likes: updatedVideo.likes,
-        isLiked: false,
-      })
+        isLiked: false
+      });
     } else {
-      // Like the video
-      const updatedVideo = await LongVideo.findOneAndUpdate(
-        { _id: videoId },
+      // Like
+      const updatedVideo = await LongVideo.findByIdAndUpdate(
+        videoId,
         {
-          $addToSet: { liked_by: userId },
-          $inc: { likes: 1 },
+          $push: { liked_by: { user: userId, likedAt: new Date() } },
+          $inc: { likes: 1 }
         },
         { new: true }
-      )
+      );
 
-      const updatedUser = await User.findOneAndUpdate(
-        { _id: userId },
-        {
-          $addToSet: { liked_videos: videoId },
-        },
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { $addToSet: { liked_videos: videoId } },
         { new: true }
-      )
+      );
 
-      const videoCreator = updatedVideo.created_by.toString()
-      const videoName = updatedVideo.name
-      const userName = updatedUser.username
-      const userProfilePhoto = updatedUser.profile_photo
+      // Send notification
       await addVideoLikeNotificationToQueue(
-        videoCreator,
+        updatedVideo.created_by.toString(),
         userId,
         videoId,
-        userName,
-        videoName,
-        userProfilePhoto,
+        updatedUser.username,
+        updatedVideo.name,
+        updatedUser.profile_photo,
         updatedUser.FCM_token
-      )
+      );
 
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Video liked successfully',
         likes: updatedVideo.likes,
-        isLiked: true,
-      })
+        isLiked: true
+      });
     }
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
+
 
 const ShareVideo = async (req, res, next) => {
   const { videoId } = req.body
