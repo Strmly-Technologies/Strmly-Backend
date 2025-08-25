@@ -203,7 +203,6 @@ const LikeVideo = async (req, res, next) => {
     if (!video || (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')) {
       return res.status(404).json({ message: 'Video not found' });
     }
-
     const hasLiked = video.liked_by.some(like => like.user && like.user.toString() === userId.toString());
 
     if (hasLiked) {
