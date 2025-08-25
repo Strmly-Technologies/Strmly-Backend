@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    gender:{
+      type: String,
+      required:false,
+    },
     password: {
       type: String,
       minlength: 6,

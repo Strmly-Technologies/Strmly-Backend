@@ -35,6 +35,7 @@ const {
   GetLikedVideosInProfileById,
   HasCommunityAccess,
   HasUserAccess,
+  fetchSocialMediaLinks,
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -124,6 +125,7 @@ router.get(
 
 // Update social media links
 router.put('/social-media-links', authenticateToken, updateSocialMediaLinks)
+router.get('/social-media-links', authenticateToken, fetchSocialMediaLinks)
 
 // Add video to user view history
 router.post('/history', authenticateToken, AddVideoToUserViewHistory)

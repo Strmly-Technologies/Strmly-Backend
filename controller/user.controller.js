@@ -181,8 +181,11 @@ const UpdateUserProfile = async (req, res, next) => {
       bio,
       date_of_birth,
       interests,
+      interest1,
+      interest2,
       content_interests,
       custom_name,
+      gender,
     } = req.body
     const profilePhotoFile = req.file
 
@@ -192,6 +195,7 @@ const UpdateUserProfile = async (req, res, next) => {
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth
     if (content_interests) updateData.content_interests = content_interests
     if (custom_name) updateData.custom_name = custom_name
+    if (gender) updateData.gender = gender
 
     // Parse interests from JSON string
     if (interests) {
@@ -205,6 +209,36 @@ const UpdateUserProfile = async (req, res, next) => {
         return res
           .status(400)
           .json({ message: 'Invalid interests format. Must be a JSON array.' })
+      }
+    }
+
+    // Parse interest1 (YouTube interests) from JSON string
+    if (interest1) {
+      try {
+        const parsedInterest1 = JSON.parse(interest1)
+        if (Array.isArray(parsedInterest1)) {
+          updateData.interest1 = parsedInterest1
+        }
+      } catch (error) {
+        console.error(error)
+        return res
+          .status(400)
+          .json({ message: 'Invalid interest1 format. Must be a JSON array.' })
+      }
+    }
+
+    // Parse interest2 (Netflix interests) from JSON string
+    if (interest2) {
+      try {
+        const parsedInterest2 = JSON.parse(interest2)
+        if (Array.isArray(parsedInterest2)) {
+          updateData.interest2 = parsedInterest2
+        }
+      } catch (error) {
+        console.error(error)
+        return res
+          .status(400)
+          .json({ message: 'Invalid interest2 format. Must be a JSON array.' })
       }
     }
 
@@ -277,7 +311,6 @@ const UpdateUserProfile = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
-
 const GetUserCommunities = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
@@ -2505,6 +2538,23 @@ const HasUserAccess = async (req, res, next) => {
   }
 }
 
+const fetchSocialMediaLinks=async(req,res,next)=>{
+  try {
+    const userId = req.user.id.toString()
+    const user = await User.findById(userId).select('social_media_links username')
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    return res.status(200).json({
+      message: 'User social media links retrieved successfully',
+      social_media_links: user.social_media_links,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+    
+  }
+}
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -2540,4 +2590,5 @@ module.exports = {
   GetLikedVideosInProfileById,
   HasCommunityAccess,
   HasUserAccess,
+  fetchSocialMediaLinks,
 }

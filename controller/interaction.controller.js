@@ -84,8 +84,7 @@ const statusOfLike = async (req, res, next) => {
       return res.status(404).json({ message: 'Video not found' })
     }
 
-    const isLiked = video.liked_by.some((user) => user.toString() === userId)
-
+    const isLiked =video.liked_by.some(like => like.user && like.user.toString() === userId)
     res.status(200).json({
       message: 'Like status retrieved successfully',
       isLiked,
@@ -205,7 +204,6 @@ const LikeVideo = async (req, res, next) => {
       return res.status(404).json({ message: 'Video not found' });
     }
 
-    // Check if user has already liked - FIX: Convert ObjectId to string for comparison
     const hasLiked = video.liked_by.some(like => like.user && like.user.toString() === userId.toString());
 
     if (hasLiked) {
@@ -420,62 +418,48 @@ const CommentOnVideo = async (req, res, next) => {
   }
 }
 
-const getVideoComments = async (req, res, next) => {
+
+const getVideoComments = async (req, res) => {
   try {
-    const userId = req.user.id.toString()
-    const { videoId } = req.params
-
-    if (!videoId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Video ID is required',
-        code: 'MISSING_VIDEO_ID',
-      })
-    }
-
-    const video = await LongVideo.findById(videoId)
-      .populate('comments.user', 'username profile_photo')
-      .populate('created_by', 'username profile_photo')
-
-    if (
-      !video ||
-      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
-    ) {
-      return res.status(404).json({
-        success: false,
-        error: 'Video not found',
-        code: 'VIDEO_NOT_FOUND',
-      })
-    }
-
-    const comments = video.comments.map((comment) => ({
-      _id: comment._id,
-      content: comment.content,
-      videoId: videoId,
-      replies: comment.replies ? comment.replies.length : 0,
-      timestamp: comment.createdAt,
-      gifts: comment.gifts || 0,
-      upvotes: comment.upvotes || 0,
-      downvotes: comment.downvoted_by || 0,
-      likes: comment.liked_by || 0,
-      user: {
-        id: comment.user._id,
-        name: comment.user.username,
-        avatar: comment.user.profile_photo || '',
-      },
-      upvoted: comment.upvoted_by ? comment.upvoted_by.includes(userId) : false,
-      downvoted: comment.downvoted_by
-        ? comment.downvoted_by.includes(userId)
-        : false,
-      liked: comment.liked_by ? comment.liked_by.includes(userId) : false,
-    }))
-
-    res.status(200).json(comments)
+    const { videoId } = req.params;
+    
+    const comments = await Comment.find({ 
+      long_video: videoId,
+      parent_comment: null 
+    })
+    .populate('user', '_id username profile_photo')
+    .sort({ createdAt: -1 });
+    
+    const formattedComments = comments.map(comment => {
+      const user = comment.user;
+      
+      return {
+        _id: comment._id,
+        content: comment.content,
+        userId: user ? user._id : null,
+        username: user ? user.username : 'Unknown User',
+        profilePicture: user ? user.profile_photo : null, 
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
+        likes: comment.likes || 0,
+        upvotes: comment.upvotes || 0,
+        downvotes: comment.downvotes || 0,
+        gifts: comment.gifts || 0
+      };
+    });
+    
+    res.status(200).json({
+      success: true,
+      comments: formattedComments,
+      totalComments: formattedComments.length
+    });
   } catch (error) {
-    handleError(error, req, res, next)
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
-}
-
+};
 const getCommentReplies = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
@@ -1520,7 +1504,6 @@ const UpvoteReply = async (req, res, next) => {
         reply._id.toString()
       )
     }
-
     res
       .status(200)
       .json({ message: 'Reply upvoted successfully', upvotes: reply.upvotes })

@@ -70,13 +70,9 @@ const longVideoSchema = new mongoose.Schema(
       trim: true,
     },
     videoResolutions: {
-      type: Object,
-      default: () => ({
-        master: { url: '' },
-        variants: {}
-      }),
       master: {
-        url: { type: String, default: '' }
+        url: { type: String, default: '' },
+        type: { type: String, enum: ['mp4', 'hls'], default: 'mp4' }
       },
       variants: {
         type: Map,
@@ -253,4 +249,4 @@ longVideoSchema.pre('save', function (next) {
 const LongVideo = mongoose.model('LongVideo', longVideoSchema)
 
 module.exports = LongVideo
-module.exports = LongVideo
+

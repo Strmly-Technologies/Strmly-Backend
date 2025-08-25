@@ -17,6 +17,7 @@ const {
   changeCommunityFounder,
   makeFirstJoinedCreatorFounder,
   getCommunityFollowingStatus,
+  UpdateCommunitySettingsAccess,
 } = require('../controller/community.controller')
 
 const {
@@ -27,7 +28,9 @@ const {
 const { authenticateToken } = require('../middleware/auth')
 
 // API to create a community
-router.post('/create', authenticateToken, CreateCommunity)
+router.post('/create', authenticateToken,communityProfilePhotoUpload,CreateCommunity)
+
+router.post('//update-settings',authenticateToken, UpdateCommunitySettingsAccess)
 
 // API to rename a community
 router.put('/rename', authenticateToken, RenameCommunity)

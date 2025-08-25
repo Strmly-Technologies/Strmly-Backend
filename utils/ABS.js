@@ -250,6 +250,57 @@ const uploadVideoSegmentsToS3 = async (segmentPath) => {
   }
 }
 
+const generateMasterPlaylist = (variants, videoId) => {
+  let masterPlaylistContent = '#EXTM3U\n#EXT-X-VERSION:3\n\n'
+
+  // Define resolution configurations
+  const resolutionConfigs = {
+    '240p': { bandwidth: 400000, resolution: '426x240' },
+    '360p': { bandwidth: 800000, resolution: '640x360' },
+    '480p': { bandwidth: 1200000, resolution: '854x480' },
+    '720p': { bandwidth: 2500000, resolution: '1280x720' },
+    '1080p': { bandwidth: 5000000, resolution: '1920x1080' },
+  }
+
+  // Add each variant to the master playlist
+  Object.entries(variants).forEach(([resolution, url]) => {
+    const config = resolutionConfigs[resolution]
+    if (config) {
+      masterPlaylistContent += `#EXT-X-STREAM-INF:BANDWIDTH=${config.bandwidth},RESOLUTION=${config.resolution}\n`
+      masterPlaylistContent += `${url}\n\n`
+    }
+  })
+
+  return masterPlaylistContent
+}
+
+const uploadMasterPlaylistToS3 = async (playlistContent, videoId) => {
+  try {
+    const fileName = `video-segments/${videoId}/master.m3u8`
+
+    const uploadParams = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: fileName,
+      Body: playlistContent,
+      ContentType: 'application/vnd.apple.mpegurl',
+    }
+
+    const result = await s3.upload(uploadParams).promise()
+
+    return {
+      success: true,
+      url: result.Location,
+      key: result.Key,
+    }
+  } catch (error) {
+    console.error('Error uploading master playlist to S3:', error)
+    return {
+      success: false,
+      error: error.message,
+    }
+  }
+}
+
 const generateVideoABSSegments = async (videoFile, videoId) => {
   try {
     //get the input path of the original video
@@ -266,6 +317,7 @@ const generateVideoABSSegments = async (videoFile, videoId) => {
     await segmentVideo(videos, videoId)
     //store the segments in S3
     let segmentM3u8Urls = {}
+    let videoSegmentUrls = {}
     for (const video of videos) {
       const uploadResult = await uploadVideoSegmentsToS3(video.segmentPath)
       if (fs.existsSync(video.segmentPath)) {
@@ -275,12 +327,28 @@ const generateVideoABSSegments = async (videoFile, videoId) => {
         url: uploadResult.url,
         key: uploadResult.key,
       }
+      videoSegmentUrls[video.res] = uploadResult.url
     }
     //cleanup
     if (fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
     //return segments metadata (.m3u8) url
+
+    // After generating all resolution segments, create master playlist
+    const masterPlaylistContent = generateMasterPlaylist(videoSegmentUrls, videoId)
+
+    // Upload master playlist to S3
+    const masterUploadResult = await uploadMasterPlaylistToS3(masterPlaylistContent, videoId)
+
+    if (masterUploadResult.success) {
+      // Add master URL to the response
+      segmentM3u8Urls.master = {
+        url: masterUploadResult.url,
+        key: masterUploadResult.key,
+      }
+    }
+
     return segmentM3u8Urls
   } catch (e) {
     throw e

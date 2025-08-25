@@ -548,15 +548,20 @@ const createVideoABSSegments = async (req, res, next) => {
 
     const videoSegmentUrls = await generateVideoABSSegments(videoFile, videoId)
     
-    // Format the videoResolutions properly
+    // Format the videoResolutions properly with master playlist
     const formattedResolutions = {
-      master: { url: videoUrl },
+      master: {
+        url: videoSegmentUrls.master?.url || videoUrl,
+        type: 'hls' // Indicate this is an HLS master playlist
+      },
       variants: {}
     }
     
-    // Convert the segments object to the proper format
+    // Convert the segments object to the proper format (excluding master)
     Object.entries(videoSegmentUrls).forEach(([resolution, data]) => {
-      formattedResolutions.variants[resolution] = data.url;
+      if (resolution !== 'master') {
+        formattedResolutions.variants[resolution] = data.url;
+      }
     });
 
     await LongVideo.findOneAndUpdate(
@@ -567,7 +572,8 @@ const createVideoABSSegments = async (req, res, next) => {
 
     res.status(200).json({
       message: 'Segments created successfully',
-      segments: formattedResolutions
+      segments: formattedResolutions,
+      masterPlaylistUrl: formattedResolutions.master.url
     })
   } catch (error) {
     handleError(error, req, res, next)

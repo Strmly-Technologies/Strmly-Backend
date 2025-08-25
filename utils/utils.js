@@ -530,19 +530,22 @@ const addDetailsToVideoObject = async (videoObject, userId) => {
   videoObject.is_reshared =
     reshare && Object.keys(reshare).length > 0 ? true : false
 
-  // Ensure videoResolutions is properly formatted for client
   if (videoObject.videoResolutions) {
-    // Make sure variants is an object if it's a Map
     if (videoObject.videoResolutions.variants instanceof Map) {
       videoObject.videoResolutions.variants = Object.fromEntries(videoObject.videoResolutions.variants);
     }
     
-    // If variants is missing or empty but there's a master URL, create a default entry
     if (!videoObject.videoResolutions.variants || Object.keys(videoObject.videoResolutions.variants).length === 0) {
       if (videoObject.videoResolutions.master && videoObject.videoResolutions.master.url) {
-        videoObject.videoResolutions.variants = {
-          "default": videoObject.videoResolutions.master.url
-        };
+        if (videoObject.videoResolutions.master.type === 'hls') {
+          videoObject.videoResolutions.variants = {
+            "auto": videoObject.videoResolutions.master.url
+          };
+        } else {
+          videoObject.videoResolutions.variants = {
+            "default": videoObject.videoResolutions.master.url
+          };
+        }
       }
     }
   }
