@@ -2631,6 +2631,7 @@ const getUserFollowingCommunities = async (req, res, next) => {
   } catch (error) {
     handleError(error, req, res, next)
   }
+}
 
 
 module.exports = {
