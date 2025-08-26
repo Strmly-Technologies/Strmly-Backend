@@ -1131,7 +1131,7 @@ module.exports = {
   getCommunityProfileDetails,
   getAllCommunities,
   getCommunityById,
-  getUserCommunities,
+   getUserCommunities,
   FollowCommunity,
   CreateCommunity,
   RenameCommunity,

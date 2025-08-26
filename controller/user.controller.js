@@ -2555,6 +2555,29 @@ const fetchSocialMediaLinks=async(req,res,next)=>{
   }
 }
 
+const getUserFollowingCommunities=async(req,res,next)=>{
+try {
+  const userId=req.user.id.toString()
+  const user=await User.findById(userId)
+  if(!user){
+    return res.status(404).json({message:'User not found'})
+  }
+  // have to get communities user is following but is not part of its creators
+  const communities = await Community.find({
+  _id: { $in: user.following_communities },
+  creators: { $nin: [userId] }
+});
+
+  return res.status(200).json({
+    message:'User following communities retrieved successfully',
+    data:communities
+  });
+  
+} catch (error) {
+  handleError(error, req, res, next) 
+}
+}
+
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -2591,4 +2614,5 @@ module.exports = {
   HasCommunityAccess,
   HasUserAccess,
   fetchSocialMediaLinks,
+  getUserFollowingCommunities,
 }

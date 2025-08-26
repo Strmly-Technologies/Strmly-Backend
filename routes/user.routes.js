@@ -36,6 +36,7 @@ const {
   HasCommunityAccess,
   HasUserAccess,
   fetchSocialMediaLinks,
+  getUserFollowingCommunities
 } = require('../controller/user.controller')
 const { createImageMulter, handleMulterError } = require('../utils/utils')
 
@@ -170,5 +171,7 @@ router.get(
 router.get('/has-user-access/:assetId', authenticateToken, HasUserAccess)
 
 router.get('/reshares/:id', authenticateToken, getResharesOfOtherUser)
+
+router.get('/following-communities',authenticateToken,getUserFollowingCommunities);
 
 module.exports = router
