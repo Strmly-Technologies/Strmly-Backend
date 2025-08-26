@@ -300,7 +300,6 @@ const FollowCommunity = async (req, res, next) => {
     )
 
     // Add user to creator join order if not already present
-    community.addCreatorToJoinOrder(userId)
     await community.save()
 
     res.status(200).json({
@@ -563,7 +562,9 @@ const getUserCommunities = async (req, res, next) => {
     }
 
     if (type === 'joined' || type === 'all') {
-      joined = await Community.find({ followers: userId })
+      joined = await Community.find(
+        {creators: {$in: [userId]} }
+      )
         .populate('founder', 'username profile_photo')
         .populate('followers', 'username profile_photo')
         .populate('creators', 'username profile_photo')

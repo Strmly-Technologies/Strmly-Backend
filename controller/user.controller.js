@@ -1181,7 +1181,7 @@ const GetUserVideosById = async (req, res, next) => {
             {
               path: 'series',
               select:
-                'title description price genre episodes seasons total_episodes',
+                'title description price genre episodes seasons total_episodes type',
               populate: {
                 path: 'created_by',
                 select: 'username profile_photo',
@@ -1200,6 +1200,19 @@ const GetUserVideosById = async (req, res, next) => {
       videos = user.saved_videos
       for (let i = 0; i < videos.length; i++) {
         await addDetailsToVideoObject(videos[i], userId)
+        
+        // Add creatorPassDetails
+        const creatorPassDetails = await User.findById(
+          videos[i].created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          videos[i].creatorPassDetails = creatorPassDetails
+        }
       }
     } else if (type === 'liked') {
       const user = await User.findById(userId)
@@ -1219,7 +1232,7 @@ const GetUserVideosById = async (req, res, next) => {
             {
               path: 'series',
               select:
-                'title description price genre episodes seasons total_episodes',
+                'title description price genre episodes seasons total_episodes type',
               populate: {
                 path: 'created_by',
                 select: 'username profile_photo',
@@ -1238,6 +1251,19 @@ const GetUserVideosById = async (req, res, next) => {
       videos = user.liked_videos
       for (let i = 0; i < videos.length; i++) {
         await addDetailsToVideoObject(videos[i], userId)
+        
+        // Add creatorPassDetails
+        const creatorPassDetails = await User.findById(
+          videos[i].created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          videos[i].creatorPassDetails = creatorPassDetails
+        }
       }
     } else if (type === 'history') {
       const user = await User.findById(userId)
@@ -1257,7 +1283,7 @@ const GetUserVideosById = async (req, res, next) => {
             {
               path: 'series',
               select:
-                'title description price genre episodes seasons total_episodes',
+                'title description price genre episodes seasons total_episodes type',
               populate: {
                 path: 'created_by',
                 select: 'username profile_photo',
@@ -1276,41 +1302,21 @@ const GetUserVideosById = async (req, res, next) => {
       videos = user.history
       for (let i = 0; i < videos.length; i++) {
         await addDetailsToVideoObject(videos[i], userId)
+        
+        // Add creatorPassDetails
+        const creatorPassDetails = await User.findById(
+          videos[i].created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          videos[i].creatorPassDetails = creatorPassDetails
+        }
       }
-    } /* else if (type === 'playlist') {
-      const user = await User.findById(userId).populate({
-        path: 'playlist',
-        options: {
-          skip: skip,
-          limit: parseInt(limit),
-          sort: { createdAt: -1 },
-        },
-        populate: [
-          {
-            path: 'created_by',
-            select: 'username profile_photo',
-          },
-          {
-            path: 'series',
-            select:
-              'title description price genre episodes seasons total_episodes',
-            populate: {
-              path: 'created_by',
-              select: 'username profile_photo',
-            },
-          },
-          {
-            path: 'community',
-            select: 'name profile_photo followers',
-          },
-          {
-            path: 'liked_by',
-            select: 'username profile_photo',
-          },
-        ],
-      })
-      videos = user.playlist
-    }  */ else if (type === 'reshares') {
+    } else if (type === 'reshares') {
       const reshares = await Reshare.find({
         user: userId,
       })
@@ -1329,7 +1335,7 @@ const GetUserVideosById = async (req, res, next) => {
             {
               path: 'series',
               select:
-                'title description price genre episodes seasons total_episodes',
+                'title description price genre episodes seasons total_episodes type',
               populate: {
                 path: 'created_by',
                 select: 'username profile_photo custom_name',
@@ -1348,6 +1354,19 @@ const GetUserVideosById = async (req, res, next) => {
       videos = reshares
       for (let i = 0; i < videos.length; i++) {
         await addDetailsToVideoObject(videos[i], userId)
+        
+        // Add creatorPassDetails for reshared videos
+        const creatorPassDetails = await User.findById(
+          videos[i].long_video?.created_by?._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          videos[i].long_video.creatorPassDetails = creatorPassDetails
+        }
       }
     } else {
       videos = await LongVideo.find({ created_by: userId })
@@ -1357,7 +1376,7 @@ const GetUserVideosById = async (req, res, next) => {
         .populate({
           path: 'series',
           select:
-            'title description price genre episodes seasons total_episodes',
+            'title description price genre episodes seasons total_episodes type',
           populate: {
             path: 'created_by',
             select: 'username profile_photo',
@@ -1369,6 +1388,19 @@ const GetUserVideosById = async (req, res, next) => {
         .limit(parseInt(limit))
       for (let i = 0; i < videos.length; i++) {
         await addDetailsToVideoObject(videos[i], userId)
+        
+        // Add creatorPassDetails
+        const creatorPassDetails = await User.findById(
+          videos[i].created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          )
+
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          videos[i].creatorPassDetails = creatorPassDetails
+        }
       }
     }
 
@@ -2555,27 +2587,49 @@ const fetchSocialMediaLinks=async(req,res,next)=>{
   }
 }
 
-const getUserFollowingCommunities=async(req,res,next)=>{
-try {
-  const userId=req.user.id.toString()
-  const user=await User.findById(userId)
-  if(!user){
-    return res.status(404).json({message:'User not found'})
-  }
-  // have to get communities user is following but is not part of its creators
-  const communities = await Community.find({
-  _id: { $in: user.following_communities },
-  creators: { $nin: [userId] }
-});
+const getUserFollowingCommunities = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 10
+    const skip = (page - 1) * limit
 
-  return res.status(200).json({
-    message:'User following communities retrieved successfully',
-    data:communities
-  });
-  
-} catch (error) {
-  handleError(error, req, res, next) 
-}
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    // Get communities user is following but is not a creator or founder
+    const communities = await Community.find({
+      _id: { $in: user.following_communities },
+      creators: { $nin: [userId] },
+      founder: { $ne: userId }
+    })
+      .populate('founder', 'username profile_photo')
+      .populate('creators', 'username profile_photo')
+      .select('name profile_photo bio community_fee_type community_fee_amount followers creators')
+      .skip(skip)
+      .limit(limit)
+
+    const totalCount = await Community.countDocuments({
+      _id: { $in: user.following_communities },
+      creators: { $nin: [userId] },
+      founder: { $ne: userId }
+    })
+
+    return res.status(200).json({
+      message: 'User following communities retrieved successfully',
+      data: communities,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        hasMore: skip + limit < totalCount
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
 }
 
 module.exports = {
