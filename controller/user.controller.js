@@ -2587,6 +2587,7 @@ const fetchSocialMediaLinks=async(req,res,next)=>{
   }
 }
 
+
 const getUserFollowingCommunities = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
@@ -2630,7 +2631,7 @@ const getUserFollowingCommunities = async (req, res, next) => {
   } catch (error) {
     handleError(error, req, res, next)
   }
-}
+
 
 module.exports = {
   getUserProfileDetails,
