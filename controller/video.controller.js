@@ -230,14 +230,6 @@ const uploadVideo = async (req, res, next) => {
 
     await savedVideo.save()
 
-   if (communityId) {
-  await Community.findByIdAndUpdate(communityId, {
-    $push: { long_videos: savedVideo._id },
-    $addToSet: { creators: userId },
-  })
-  console.log("adding to creators")
-}
-
     if (seriesId) {
       try {
         

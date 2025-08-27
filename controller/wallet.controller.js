@@ -1127,12 +1127,14 @@ const transferCommunityFee = async (req, res, next) => {
               total_uploads: 1,
               'analytics.total_revenue': amount,
             },
+            $addToSet:{creators: creatorId},
             $set: {
               'analytics.last_analytics_update': new Date(),
             },
           },
           { session }
         )
+        console.log("added as creator")
 
 
         // Update user earnings
