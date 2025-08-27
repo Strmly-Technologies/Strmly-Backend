@@ -1134,6 +1134,7 @@ const transferCommunityFee = async (req, res, next) => {
           { session }
         )
 
+
         // Update user earnings
         await User.findByIdAndUpdate(
           founderId,

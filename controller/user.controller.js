@@ -1456,7 +1456,7 @@ const HasCreatorPass = async (req, res, next) => {
 
 const followUser = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString() //convert to string to prevent type mismatch bugs
+    const userId = req.user.id.toString()
     const { followUserId } = req.body
 
     if (!followUserId) {
@@ -1493,6 +1493,14 @@ const followUser = async (req, res, next) => {
     await user.save()
     await followUser.save()
 
+    // Clear cache for both users
+    const redis = getRedisClient()
+    if (redis) {
+      await redis.del(`user_profile_public:${followUserId}`)
+      await redis.del(`user_profile_public:${userId}`)
+      console.log(`🗑️ Cleared profile cache for users: ${userId}, ${followUserId}`)
+    }
+
     res.status(200).json({
       message: 'User followed successfully',
       isFollowing: true,
@@ -1511,30 +1519,36 @@ const followUser = async (req, res, next) => {
 
 const unfollowUser = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString() //convert to string to prevent type mismatch bugs
+    const userId = req.user.id.toString()
     const { unfollowUserId } = req.body
+    
     if (!unfollowUserId) {
       return res.status(400).json({ message: 'Unfollow user ID is required' })
     }
     if (userId === unfollowUserId) {
       return res.status(400).json({ message: 'You cannot unfollow yourself' })
     }
+    
     const user = await User.findById(userId)
     const unfollowUser = await User.findById(unfollowUserId)
+    
     if (!user || !unfollowUser) {
       return res.status(404).json({ message: 'User not found' })
     }
+    
     const isFollowing = user.following.some(
       (id) => id.toString() === unfollowUserId
     )
     const isFollowed = unfollowUser.followers.some(
       (id) => id.toString() === userId
     )
+    
     if (!isFollowing || !isFollowed) {
       return res
         .status(400)
         .json({ message: 'You are not following this user' })
     }
+    
     // Remove follow relationships
     user.following = user.following.filter(
       (id) => id.toString() !== unfollowUserId
@@ -1542,8 +1556,18 @@ const unfollowUser = async (req, res, next) => {
     unfollowUser.followers = unfollowUser.followers.filter(
       (id) => id.toString() !== userId
     )
+    
     await user.save()
     await unfollowUser.save()
+
+    // Clear cache for both users
+    const redis = getRedisClient()
+    if (redis) {
+      await redis.del(`user_profile_public:${unfollowUserId}`)
+      await redis.del(`user_profile_public:${userId}`)
+      console.log(`🗑️ Cleared profile cache for users: ${userId}, ${unfollowUserId}`)
+    }
+    
     res.status(200).json({
       message: 'User unfollowed successfully',
       isFollowing: false,

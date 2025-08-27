@@ -298,8 +298,6 @@ const FollowCommunity = async (req, res, next) => {
         $set: { 'analytics.last_analytics_update': new Date() },
       }
     )
-
-    // Add user to creator join order if not already present
     await community.save()
 
     res.status(200).json({
