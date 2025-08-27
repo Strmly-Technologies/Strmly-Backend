@@ -1137,6 +1137,7 @@ const transferCommunityFee = async (req, res, next) => {
         console.log("added as creator")
 
 
+
         // Update user earnings
         await User.findByIdAndUpdate(
           founderId,
