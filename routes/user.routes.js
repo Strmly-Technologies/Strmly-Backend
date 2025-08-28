@@ -160,6 +160,8 @@ router.get('/videos/:id', authenticateToken, GetUserVideosById)
 // Check if user has creator pass for specific creator
 router.get('/has-creator-pass/:creatorId', authenticateToken, HasCreatorPass)
 
+
+
 // Check if user has community access using community-id
 router.get(
   '/has-community-access/:communityId',
