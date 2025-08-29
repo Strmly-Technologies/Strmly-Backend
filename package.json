@@ -37,6 +37,7 @@
     "nodemon": "^3.1.10",
     "razorpay": "^2.9.4",
     "redis": "^5.6.0",
+    "resend": "^6.2.0-preview-contacts.0",
     "socket.io": "^4.8.1",
     "streamifier": "^0.1.1",
     "uuid": "^11.1.0",

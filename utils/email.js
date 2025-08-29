@@ -1,32 +1,18 @@
-const nodemailer=require('nodemailer');
-const crypto=require('crypto');
+const { Resend } = require('resend');
+const crypto = require('crypto');
+require('dotenv').config();
 
-const createTransporter=()=>{
-    return nodemailer.createTransport({
-        service: 'gmail',
-        host: 'smtp.gmail.com',
-        port:587,
-        secure:false,
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-        },
-        secure: true,
-        tls: {
-            rejectUnauthorized: false,
-        },
-    });
-};
+const resendAPI= process.env.RESEND_API_KEY;
+const resend = new Resend(resendAPI);
 
 const generateVerificationOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
 }
 
 const sendVerificationEmail = async (email, username, verificationOTP) => {
-  const transporter = createTransporter();
-  
+  console.log('Sending verification email to:', email);
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+     from: process.env.EMAIL_FROM || 'noreply@strmly.com',
     to: email,
     subject: 'Verify your Strmly account - OTP',
     html: `
@@ -55,20 +41,18 @@ const sendVerificationEmail = async (email, username, verificationOTP) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    return { success: true };
+    const data = await resend.emails.send(mailOptions);
+  console.log({ data });
+  return { success: true };
   } catch (error) {
     console.error('Email sending error:', error);
     return { success: false, error: error.message };
   }
 };
 
-
 const sendWelcomeEmail = async (email, username) => {
-  const transporter = createTransporter();
-  
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+   from: process.env.EMAIL_FROM || 'noreply@strmly.com',
     to: email,
     subject: 'Welcome to Strmly!',
     html: `
@@ -101,7 +85,7 @@ const sendWelcomeEmail = async (email, username) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await resend.emails.send(mailOptions);
     return { success: true };
   } catch (error) {
     console.error('Welcome email sending error:', error);
@@ -110,11 +94,8 @@ const sendWelcomeEmail = async (email, username) => {
 };
 
 const sendPasswordResetEmail = async (email, username, reset_otp) => {
-  const transporter = createTransporter();
-  
-  
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+   from: process.env.EMAIL_FROM || 'noreply@strmly.com',
     to: email,
     subject: 'Reset your Strmly password',
     html: `
@@ -147,7 +128,7 @@ const sendPasswordResetEmail = async (email, username, reset_otp) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await resend.emails.send(mailOptions);
     return { success: true };
   } catch (error) {
     console.error('Password reset email sending error:', error);
@@ -156,10 +137,8 @@ const sendPasswordResetEmail = async (email, username, reset_otp) => {
 };
 
 const sendPasswordResetConfirmationEmail = async (email, username) => {
-  const transporter = createTransporter();
-  
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+   from: process.env.EMAIL_FROM || 'noreply@strmly.com',
     to: email,
     subject: 'Password successfully changed - Strmly',
     html: `
@@ -190,7 +169,7 @@ const sendPasswordResetConfirmationEmail = async (email, username) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await resend.emails.send(mailOptions);
     return { success: true };
   } catch (error) {
     console.error('Password reset confirmation email error:', error);
@@ -199,11 +178,9 @@ const sendPasswordResetConfirmationEmail = async (email, username) => {
 };
 
 const sendAccountDeletionRequestEmail = async (email, username) => {
-  const transporter = createTransporter();
-
   const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.EMAIL_USER,
+   from: process.env.EMAIL_FROM || 'noreply@strmly.com',
+    to: process.env.ADMIN_EMAIL || process.env.EMAIL_FROM,
     subject: 'Account Deletion Request - Strmly',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -221,7 +198,7 @@ const sendAccountDeletionRequestEmail = async (email, username) => {
     `,
   };
   try {
-    await transporter.sendMail(mailOptions);
+    await resend.emails.send(mailOptions);
     return { success: true };
   } catch (error) {
     console.error('Account deletion email error:', error);
@@ -229,10 +206,9 @@ const sendAccountDeletionRequestEmail = async (email, username) => {
   }
 }
 
- const sendDeletionRequestEmailToUser= async (email, username) => {
-  const transporter = createTransporter();
+const sendDeletionRequestEmailToUser = async (email, username) => {
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+   from: process.env.EMAIL_FROM || 'noreply@strmly.com',
     to: email,
     subject: 'Account Deletion Request Received - Strmly',
     html: `
@@ -251,7 +227,7 @@ const sendAccountDeletionRequestEmail = async (email, username) => {
     `,
   };
   try {
-    await transporter.sendMail(mailOptions);
+    await resend.emails.send(mailOptions);
     return { success: true };
   } catch (error) {
     console.error('Account deletion request confirmation email error:', error);
@@ -265,14 +241,13 @@ const generatePasswordResetToken = () => {
 
 const sendEmail = async (to, subject, text) => {
   try {
-    const transporter = createTransporter();
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_FROM || 'noreply@strmly.com',
       to,
       subject,
       text,
     };
-    await transporter.sendMail(mailOptions);
+    await resend.emails.send(mailOptions);
     console.log('Email sent successfully');
     return { success: true }
   } catch (error) {
@@ -292,4 +267,3 @@ module.exports = {
     sendDeletionRequestEmailToUser,
     sendEmail
 }
-

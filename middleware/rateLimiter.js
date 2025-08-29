@@ -83,9 +83,30 @@ const bankSetupRateLimiter = rateLimit({
   },
 })
 
+const emailRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // Limit each IP to 50 email requests per hour
+  message: {
+    success: false,
+    error: 'Too many email requests from this IP, please try again later.',
+    code: 'EMAIL_RATE_LIMIT_EXCEEDED',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      error: 'Too many email requests from this IP, please try again later.',
+      code: 'EMAIL_RATE_LIMIT_EXCEEDED',
+      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
+    })
+  },
+})
+
 module.exports = {
   paymentRateLimiter,
   withdrawalRateLimiter,
   generalRateLimiter,
   bankSetupRateLimiter,
+  emailRateLimiter,
 }
