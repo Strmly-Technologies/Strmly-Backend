@@ -1441,6 +1441,10 @@ const HasCreatorPass = async (req, res, next) => {
     const userId = req.user.id
     const { creatorId } = req.params
 
+    if(creatorId === userId){
+      return res.status(200).json({ hasCreatorPass: true })
+    }
+
     const access = await UserAccess.findOne({
       user_id: userId,
       content_id: creatorId,
@@ -2541,6 +2545,8 @@ const GetLikedVideosInProfileById = async (req, res, next) => {
   }
 }
 
+
+
 const HasCommunityAccess = async (req, res, next) => {
   try {
     const communityId = req.params.communityId
@@ -2573,6 +2579,19 @@ const HasUserAccess = async (req, res, next) => {
   try {
     const assetId = req.params.assetId
     const userId = req.user.id.toString()
+    const video=await LongVideo.findById(assetId)
+    if(!video){
+      return res.status(404).json({ message: 'Video not found' })
+    }
+    if(video.created_by.toString()===userId){
+      return res.status(200).json({
+        message: 'User is the creator of the video and has access',
+        data: {
+          hasUserAccess:true,
+          accessData: null,
+        },
+      })
+    }
     const userAccess = await UserAccess.findOne({
       user_id: userId,
       content_id: assetId,
