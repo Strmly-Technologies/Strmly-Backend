@@ -1,6 +1,7 @@
 const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
+const os = require('os')
 const { v4: uuidv4 } = require('uuid')
 
 const runFFprobe = (filePath) => {
@@ -49,8 +50,9 @@ const videoCompressor = (file) => {
   const fileOriginalName = file.originalname
   const fileMimeType = file.mimetype
   const fileBuffer = file.buffer
-  const inputPath = path.join(__dirname, `temp-${uuidv4()}.mp4`)
-  const outputPath = path.join(__dirname, `compressed-${uuidv4()}.mp4`)
+  const tempDir = os.tmpdir()
+  const inputPath = path.join(tempDir, `temp-${uuidv4()}.mp4`)
+  const outputPath = path.join(tempDir, `compressed-${uuidv4()}.mp4`)
 
   fs.writeFileSync(inputPath, fileBuffer)
 

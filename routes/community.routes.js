@@ -5,6 +5,7 @@ const {
   RenameCommunity,
   ChangeCommunityProfilePhoto,
   AddBioToCommunity,
+  UpdateCommunitySettings,
   getAllCommunities,
   getCommunityById,
   getUploadPermissionForCommunity,
@@ -14,6 +15,7 @@ const {
   getCommunityVideos,
   getUserCommunities,
   getListOfCreators,
+  getCommunityFollowers,
   changeCommunityFounder,
   makeFirstJoinedCreatorFounder,
   getCommunityFollowingStatus,
@@ -52,11 +54,16 @@ router.post('/follow', authenticateToken, FollowCommunity)
 // API to add bio to a community
 router.put('/add-bio', authenticateToken, AddBioToCommunity)
 
+// API to update community settings (creator limit, fee, etc.)
+router.put('/update-settings', authenticateToken, UpdateCommunitySettings)
+
 // API to get all communities
 router.get('/all', authenticateToken, getAllCommunities)
 
 // API to get user communities
-router.get('/my-communities', authenticateToken, getUserCommunities)
+router.get('/user-communities', authenticateToken, getUserCommunities)
+
+
 
 // API to get upload permission for a community
 router.post(
@@ -69,6 +76,9 @@ router.post(
 router.get('/trending-videos', getTrendingCommunityVideos)
 
 router.get('/creators/:communityId', authenticateToken, getListOfCreators)
+
+// API to get community followers
+router.get('/followers/:communityId', authenticateToken, getCommunityFollowers)
 
 // API to change community founder
 router.post('/change-founder', authenticateToken, changeCommunityFounder)

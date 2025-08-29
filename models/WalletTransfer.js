@@ -54,6 +54,10 @@ const walletTransferSchema = new mongoose.Schema(
         'creator_pass',
       ],
     },
+    content_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: 'content_type',
+    },
     content_type: {
       type: String,
       enum: [

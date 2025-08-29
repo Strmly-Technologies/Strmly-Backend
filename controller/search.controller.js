@@ -78,6 +78,7 @@ const GlobalSearch = async (req, res, next) => {
         videos,
         series,
         communities,
+        
       },
       pagination: {
         currentPage: parseInt(page),

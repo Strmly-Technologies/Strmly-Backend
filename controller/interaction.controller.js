@@ -15,7 +15,6 @@ const {
   addCommentGiftNotificationToQueue,
   addVideoReshareNotificationToQueue,
   addCommentReplyNotificationToQueue,
-  addVideoGiftNotificationToQueue,
 } = require('../utils/notification_queue')
 
 const MIN_GIFT_AMOUNT = 1
@@ -70,7 +69,7 @@ const validateObjectId = (id, fieldName = 'ID') => {
 
 const statusOfLike = async (req, res, next) => {
   const { videoId } = req.body
-  const userId = req.user.id.toString()
+  const userId = req.user.id
   if (!videoId) {
     return res.status(400).json({ message: 'Video ID is required' })
   }
@@ -371,9 +370,14 @@ const CommentOnVideo = async (req, res, next) => {
     })
 
     await newComment.save()
+    
+    // FIX: Increment comments count on video and properly push comment ID
     video = await LongVideo.findOneAndUpdate(
       { _id: videoId },
-      { $push: { comments: newComment._id } },
+      { 
+        $push: { comments: newComment._id },
+        $inc: { comments_count: 1 } // Add this field to track comment count
+      },
       { new: true }
     )
 
@@ -391,6 +395,7 @@ const CommentOnVideo = async (req, res, next) => {
     }
 
     await user.save()
+    
     //add comment notification to queue:
     const videoCreator = video.created_by.toString()
     const videoName = video.name
@@ -408,15 +413,30 @@ const CommentOnVideo = async (req, res, next) => {
       commentId,
       commentText
     )
+    
+    // FIX: Return the new comment data and updated count
     res.status(200).json({
       message: 'Comment added successfully',
       comments: video.comments.length,
+      commentsCount: video.comments.length, // Consistent field name
+      newComment: {
+        _id: newComment._id,
+        content: newComment.content,
+        userId: user._id,
+        username: user.username,
+        profilePicture: user.profile_photo,
+        createdAt: newComment.createdAt,
+        upvotes: 0,
+        downvotes: 0,
+        gifts: 0,
+        upvoted: false,
+        downvoted: false
+      }
     })
   } catch (error) {
     handleError(error, req, res, next)
   }
 }
-
 
 const getVideoComments = async (req, res) => {
   try {
@@ -435,15 +455,30 @@ const getVideoComments = async (req, res) => {
       return {
         _id: comment._id,
         content: comment.content,
+        videoId: videoId,
         userId: user ? user._id : null,
         username: user ? user.username : 'Unknown User',
         profilePicture: user ? user.profile_photo : null, 
         createdAt: comment.createdAt,
         updatedAt: comment.updatedAt,
+        timestamp: comment.createdAt, // Add timestamp field for consistency
         likes: comment.likes || 0,
         upvotes: comment.upvotes || 0,
         downvotes: comment.downvotes || 0,
-        gifts: comment.gifts || 0
+        gifts: comment.gifts || 0,
+        donations: comment.gifts || 0, // Alias for gifts
+        replies: comment.replies ? comment.replies.length : 0,
+        repliesCount: comment.replies ? comment.replies.length : 0,
+        // Add user interaction flags
+        upvoted: comment.upvoted_by ? comment.upvoted_by.includes(req.user.id) : false,
+        downvoted: comment.downvoted_by ? comment.downvoted_by.includes(req.user.id) : false,
+        user: {
+          id: user ? user._id : null,
+          username: user ? user.username : 'Unknown User',
+          name: user ? user.username : 'Unknown User',
+          avatar: user ? user.profile_photo : null
+        },
+        is_monetized: true // Default to true
       };
     });
     
@@ -459,6 +494,7 @@ const getVideoComments = async (req, res) => {
     });
   }
 };
+
 const getCommentReplies = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
@@ -477,31 +513,56 @@ const getCommentReplies = async (req, res, next) => {
     }).populate('user', '_id username profile_photo')
 
     if (!commentReplies || commentReplies.length === 0) {
-      res.status(200).json({ replies: [] })
+      res.status(200).json({
+        message: 'No replies found',
+        replies: [],
+        pagination: {
+          page: parseInt(req.query.page) || 1,
+          limit: parseInt(req.query.limit) || 5,
+          total: 0,
+          totalPages: 0
+        }
+      })
       return
     }
 
-    const replies = commentReplies.map((reply) => ({
-      _id: reply._id,
-      content: reply.content,
-      parentId: commentId,
-      timestamp: reply.createdAt,
-      gifts: reply.gifts || 0,
-      upvotes: reply.upvotes || 0,
-      downvotes: reply.downvoted_by || 0,
-      user: {
-        id: reply.user._id,
-        name: reply.user.username,
-        username: reply.user.username,
-        avatar: reply.user.profile_photo || '',
-      },
-      upvoted: reply.upvoted_by ? reply.upvoted_by.includes(userId) : false,
-      downvoted: reply.downvoted_by
-        ? reply.downvoted_by.includes(userId)
-        : false,
-    }))
+    const replies = commentReplies
+      .filter(reply => reply && reply.user && reply.content) // Filter out replies without valid users or content
+      .map((reply) => {
+        // Debug reply content
+        console.log(`💬 Reply ${reply._id}: content="${reply.content}"`)
 
-    res.status(200).json(replies)
+        return {
+          _id: reply._id,
+          content: reply.content,
+          parentId: commentId,
+          timestamp: reply.createdAt,
+          donations: reply.donations || 0,
+          upvotes: reply.upvotes || 0,
+          downvotes: reply.downvotes || 0,
+          user: {
+            id: reply.user._id,
+            name: reply.user.username || 'Anonymous User',
+            username: reply.user.username || 'anonymous',
+            avatar: reply.user.profile_photo || 'https://api.dicebear.com/7.x/identicon/svg?seed=anonymous',
+          },
+          upvoted: reply.upvoted_by ? reply.upvoted_by.includes(userId) : false,
+          downvoted: reply.downvoted_by
+            ? reply.downvoted_by.includes(userId)
+            : false,
+        }
+      })
+
+    res.status(200).json({
+      message: 'Replies fetched successfully',
+      replies: replies,
+      pagination: {
+        page: parseInt(req.query.page) || 1,
+        limit: parseInt(req.query.limit) || 5,
+        total: replies.length,
+        totalPages: Math.ceil(replies.length / (parseInt(req.query.limit) || 5))
+      }
+    })
   } catch (error) {
     handleError(error, req, res, next)
   }
@@ -524,7 +585,22 @@ const upvoteComment = async (req, res, next) => {
 
     const comment = await Comment.findById(commentId)
     if (!comment) {
+      console.log('❌ Comment not found:', commentId);
       return res.status(404).json({ error: 'Comment not found' })
+    }
+
+    console.log('📝 Comment found:', {
+      id: comment._id,
+      content: comment.content.substring(0, 50),
+      videoId: comment.long_video,
+      upvotes: comment.upvotes,
+      upvoted_by_count: comment.upvoted_by.length
+    });
+
+    // Verify comment belongs to this video
+    if (comment.long_video.toString() !== videoId) {
+      console.log('❌ Comment video mismatch:', { commentVideo: comment.long_video.toString(), requestVideo: videoId });
+      return res.status(400).json({ error: 'Comment does not belong to this video' })
     }
 
     // Remove from downvotes if exists
@@ -535,12 +611,16 @@ const upvoteComment = async (req, res, next) => {
 
     // Toggle upvote
     const alreadyUpvoted = comment.upvoted_by.includes(userId)
+    console.log('🔍 Vote status:', { alreadyUpvoted, userId, upvoted_by: comment.upvoted_by });
+
     if (alreadyUpvoted) {
       comment.upvoted_by.pull(userId)
       comment.upvotes = Math.max(0, comment.upvotes - 1)
+      console.log('👎 Removed upvote');
     } else {
       comment.upvoted_by.push(userId)
       comment.upvotes += 1
+      console.log('👍 Added upvote');
     }
 
     await comment.save()
@@ -557,9 +637,11 @@ const upvoteComment = async (req, res, next) => {
         userName,
         videoName,
         userProfilePhoto,
-        commentId
+        commentId,
+        user.FCM_token
       )
     }
+
     res.status(200).json({
       success: true,
       upvotes: comment.upvotes,
@@ -568,6 +650,7 @@ const upvoteComment = async (req, res, next) => {
       downvoted: comment.downvoted_by.includes(userId),
     })
   } catch (error) {
+    console.error('❌ Error in upvoteComment:', error)
     handleError(error, req, res, next)
   }
 }
@@ -589,6 +672,11 @@ const downvoteComment = async (req, res, next) => {
     const comment = await Comment.findById(commentId)
     if (!comment) {
       return res.status(404).json({ error: 'Comment not found' })
+    }
+
+    // Verify comment belongs to this video
+    if (comment.long_video.toString() !== videoId) {
+      return res.status(400).json({ error: 'Comment does not belong to this video' })
     }
 
     // Remove from upvotes if exists
@@ -616,6 +704,7 @@ const downvoteComment = async (req, res, next) => {
       downvoted: comment.downvoted_by.includes(userId),
     })
   } catch (error) {
+    console.error('❌ Error in downvoteComment:', error)
     handleError(error, req, res, next)
   }
 }
@@ -886,15 +975,14 @@ const GiftComment = async (req, res, next) => {
         })
 
         await receiverTransaction.save({ session })
-        //update comment analytics
-        comment.gifts += amount
-        comment.gifted_by.push(gifterId)
-        await comment.save({ session })
       })
 
       await session.endSession()
       //send comment gift notification
       const gifter = User.findById(gifterId).select('username profile_photo')
+      const user = await User.findById(comment.user.toString()).select(
+        'FCM_token'
+      )
       await addCommentGiftNotificationToQueue(
         comment.user.toString(),
         gifterId,
@@ -903,7 +991,8 @@ const GiftComment = async (req, res, next) => {
         video.name,
         gifter.profile_photo,
         commentId,
-        amount
+        amount,
+        user.FCM_token
       )
       res.status(200).json({
         success: true,
@@ -946,280 +1035,7 @@ const GiftComment = async (req, res, next) => {
   }
 }
 
-const GiftVideo = async (req, res, next) => {
-  try {
-    const { videoId, amount } = req.body
-    const gifterId = req.user.id.toString()
 
-    // Validation
-    if (!videoId || !amount) {
-      return res.status(400).json({
-        success: false,
-        error: 'Video ID and amount are required',
-        code: 'MISSING_REQUIRED_FIELDS',
-      })
-    }
-
-    const videoValidation = validateObjectId(videoId, 'Video ID')
-    if (!videoValidation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: videoValidation.error,
-        code: 'INVALID_VIDEO_ID',
-      })
-    }
-
-    const amountValidation = validateAmount(amount)
-    if (!amountValidation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: amountValidation.error,
-        code: 'INVALID_AMOUNT',
-      })
-    }
-
-    const video = await LongVideo.findById(videoId)
-
-    if (
-      !video ||
-      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
-    ) {
-      return res.status(404).json({
-        success: false,
-        error: 'Video not found',
-        code: 'VIDEO_NOT_FOUND',
-      })
-    }
-    const videoCreatorId = video.created_by.toString()
-    // Get user details
-    const receiver = await User.findById(videoCreatorId).select('username')
-    if (!receiver) {
-      return res.status(404).json({
-        success: false,
-        error: 'Video creator not found',
-        code: 'VIDEO_VIDEO_NOT_FOUND',
-      })
-    }
-
-    // Check if user is trying to gift themselves
-    if (videoCreatorId === gifterId) {
-      return res.status(400).json({
-        success: false,
-        error: 'You cannot gift yourself',
-        code: 'CANNOT_GIFT_SELF',
-      })
-    }
-
-    // Get wallets
-    const gifterWallet = await Wallet.findOne({ user_id: gifterId })
-    if (!gifterWallet) {
-      return res.status(400).json({
-        success: false,
-        error: 'gifter wallet not found',
-        code: 'GIFTER_WALLET_NOT_FOUND',
-      })
-    }
-    const receiverWallet = await Wallet.findOne({ user_id: videoCreatorId })
-    if (!receiverWallet) {
-      return res.status(400).json({
-        success: false,
-        error: 'receiver wallet not found',
-        code: 'RECEIVER_WALLET_NOT_FOUND',
-      })
-    }
-    // Check gifter's wallet balance
-    if (gifterWallet.balance < amount) {
-      return res.status(400).json({
-        success: false,
-        error: 'Insufficient wallet balance',
-        currentBalance: gifterWallet.balance,
-        requiredAmount: amount,
-        shortfall: amount - gifterWallet.balance,
-        code: 'INSUFFICIENT_BALANCE',
-      })
-    }
-
-    // Check wallet statuses
-    if (gifterWallet.status !== 'active') {
-      return res.status(400).json({
-        success: false,
-        error: 'Your wallet is not active',
-        code: 'WALLET_INACTIVE',
-      })
-    }
-
-    if (receiverWallet.status !== 'active') {
-      return res.status(400).json({
-        success: false,
-        error: "Receiver's wallet is not active",
-        code: 'RECEIVER_WALLET_INACTIVE',
-      })
-    }
-
-    const session = await mongoose.startSession()
-
-    const gifterBalanceBefore = gifterWallet.balance
-    const receiverBalanceBefore = receiverWallet.balance
-    let walletTransfer
-
-    try {
-      await session.withTransaction(async () => {
-        const gifterBalanceAfter = gifterBalanceBefore - amount
-        const receiverBalanceAfter = receiverBalanceBefore + amount
-
-        walletTransfer = new WalletTransfer({
-          sender_id: gifterId,
-          receiver_id: videoCreatorId,
-          sender_wallet_id: gifterWallet._id,
-          receiver_wallet_id: receiverWallet._id,
-          total_amount: amount,
-          creator_amount: amount,
-          platform_amount: 0,
-          currency: 'INR',
-          transfer_type: 'video_gift',
-          content_id: videoId,
-          content_type: 'LongVideo',
-          description: `Gift for video: "${video.name.substring(0, 30)}..."`,
-          sender_balance_before: gifterBalanceBefore,
-          sender_balance_after: gifterBalanceAfter,
-          receiver_balance_before: receiverBalanceBefore,
-          receiver_balance_after: receiverBalanceAfter,
-          platform_fee_percentage: 0,
-          creator_share_percentage: 100,
-          status: 'completed',
-          metadata: {
-            video_title: video.name,
-            creator_name: receiver.username,
-            transfer_note: 'video gift',
-            video_id: videoId,
-          },
-        })
-
-        await walletTransfer.save({ session })
-
-        // Update wallets
-        gifterWallet.balance = gifterBalanceAfter
-        gifterWallet.total_spent += amount
-        gifterWallet.last_transaction_at = new Date()
-        await gifterWallet.save({ session })
-
-        receiverWallet.balance = receiverBalanceAfter
-        receiverWallet.total_received += amount
-
-        receiverWallet.last_transaction_at = new Date()
-        await receiverWallet.save({ session })
-
-        // Create gifter transaction
-        const gifterTransaction = new WalletTransaction({
-          wallet_id: gifterWallet._id,
-          user_id: gifterId,
-          transaction_type: 'debit',
-          transaction_category: 'video_gift',
-          amount: amount,
-          currency: 'INR',
-          description: `Gift sent to ${receiver.username} for video "${video.name.substring(0, 30)}..."`,
-          balance_before: gifterBalanceBefore,
-          balance_after: gifterBalanceAfter,
-          content_id: videoId,
-          content_type: 'LongVideo',
-          status: 'completed',
-          metadata: {
-            video_title: video.name,
-            creator_name: receiver.username,
-            video_id: videoId,
-            transfer_id: walletTransfer._id,
-          },
-        })
-
-        await gifterTransaction.save({ session })
-
-        // Create receiver transaction
-        const receiverTransaction = new WalletTransaction({
-          wallet_id: receiverWallet._id,
-          user_id: videoCreatorId,
-          transaction_type: 'credit',
-          transaction_category: 'gift_received',
-          amount: amount,
-          currency: 'INR',
-          description: `Gift received from ${req.user.username} for your video "${video.name.substring(0, 30)}..."`,
-          balance_before: receiverBalanceBefore,
-          balance_after: receiverBalanceAfter,
-          content_id: videoId,
-          content_type: 'LongVideo',
-          status: 'completed',
-          metadata: {
-            video_title: video.name,
-            creator_name: req.user.username,
-
-            video_id: videoId,
-            transfer_id: walletTransfer._id,
-          },
-        })
-
-        await receiverTransaction.save({ session })
-        //update video analytics
-        await LongVideo.updateOne(
-          { _id: videoId },
-          {
-            $inc: { gifts: amount },
-            $push: { gifted_by: gifterId },
-          },
-          { session }
-        )
-      })
-
-      await session.endSession()
-      //send comment gift notification
-      const gifter = User.findById(gifterId).select('username profile_photo')
-      await addVideoGiftNotificationToQueue(
-        videoCreatorId,
-        gifterId,
-        videoId,
-        gifter.username,
-        video.name,
-        gifter.profile_photo,
-        amount
-      )
-      res.status(200).json({
-        success: true,
-        message: 'Gift sent successfully!',
-        gift: {
-          amount: amount,
-          from: req.user.username,
-          to: receiver.username,
-          videoTitle: video.name,
-
-          giftNote: 'video gift',
-          transferType: 'video_gift',
-        },
-        gifter: {
-          balanceBefore: gifterBalanceBefore,
-          balanceAfter: gifterWallet.balance,
-          currentBalance: gifterWallet.balance,
-        },
-        receiver: {
-          balanceBefore: receiverBalanceBefore,
-          balanceAfter: receiverWallet.balance,
-          currentBalance: receiverWallet.balance,
-          receivedAmount: amount,
-        },
-        transfer: {
-          id: walletTransfer._id,
-          createdAt: new Date(),
-        },
-      })
-    } catch (transactionError) {
-      await session.abortTransaction()
-      throw transactionError
-    } finally {
-      if (session.inTransaction()) {
-        await session.endSession()
-      }
-    }
-  } catch (error) {
-    handleError(error, req, res, next)
-  }
-}
 const reshareVideo = async (req, res, next) => {
   const { videoId } = req.body
   const userId = req.user.id.toString()
@@ -1241,7 +1057,6 @@ const reshareVideo = async (req, res, next) => {
     ) {
       return res.status(404).json({ message: 'Video not found' })
     }
-
     const existingReshare = await Reshare.findOne({
       user: userId,
       long_video: videoId,
@@ -1398,6 +1213,7 @@ const checkForSaveVideo = async (req, res, next) => {
 const ReplyToComment = async (req, res, next) => {
   const { videoId, commentId, reply } = req.body
   const userId = req.user.id.toString()
+  
   if (!videoId || !commentId || !reply) {
     return res.status(400).json({
       message: 'Video ID, comment ID and reply are required',
@@ -1412,6 +1228,7 @@ const ReplyToComment = async (req, res, next) => {
     ) {
       return res.status(404).json({ message: 'Video not found' })
     }
+    
     const comment = await Comment.findById(commentId)
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' })
@@ -1428,11 +1245,21 @@ const ReplyToComment = async (req, res, next) => {
       parent_comment: commentId,
       content: reply,
     })
-    comment.replies.push(newReply._id)
-    await comment.save()
+    
+    // FIX: Properly update the parent comment
+    await Comment.findByIdAndUpdate(
+      commentId,
+      { 
+        $push: { replies: newReply._id },
+        $inc: { reply_count: 1 } // Track reply count
+      },
+      { new: true }
+    )
 
-    //send reply notification
+    // Get user data for response
     const user = await User.findById(userId).select('username profile_photo')
+    
+    //send reply notification
     await addCommentReplyNotificationToQueue(
       comment.user.toString(),
       userId,
@@ -1445,9 +1272,27 @@ const ReplyToComment = async (req, res, next) => {
       reply
     )
 
+    // FIX: Return the new reply data
     res.status(200).json({
       message: 'Reply added successfully',
-      repliesCount: comment.replies.length,
+      repliesCount: comment.replies.length + 1,
+      newReply: {
+        _id: newReply._id,
+        content: newReply.content,
+        parentId: commentId,
+        timestamp: newReply.createdAt,
+        gifts: 0,
+        upvotes: 0,
+        downvotes: 0,
+        user: {
+          id: user._id,
+          name: user.username,
+          username: user.username,
+          avatar: user.profile_photo || '',
+        },
+        upvoted: false,
+        downvoted: false,
+      }
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -1492,7 +1337,9 @@ const UpvoteReply = async (req, res, next) => {
     await reply.save()
     if (!alreadyUpvoted) {
       //send reply upvote notification
-      const user = await User.findById(userId).select('username profile_photo')
+      const user = await User.findById(userId).select(
+        'username profile_photo FCM_token'
+      )
       await addCommentUpvoteNotificationToQueue(
         reply.user.toString(),
         userId,
@@ -1500,7 +1347,8 @@ const UpvoteReply = async (req, res, next) => {
         user.username,
         video.name,
         user.profile_photo,
-        reply._id.toString()
+        reply._id.toString(),
+        user.FCM_token
       )
     }
     res
@@ -1624,6 +1472,254 @@ const UnsaveVideo = async (req, res, next) => {
   }
 }
 
+const GiftVideo = async (req, res, next) => {
+  try {
+    const { videoId, amount, giftNote } = req.body
+    const gifterId = req.user.id.toString()
+
+    // Validation
+    if (!videoId || !amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Video ID and amount are required',
+        code: 'MISSING_REQUIRED_FIELDS',
+      })
+    }
+
+    const videoValidation = validateObjectId(videoId, 'Video ID')
+    if (!videoValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: videoValidation.error,
+        code: 'INVALID_VIDEO_ID',
+      })
+    }
+
+    const amountValidation = validateAmount(amount)
+    if (!amountValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: amountValidation.error,
+        code: 'INVALID_AMOUNT',
+      })
+    }
+
+    if (giftNote && giftNote.length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gift note must be less than 200 characters',
+        code: 'INVALID_GIFT_NOTE',
+      })
+    }
+
+    const video = await LongVideo.findById(videoId).populate('created_by', 'username')
+
+    if (
+      !video ||
+      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
+    ) {
+      return res.status(404).json({
+        success: false,
+        error: 'Video not found',
+        code: 'VIDEO_NOT_FOUND',
+      })
+    }
+
+    const videoCreatorId = video.created_by._id
+
+    // Check if user is trying to gift themselves
+    if (videoCreatorId.toString() === gifterId) {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot gift yourself',
+        code: 'CANNOT_GIFT_SELF',
+      })
+    }
+
+    // Note: Video monetization check removed for testing
+    // TODO: Add video_monetization_enabled field to User model if needed
+
+    // Get wallets
+    const gifterWallet = await Wallet.findOne({ user_id: gifterId })
+    if (!gifterWallet) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gifter wallet not found',
+        code: 'GIFTER_WALLET_NOT_FOUND',
+      })
+    }
+
+    const receiverWallet = await Wallet.findOne({ user_id: videoCreatorId })
+    if (!receiverWallet) {
+      return res.status(400).json({
+        success: false,
+        error: 'Receiver wallet not found',
+        code: 'RECEIVER_WALLET_NOT_FOUND',
+      })
+    }
+
+    // Check gifter's wallet balance
+    if (gifterWallet.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient wallet balance',
+        currentBalance: gifterWallet.balance,
+        requiredAmount: amount,
+        shortfall: amount - gifterWallet.balance,
+        code: 'INSUFFICIENT_BALANCE',
+      })
+    }
+
+    // Check wallet statuses
+    if (gifterWallet.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: 'Your wallet is not active',
+        code: 'WALLET_INACTIVE',
+      })
+    }
+
+    if (receiverWallet.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: "Receiver's wallet is not active",
+        code: 'RECEIVER_WALLET_INACTIVE',
+      })
+    }
+
+    const session = await mongoose.startSession()
+
+    const gifterBalanceBefore = gifterWallet.balance
+    const receiverBalanceBefore = receiverWallet.balance
+    let walletTransfer
+
+    try {
+      await session.withTransaction(async () => {
+        const gifterBalanceAfter = gifterBalanceBefore - amount
+        const receiverBalanceAfter = receiverBalanceBefore + amount
+
+        walletTransfer = new WalletTransfer({
+          sender_id: gifterId,
+          receiver_id: videoCreatorId,
+          sender_wallet_id: gifterWallet._id,
+          receiver_wallet_id: receiverWallet._id,
+          total_amount: amount,
+          creator_amount: amount,
+          platform_amount: 0,
+          currency: 'INR',
+          transfer_type: 'video_gift',
+          content_id: videoId,
+          content_type: 'LongVideo',
+          description: `Gift for video: ${video.name.substring(0, 50)}...`,
+          sender_balance_before: gifterBalanceBefore,
+          sender_balance_after: gifterBalanceAfter,
+          receiver_balance_before: receiverBalanceBefore,
+          receiver_balance_after: receiverBalanceAfter,
+          platform_fee_percentage: 0,
+          creator_share_percentage: 100,
+          status: 'completed',
+          metadata: {
+            video_title: video.name,
+            creator_name: video.created_by.username,
+            transfer_note: giftNote || '',
+            video_id: videoId,
+          },
+        })
+
+        await walletTransfer.save({ session })
+
+        // Update wallets
+        gifterWallet.balance = gifterBalanceAfter
+        gifterWallet.total_spent += amount
+        gifterWallet.last_transaction_at = new Date()
+        await gifterWallet.save({ session })
+
+        receiverWallet.balance = receiverBalanceAfter
+        receiverWallet.total_received += amount
+        receiverWallet.last_transaction_at = new Date()
+        await receiverWallet.save({ session })
+
+        // Update video gifts count
+        await LongVideo.findByIdAndUpdate(
+          videoId,
+          { $inc: { gifts: amount } },
+          { session }
+        )
+
+        // Create gifter transaction
+        const gifterTransaction = new WalletTransaction({
+          wallet_id: gifterWallet._id,
+          user_id: gifterId,
+          transaction_type: 'debit',
+          transaction_category: 'video_gift',
+          amount: amount,
+          currency: 'INR',
+          description: `Gift sent to ${video.created_by.username} for video "${video.name.substring(0, 30)}..."`,
+          balance_before: gifterBalanceBefore,
+          balance_after: gifterBalanceAfter,
+          content_id: videoId,
+          content_type: 'LongVideo',
+          status: 'completed',
+          metadata: {
+            video_title: video.name,
+            creator_name: video.created_by.username,
+            video_id: videoId,
+            transfer_id: walletTransfer._id,
+          },
+        })
+
+        await gifterTransaction.save({ session })
+
+        // Create receiver transaction
+        const receiverTransaction = new WalletTransaction({
+          wallet_id: receiverWallet._id,
+          user_id: videoCreatorId,
+          transaction_type: 'credit',
+          transaction_category: 'gift_received',
+          amount: amount,
+          currency: 'INR',
+          description: `Gift received from ${req.user.username} for your video "${video.name.substring(0, 30)}..."`,
+          balance_before: receiverBalanceBefore,
+          balance_after: receiverBalanceAfter,
+          content_id: videoId,
+          content_type: 'LongVideo',
+          status: 'completed',
+          metadata: {
+            video_title: video.name,
+            creator_name: req.user.username,
+            video_id: videoId,
+            transfer_id: walletTransfer._id,
+          },
+        })
+
+        await receiverTransaction.save({ session })
+      })
+
+      await session.endSession()
+
+      res.status(200).json({
+        success: true,
+        message: 'Video gift sent successfully',
+        gift: {
+          amount: amount,
+          recipient: video.created_by.username,
+          video_title: video.name,
+          transfer_id: walletTransfer._id,
+        },
+        wallet: {
+          balance: gifterWallet.balance,
+        },
+      })
+    } catch (transactionError) {
+      await session.endSession()
+      throw transactionError
+    }
+  } catch (error) {
+    console.error('❌ Error in GiftVideo:', error)
+    handleError(error, req, res, next)
+  }
+}
+
 const deleteComment = async (req, res, next) => {
   try {
     const { commentId, videoId } = req.body
@@ -1702,6 +1798,7 @@ module.exports = {
   ShareVideo,
   CommentOnVideo,
   GiftComment,
+  GiftVideo,
   reshareVideo,
   getVideoComments,
   getCommentReplies,
@@ -1711,8 +1808,4 @@ module.exports = {
   saveVideo,
   getTotalSharesByVideoId,
   deleteComment,
-  statusOfReshare,
-  statusOfUserFollowing,
-  statusOfUserFollower,
-  GiftVideo,
 }

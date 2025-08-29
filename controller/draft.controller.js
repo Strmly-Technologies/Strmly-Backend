@@ -23,6 +23,7 @@ const createOrUpdateDraft = async (req, res, next) => {
       type,
       language,
       age_restriction,
+      amount,
       communityId,
       seriesId,
       start_time,
@@ -63,6 +64,8 @@ const createOrUpdateDraft = async (req, res, next) => {
         display_till_time: Number(display_till_time),
       }),
     }
+    
+    console.log('📝 Draft data being saved:', draftData);
 
     draft.draft_data = draftData
     await draft.save()
@@ -400,6 +403,7 @@ const getDraftById = async (req, res, next) => {
         content_type: draft.content_type,
         status: draft.status,
         draft_data: draft.draft_data,
+        video_data: draft.video_data,
         last_modified: draft.last_modified,
         expires_at: draft.expires_at,
         error_message: draft.error_message,
@@ -530,6 +534,11 @@ const completeDraftUpload = async (req, res, next) => {
       }
 
       // Create the actual video record
+      console.log('📝 Draft data during video creation:', draft.draft_data)
+      console.log('🎬 Series ID from draft:', draft.draft_data.series_id)
+      console.log('💰 Amount from draft:', draft.draft_data.amount)
+      console.log('🎭 Type from draft:', draft.draft_data.type)
+      
       const longVideo = new LongVideo({
         name:
           draft.draft_data.name ||
@@ -543,6 +552,7 @@ const completeDraftUpload = async (req, res, next) => {
         community: draft.draft_data.community_id || null,
         genre: draft.draft_data.genre || 'Action',
         type: draft.draft_data.type || 'Free',
+        amount: draft.draft_data.amount || 0,
         series: draft.draft_data.series_id || null,
         age_restriction: draft.draft_data.age_restriction || false,
         Videolanguage: draft.draft_data.language || 'English',
@@ -551,12 +561,73 @@ const completeDraftUpload = async (req, res, next) => {
       })
 
       await longVideo.save()
+      console.log(`📹 Video created successfully with ID: ${longVideo._id}`)
 
       // Update community if specified
       if (draft.draft_data.community_id) {
         await Community.findByIdAndUpdate(draft.draft_data.community_id, {
           $push: { long_videos: longVideo._id },
+          $addToSet: { creators: userId },
         })
+      }
+
+      // If video belongs to a series, add it to the series episodes
+      console.log('🔍 Checking for series integration. Series ID:', draft.draft_data.series_id)
+      if (draft.draft_data.series_id) {
+        try {
+          console.log(`🎬 Processing series integration for draft video with series ${draft.draft_data.series_id}`)
+          const Series = require('../models/Series')
+          const mongoose = require('mongoose')
+          
+          // Validate ObjectId
+          if (!mongoose.Types.ObjectId.isValid(draft.draft_data.series_id)) {
+            console.error(`❌ Invalid series ObjectId: ${draft.draft_data.series_id}`)
+            throw new Error('Invalid series ID format')
+          }
+          
+          // Get the series to check if it exists and get current episode count
+          const series = await Series.findById(draft.draft_data.series_id)
+          console.log(`📺 Found series:`, series ? series.title : 'Not found')
+          console.log(`👤 Series creator: ${series?.created_by}, Video creator: ${userId}`)
+          console.log(`📊 Current total episodes: ${series?.total_episodes || 0}`)
+          if (series && series.created_by.toString() === userId.toString()) {
+            // Calculate next episode number
+            const nextEpisodeNumber = (series.total_episodes || 0) + 1
+            console.log(`🔢 Assigning episode number: ${nextEpisodeNumber}`)
+            
+            // Update the video with episode information
+            await LongVideo.findByIdAndUpdate(longVideo._id, {
+              episode_number: nextEpisodeNumber,
+              season_number: 1, // Default to season 1
+              is_standalone: false
+            })
+            
+            // Add video to series episodes and update analytics
+            const seriesUpdateResult = await Series.findByIdAndUpdate(draft.draft_data.series_id, {
+              $addToSet: { episodes: longVideo._id },
+              $inc: {
+                total_episodes: 1,
+                'analytics.total_likes': longVideo.likes || 0,
+                'analytics.total_views': longVideo.views || 0,
+                'analytics.total_shares': longVideo.shares || 0,
+              },
+              $set: { 'analytics.last_analytics_update': new Date() },
+            }, { new: true })
+            
+            console.log('📊 Series update result:', seriesUpdateResult ? 'Success' : 'Failed')
+            
+            // Verify the update worked
+            const updatedSeries = await Series.findById(draft.draft_data.series_id)
+            console.log(`✅ Video ${longVideo._id} added to series ${draft.draft_data.series_id} as episode ${nextEpisodeNumber}`)
+            console.log(`📊 Updated series total episodes: ${updatedSeries?.total_episodes}`)
+            console.log(`📋 Updated series episodes array length: ${updatedSeries?.episodes?.length}`)
+          } else {
+            console.error(`❌ Series ${draft.draft_data.series_id} not found or user ${userId} not authorized`)
+          }
+        } catch (seriesError) {
+          console.error('❌ Error adding video to series:', seriesError)
+          // Don't fail the entire upload, just log the error
+        }
       }
 
       // Mark draft as completed and remove from user's drafts

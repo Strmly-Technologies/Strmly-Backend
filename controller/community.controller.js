@@ -378,6 +378,92 @@ const AddBioToCommunity = async (req, res, next) => {
   }
 }
 
+const UpdateCommunitySettings = async (req, res, next) => {
+  const { communityId, creator_limit, community_fee_type, community_fee_amount, community_fee_description } = req.body
+  const userId = req.user.id
+
+  console.log('📝 Update community settings request:', {
+    communityId,
+    creator_limit,
+    community_fee_type,
+    community_fee_amount,
+    community_fee_description,
+    userId
+  })
+
+  if (!communityId) {
+    return res.status(400).json({ message: 'Community ID is required' })
+  }
+
+  try {
+    // Build update object with only provided fields
+    const updateFields = {}
+    
+    if (creator_limit !== undefined) {
+      const limit = parseInt(creator_limit)
+      if (isNaN(limit) || limit < 1 || limit > 1000) {
+        return res.status(400).json({ 
+          message: 'Creator limit must be a number between 1 and 1000' 
+        })
+      }
+      updateFields.creator_limit = limit
+    }
+
+    if (community_fee_type !== undefined) {
+      if (!['free', 'paid'].includes(community_fee_type)) {
+        return res.status(400).json({ 
+          message: 'Community fee type must be either "free" or "paid"' 
+        })
+      }
+      updateFields.community_fee_type = community_fee_type
+      
+      // If changing to free, reset fee amount and description
+      if (community_fee_type === 'free') {
+        updateFields.community_fee_amount = 0
+        updateFields.community_fee_description = ''
+      }
+    }
+
+    if (community_fee_amount !== undefined && updateFields.community_fee_type !== 'free') {
+      const amount = parseInt(community_fee_amount)
+      if (isNaN(amount) || amount < 0 || amount > 5000) {
+        return res.status(400).json({ 
+          message: 'Community fee amount must be a number between 0 and 5000' 
+        })
+      }
+      updateFields.community_fee_amount = amount
+    }
+
+    if (community_fee_description !== undefined) {
+      updateFields.community_fee_description = community_fee_description
+    }
+
+    console.log('📝 Update fields:', updateFields)
+
+    const updatedCommunity = await Community.findOneAndUpdate(
+      { _id: communityId, founder: userId },
+      updateFields,
+      { new: true }
+    )
+
+    if (!updatedCommunity) {
+      return res
+        .status(404)
+        .json({ message: 'Community not found or you are not the founder' })
+    }
+
+    console.log('✅ Community settings updated successfully')
+
+    res.status(200).json({
+      message: 'Community settings updated successfully',
+      community: updatedCommunity,
+    })
+  } catch (error) {
+    console.error('❌ Error updating community settings:', error)
+    handleError(error, req, res, next)
+  }
+}
+
 const checkCommunityUploadPermission = async (userId, communityId) => {
   const community = await Community.findById(communityId)
 
@@ -539,12 +625,18 @@ const getCommunityById = async (req, res, next) => {
 
 const getUserCommunities = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.id.toString()
     const { type = 'all' } = req.query
 
     if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' })
+      return res.status(400).json({ 
+        success: false,
+        error: 'User ID is required',
+        code: 'MISSING_USER_ID'
+      })
     }
+
+
 
     let created = []
     let joined = []
@@ -601,6 +693,59 @@ const getUserCommunities = async (req, res, next) => {
   }
 }
 
+const getFollowedCommunities = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'User ID is required',
+        code: 'MISSING_USER_ID'
+      })
+    }
+
+    // Get user's followed communities from following_communities field
+    const user = await User.findById(userId).select('following_communities')
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    let followedCommunities = []
+
+    if (user.following_communities && user.following_communities.length > 0) {
+      followedCommunities = await Community.find({ 
+        _id: { $in: user.following_communities }
+      })
+        .populate('founder', 'username profile_photo')
+        .populate('followers', 'username profile_photo')
+        .populate('creators', 'username profile_photo')
+        .populate('long_videos', 'name description videoUrl thumbnailUrl')
+        .populate('series', 'title description total_episodes')
+    }
+
+    // Add user relation info to each community
+    const communitiesWithRelation = followedCommunities.map(community => {
+      const communityObj = community.toObject()
+      communityObj.userRelation = community.founder.toString() === userId ? 'created' : 'followed'
+      communityObj.isFollowing = true
+      communityObj.isFounder = community.founder.toString() === userId
+      return communityObj
+    })
+
+    res.status(200).json({
+      communities: communitiesWithRelation,
+      count: communitiesWithRelation.length,
+      message: communitiesWithRelation.length > 0 
+        ? 'Followed communities fetched successfully' 
+        : 'No followed communities found',
+    })
+  } catch (error) {
+    console.error('❌ Error in getFollowedCommunities:', error)
+    handleError(error, req, res, next)
+  }
+}
 const getUploadPermissionForCommunity = async (req, res, next) => {
   try {
     const { communityId } = req.body
@@ -635,7 +780,7 @@ const getCommunityProfileDetails = async (req, res, next) => {
         .status(400)
         .json({ message: 'Community ID is required to proceed' })
     }
-    const community = await Community.findById(communityId)
+    const community = await Community.findById(communityId).populate('founder', 'username profile_photo')
     if (!community) {
       return res.status(404).json({ message: 'Community not found' })
     }
@@ -651,6 +796,10 @@ const getCommunityProfileDetails = async (req, res, next) => {
       name: community.name,
       bio: community.bio,
       profilePhoto: community.profile_photo,
+      creator_limit: community.creator_limit,
+      community_fee_type: community.community_fee_type,
+      community_fee_amount: community.community_fee_amount,
+      community_fee_description: community.community_fee_description,
       totalFollowers,
       totalCreators,
       totalVideos,
@@ -801,6 +950,9 @@ const getTrendingCommunityVideos = async (req, res, next) => {
         },
       })
       .populate('liked_by', 'username profile_photo')
+      .populate('created_by', 'username profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate('comments', '_id content user createdAt')
       .sort({ likes: -1, views: -1, createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -884,6 +1036,8 @@ const getTrendingVideosByCommunity = async (req, res, next) => {
         },
       })
       .populate('liked_by', 'username profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate('comments', '_id content user createdAt')
       .sort(sortObject)
       .skip(skip)
       .limit(limitNum)
@@ -961,14 +1115,31 @@ const getListOfCreators = async (req, res, next) => {
     if (!community) {
       return res.status(404).json({ message: 'Community not found' })
     }
-    if (!community.creators.includes(userId)) {
-      return res
-        .status(403)
-        .json({ message: 'You are not a creator of this community' })
-    }
     return res.status(200).json({
       message: 'Creators fetched successfully',
       creators: community.creators,
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const getCommunityFollowers = async (req, res, next) => {
+  const { communityId } = req.params
+  if (!communityId) {
+    return res.status(400).json({ message: 'Community ID is required' })
+  }
+  try {
+    const community = await Community.findById(communityId).populate(
+      'followers',
+      'username profile_photo'
+    )
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    return res.status(200).json({
+      message: 'Followers fetched successfully',
+      followers: community.followers,
     })
   } catch (error) {
     handleError(error, req, res, next)
@@ -1136,12 +1307,14 @@ module.exports = {
   RenameCommunity,
   ChangeCommunityProfilePhoto,
   AddBioToCommunity,
+  UpdateCommunitySettings,
   checkCommunityUploadPermission,
   getUploadPermissionForCommunity,
   getTrendingCommunityVideos,
   getTrendingVideosByCommunity,
   getCommunityVideos,
   getListOfCreators,
+  getCommunityFollowers,
   changeCommunityFounder,
   makeFirstJoinedCreatorFounder,
   handleFounderLeaving,

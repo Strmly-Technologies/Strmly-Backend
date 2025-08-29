@@ -92,6 +92,10 @@ const userSchema = new mongoose.Schema(
     content_interests: {
       type: String,
     },
+    gender: {
+      type: String,
+      enum: ['Male', 'Female', 'Other'],
+    },
     watch_time: {
       type: Number,
       default: 0,

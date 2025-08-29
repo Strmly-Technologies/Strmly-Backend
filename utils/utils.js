@@ -2,6 +2,7 @@ const multer = require('multer')
 const { s3 } = require('../config/AWS')
 const { v4: uuidv4 } = require('uuid')
 const { spawn } = require('child_process')
+const os = require('os')
 const { checkAccess } = require('../controller/recommendation.controller')
 const Reshare = require('../models/Reshare')
 const User = require('../models/User')
@@ -443,7 +444,7 @@ const handleError = (err, req, res) => {
 
 const generateVideoThumbnail = (videoPath) => {
   const thumbnailFilename = `thumb-${uuidv4()}.jpg`
-  const thumbnailPath = path.join(__dirname, thumbnailFilename)
+  const thumbnailPath = path.join(os.tmpdir(), thumbnailFilename)
 
   return new Promise((resolve, reject) => {
     const ffmpegProcess = spawn('ffmpeg', [
