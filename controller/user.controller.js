@@ -2753,6 +2753,35 @@ const getUserFollowingCommunities = async (req, res, next) => {
   }
 }
 
+const checkCreatorPass=async(userId,profileId)=>{
+  if(userId===profileId){
+    return true
+  }
+  const creatorPass = await CreatorPass.findOne({
+    user_id: userId,
+    creator_id: profileId,
+  })
+  return creatorPass ? true : false
+}
+
+const checkUserHasCreatorPass=async(userId)=>{
+  const creatorPass = await CreatorPass.findOne({
+    user_id: userId,
+  })
+  return creatorPass ? true : false
+}
+
+const checkCommunityPass=async(communityId,userId)=>{
+  const communityAccess = await CommunityAccess.findOne({
+    user_id: userId,
+    community_id: communityId,
+  })
+  return communityAccess ? true : false
+}
+
+
+        
+
 
 module.exports = {
   getUserProfileDetails,
