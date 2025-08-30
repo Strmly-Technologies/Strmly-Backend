@@ -7,9 +7,6 @@ const { addDetailsToVideoObject } = require('../utils/utils')
 const { handleError, uploadImageToS3 } = require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
-  console.log('🏗️ CreateCommunity request body:', req.body)
-  console.log('🏗️ CreateCommunity request files:', req.files)
-  
   const { name, bio, type, amount, fee_description } = req.body
   const userId = req.user.id
   const imageFile = req.files?.imageFile?.[0]
@@ -652,9 +649,10 @@ const getUserCommunities = async (req, res, next) => {
     }
 
     if (type === 'joined' || type === 'all') {
-      joined = await Community.find(
-        {creators: {$in: [userId]} }
-      )
+     joined = await Community.find({
+       creators: { $in: [userId] },
+      founder: { $ne: userId }   
+      })
         .populate('founder', 'username profile_photo')
         .populate('followers', 'username profile_photo')
         .populate('creators', 'username profile_photo')
@@ -1296,6 +1294,7 @@ const getCommunityFollowingStatus = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
+
 
 module.exports = {
   getCommunityProfileDetails,
