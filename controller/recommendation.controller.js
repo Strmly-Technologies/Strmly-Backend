@@ -4,6 +4,7 @@ const Reshare = require('../models/Reshare')
 const { handleError } = require('../utils/utils')
 const { checkCreatorPassAccess } = require('./creatorpass.controller')
 const UserAccess = require('../models/UserAccess')
+const { checkCreatorPass } = require('./user.controller')
 
 const getPersonalizedVideoRecommendations = async (req, res, next) => {
   try {
@@ -79,6 +80,7 @@ const getPersonalizedVideoRecommendations = async (req, res, next) => {
 
         // Check access and add access field
         video = await checkAccess(video, userId)
+        video.hasCreatorPassOfVideoOwner=await checkCreatorPass(userId, video.created_by._id.toString());
         const creatorPassDetails = await User.findById(
           video.created_by._id?.toString()
         )

@@ -2779,10 +2779,6 @@ const checkCommunityPass=async(communityId,userId)=>{
   return communityAccess ? true : false
 }
 
-
-        
-
-
 module.exports = {
   getUserProfileDetails,
   GetUserFeed,
@@ -2820,4 +2816,5 @@ module.exports = {
   HasUserAccess,
   fetchSocialMediaLinks,
   getUserFollowingCommunities,
+  checkCreatorPass
 }
