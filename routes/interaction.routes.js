@@ -18,6 +18,7 @@ const {
   UpvoteReply,
   DownvoteReply,
   deleteComment,
+  getCommentDetails,
 } = require('../controller/interaction.controller')
 const { authenticateToken } = require('../middleware/auth')
 const {
@@ -145,6 +146,13 @@ router.get(
   authenticateToken,
   generalRateLimiter,
   getTotalSharesByVideoId
+)
+
+router.get(
+  '/comments/:commentId',
+  authenticateToken,
+  generalRateLimiter,
+  getCommentDetails
 )
 
 module.exports = router

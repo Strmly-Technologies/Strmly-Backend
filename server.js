@@ -36,7 +36,6 @@ validateEnv()
 
 const app = express()
 
-app.set('trust proxy', true)
 
 const corsOptions = {
   origin: ['http://localhost:3000', 'https://strmly.com','http://localhost:3001','https://strmly-admin-panel.vercel.app', 'https://admin.strmly.com'],

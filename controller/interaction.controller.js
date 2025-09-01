@@ -994,6 +994,11 @@ const GiftComment = async (req, res, next) => {
         amount,
         user.FCM_token
       )
+
+      // add gift details to comment
+      comment.gifts+=amount
+      comment.gifted_by.push(gifterId)
+      await comment.save()
       res.status(200).json({
         success: true,
         message: 'Gift sent successfully!',
@@ -1788,6 +1793,40 @@ const deleteComment = async (req, res, next) => {
   }
 }
 
+const getCommentDetails=async(req,res,next)=>{
+  try{
+    const userId=req.user.id.toString()
+    const {commentId}=req.params
+    if(!commentId){
+      return res.status(400).json({error:'commentId is required'})
+    }
+    const commentDetails=await Comment.findById(commentId)
+    if(!commentDetails){
+      return res.status(404).json({error:'Comment not found'})
+    }
+    const hasUpvoted=commentDetails.upvoted_by.includes(userId)
+    const hasDownvoted=commentDetails.downvoted_by.includes(userId)
+    res.status(200).json({
+      comment:{
+        id:commentDetails._id,
+        content:commentDetails.content,
+        upvotes:commentDetails.upvotes,
+        downvotes:commentDetails.downvotes,
+        gifts:commentDetails.gifts,
+        user:commentDetails.user,
+        parent_comment:commentDetails.parent_comment,
+        createdAt:commentDetails.createdAt,
+        updatedAt:commentDetails.updatedAt,
+        repliesLength:commentDetails.replies.length,
+        upvoted:hasUpvoted,
+        downvoted:hasDownvoted
+      }
+    })
+  }catch(error){
+    handleError(error, req, res, next)
+  }
+}
+
 module.exports = {
   ReplyToComment,
   UpvoteReply,
@@ -1808,4 +1847,5 @@ module.exports = {
   saveVideo,
   getTotalSharesByVideoId,
   deleteComment,
+  getCommentDetails
 }
