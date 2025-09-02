@@ -1,10 +1,12 @@
+
+
 const Community = require('../models/Community')
 const CommunityAccess = require('../models/CommunityAccess')
 const LongVideo = require('../models/LongVideo')
 const User = require('../models/User')
 const WalletTransaction = require('../models/WalletTransaction')
-const { addDetailsToVideoObject } = require('../utils/utils')
-const { handleError, uploadImageToS3 } = require('../utils/utils')
+const { addDetailsToVideoObject } = require('../utils/populateVideo')
+const {handleError, uploadImageToS3}= require('../utils/utils')
 
 const CreateCommunity = async (req, res, next) => {
   const { name, bio, type, amount, fee_description } = req.body
@@ -621,6 +623,7 @@ const getCommunityById = async (req, res, next) => {
 }
 
 const getUserCommunities = async (req, res, next) => {
+  console.log("handler func", typeof(handleError))
   try {
     const userId = req.user.id.toString()
     const { type = 'all' } = req.query

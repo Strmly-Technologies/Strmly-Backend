@@ -1,15 +1,16 @@
+
 const User = require('../models/User')
 const Community = require('../models/Community')
 const LongVideo = require('../models/LongVideo')
 const Comment = require('../models/Comment')
-const { handleError, uploadImageToS3 } = require('../utils/utils')
 const UserAccess = require('../models/UserAccess')
 const CommunityAccess = require('../models/CommunityAccess')
 const Reshare = require('../models/Reshare')
 const { getRedisClient } = require('../config/redis')
 const CreatorPass = require('../models/CreatorPass')
 const Series = require('../models/Series')
-const { addDetailsToVideoObject } = require('../utils/utils')
+const { addDetailsToVideoObject } = require('../utils/populateVideo')
+const { handleError, uploadImageToS3 } = require('../utils/utils')
 const GetUserFeed = async (req, res, next) => {
   try {
     const userId = req.user.id.toString()
@@ -322,8 +323,9 @@ const UpdateUserProfile = async (req, res, next) => {
   }
 }
 const GetUserCommunities = async (req, res, next) => {
-  try {
-    const userId = req.user.id.toString()
+    console.log("handler func", typeof(handleError))
+   try{
+     const userId = req.user.id.toString()
     const { type = 'all' } = req.query
 
     let communities
@@ -380,6 +382,7 @@ const GetUserCommunities = async (req, res, next) => {
 }
 
 const GetUserVideos = async (req, res, next) => {
+  console.log("handler func", typeof(handleError))
   try {
     const userId = req.user.id.toString()
     const type = req.query.type || 'uploaded'
@@ -611,7 +614,7 @@ const GetUserVideos = async (req, res, next) => {
       },
     })
   } catch (error) {
-    handleError(error, req, res, next)
+    console.log(error)
   }
 }
 

@@ -6,12 +6,12 @@ const {
   generateVideoThumbnail,
   uploadImageToS3,
   getFileFromS3Url,
+  generatePresignedUploadUrl,
 } = require('../utils/utils')
-const { addDetailsToVideoObject } = require('../utils/utils')
+const { addDetailsToVideoObject } = require('../utils/populateVideo')
 const { checkCommunityUploadPermission } = require('./community.controller')
 const LongVideo = require('../models/LongVideo')
 const addVideoToStream = require('../utils/video_queue')
-const Reshare = require('../models/Reshare')
 const WalletTransaction = require('../models/WalletTransaction')
 const path = require('path')
 const os = require('os')
@@ -20,6 +20,239 @@ const { generateVideoABSSegments } = require('../utils/ABS')
 
 const fs = require('fs')
 const Series = require('../models/Series')
+const { randomUUID } = require('crypto')
+
+const getUploadUrl=async (req,res,next)=>{
+  try {
+    const {fileName, contentType,fileSize}=req.body
+    const userId=req.user.id.toString()
+    if(!fileName || !contentType || !fileSize){
+      return res.status(400).json({error:'fileName, contentType and fileSize are required'})
+    }
+    const result=await generatePresignedUploadUrl(fileName,fileSize,contentType,userId)
+    if(!result.success){
+      return res.status(500).json({error:result.error || 'Failed to generate upload URL'})
+    }
+    res.status(200).json({
+      uploadUrl:result.uploadUrl,
+      message:'Use this URL to upload the video directly to S3 using PUT request',
+      s3Key:result.s3Key,
+      expiresIn:result.expiresIn
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const processUploadedVideo = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString()
+    const {
+      s3Key,
+      name,
+      description,
+      genre,
+      type,
+      language,
+      age_restriction,
+      communityId,
+      seriesId,
+      is_standalone,
+      episodeNumber,
+      amount,
+      start_time,
+      display_till_time
+    } = req.body
+
+    if (!s3Key) {
+      return res.status(400).json({ error: 's3Key is required' })
+    }
+
+    // Validation
+    if (!is_standalone) {
+      return res.status(400).json({ error: 'is_standalone field required' })
+    }
+
+    if (is_standalone === 'false' && (!episodeNumber || !seriesId)) {
+      return res.status(400).json({
+        error: 'episodeNumber and seriesId required for non-standalone videos',
+      })
+    }
+
+    if (type === 'Paid') {
+      const numericAmount = parseFloat(amount)
+      if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
+        return res.status(400).json({
+          error:
+            'Amount has to be included and should be greater than 0 for paid videos',
+        })
+      }
+    }
+
+    // Check community permissions if applicable
+    if (communityId) {
+      const permissionCheck = await checkCommunityUploadPermission(
+        userId,
+        communityId
+      )
+      if (!permissionCheck.hasPermission) {
+        return res.status(403).json({
+          error: permissionCheck.error,
+          requiredFee: permissionCheck.requiredFee,
+          communityName: permissionCheck.communityName,
+        })
+      }
+
+      if (permissionCheck.accessType !== 'founder') {
+        const community = await Community.findById(communityId)
+        if (!community.followers.includes(userId)) {
+          return res.status(403).json({
+            error: 'You must follow the community to upload videos',
+          })
+        }
+      }
+    }
+
+    const user = await User.findById(userId).select('-password')
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const videoUrl = `https://${process.env.AWS_S3_BUCKET}.s3.amazonaws.com/${s3Key}`
+
+    // Download the video into temp folder
+    const tempDir = path.join(os.tmpdir(), 'video-processing')
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true })
+    }
+    const tempVideoPath = path.join(tempDir, `${randomUUID()}.mp4`)
+    const downloadParams = { Bucket: process.env.AWS_S3_BUCKET, Key: s3Key }
+    const fileStream = s3.getObject(downloadParams).createReadStream()
+    const writeStream = fs.createWriteStream(tempVideoPath)
+    await new Promise((resolve, reject) => {
+      fileStream.pipe(writeStream)
+      writeStream.on('finish', resolve)
+      writeStream.on('error', reject)
+    })
+
+    // Get duration + thumbnail
+    const { duration, durationFormatted } = await getVideoMetadata(tempVideoPath)
+    const thumbnailBuffer = await generateVideoThumbnail(tempVideoPath)
+
+    const thumbnailUploadResult = await uploadImageToS3(
+      `${name || 'video'}_thumbnail`,
+      'image/png',
+      thumbnailBuffer,
+      'video_thumbnails'
+    )
+    if (!thumbnailUploadResult.success) {
+      if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
+      return res.status(500).json({ message: 'Failed to upload thumbnail' })
+    }
+
+    const longVideo = new LongVideo({
+      name: name || 'Untitled Video',
+      description: description || 'No description provided',
+      videoUrl,
+      thumbnailUrl: thumbnailUploadResult.url,
+      created_by: userId,
+      updated_by: userId,
+      community: communityId || null,
+      genre: genre || 'Action',
+      type: type || 'Free',
+      amount: amount ? parseFloat(amount) : 0,
+      Videolanguage: language || 'English',
+      age_restriction:
+        age_restriction === 'true' || age_restriction === true || false,
+      start_time: start_time ? Number(start_time) : 0,
+      display_till_time: display_till_time ? Number(display_till_time) : 0,
+      videoS3Key: s3Key,
+      thumbnailS3Key: thumbnailUploadResult.key,
+      is_standalone: is_standalone === 'true',
+      episode_number: episodeNumber || null,
+      duration: duration || 0,
+      duration_formatted: durationFormatted || '00:00:00',
+    })
+
+    let savedVideo = await longVideo.save()
+
+    // If series specified, update it
+    if (seriesId) {
+      try {
+        const series = await Series.findById(seriesId)
+        if (series && series.created_by.toString() === userId.toString()) {
+          const nextEpisodeNumber = (series.total_episodes || 0) + 1
+          await LongVideo.findByIdAndUpdate(savedVideo._id, {
+            episode_number: nextEpisodeNumber,
+            season_number: 1,
+            is_standalone: false,
+          })
+
+          await Series.findByIdAndUpdate(seriesId, {
+            $addToSet: { episodes: savedVideo._id },
+            $inc: {
+              total_episodes: 1,
+              'analytics.total_likes': savedVideo.likes || 0,
+              'analytics.total_views': savedVideo.views || 0,
+              'analytics.total_shares': savedVideo.shares || 0,
+            },
+            $set: { 'analytics.last_analytics_update': new Date() },
+          })
+        }
+      } catch (seriesError) {
+        console.error('❌ Error adding video to series:', seriesError)
+      }
+    }
+
+    // Stream processing tasks
+    await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'nsfw_detection')
+    await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'video_fingerprint')
+    await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'audio_fingerprint')
+
+    // Update community
+    if (communityId) {
+      await Community.findByIdAndUpdate(communityId, {
+        $push: { long_videos: savedVideo._id },
+        $addToSet: { creators: userId },
+      })
+    }
+
+    if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
+
+    res.status(200).json({
+      message: 'Video processed and saved successfully',
+      videoId: savedVideo._id,
+      videoUrl,
+      thumbnailUrl: thumbnailUploadResult.url,
+      videoS3Key: s3Key,
+      thumbnailS3Key: thumbnailUploadResult.key,
+      videoName: name || 'Untitled Video',
+      duration: duration || 0,
+      durationFormatted: durationFormatted || '00:00:00',
+      videoData: {
+        name: savedVideo.name,
+        description: savedVideo.description,
+        genre: savedVideo.genre,
+        type: savedVideo.type,
+        amount: savedVideo.amount,
+        language: savedVideo.Videolanguage,
+        age_restriction: savedVideo.age_restriction,
+        start_time: savedVideo.start_time,
+        display_till_time: savedVideo.display_till_time,
+        duration: savedVideo.duration || 0,
+        duration_formatted: savedVideo.duration_formatted || '00:00:00',
+      },
+      nextSteps: {
+        message: 'Use videoId to add this video to a community',
+        endpoint: '/api/v1/videos/upload/community',
+        requiredFields: ['communityId', 'videoId'],
+      },
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 
 const uploadVideoToCommunity = async (req, res, next) => {
   try {
@@ -228,7 +461,7 @@ const uploadVideo = async (req, res, next) => {
       series: seriesId || null,
       episode_number: episodeNumber || null,
       age_restriction:
-        age_restriction === 'true' || age_restriction === true || false,
+      age_restriction === 'true' || age_restriction === true || false,
       Videolanguage: language || 'English',
       start_time: start_time ? Number(start_time) : 0,
       display_till_time: display_till_time ? Number(display_till_time) : 0,
@@ -1166,4 +1399,6 @@ module.exports = {
   finaliseChunkUpload,
   getVideoGiftingInfo,
   getVideoTotalGifting,
+  getUploadUrl,
+  processUploadedVideo,
 }

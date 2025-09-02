@@ -3,9 +3,6 @@ const { s3 } = require('../config/AWS')
 const { v4: uuidv4 } = require('uuid')
 const { spawn } = require('child_process')
 const os = require('os')
-const { checkAccess } = require('../controller/recommendation.controller')
-const Reshare = require('../models/Reshare')
-const User = require('../models/User')
 const fs = require('fs')
 const path = require('path')
 const {
@@ -65,8 +62,8 @@ const validateVideoFormData = (req, res, next) => {
       error: 'Video file is required',
     })
   }
-
-  const maxSize = 200 * 1024 * 1024
+  // 4GB
+  const maxSize = 4 * 1024 * 1024 * 1024
   if (videoFile.size > maxSize) {
     console.error('Video too large')
     return res.status(400).json({
@@ -500,54 +497,50 @@ const generateVideoThumbnail = (videoPath) => {
   })
 }
 
-const addDetailsToVideoObject = async (videoObject, userId) => {
-  const user = await User.findById(userId).select(
-    'following following_communities'
-  )
-  const is_liked_video = videoObject.liked_by?.some(
-    (like) => like.user && like.user._id?.toString() === userId
-  )
-  videoObject.is_liked_video = is_liked_video
 
-  const is_following_creator =
-    user.following?.some(
-      (user) => user.toString() === videoObject.created_by?._id?.toString()
-    ) || false
 
-  videoObject.is_following_creator = is_following_creator
 
-  const is_following_community =
-    user.following_communities?.some(
-      (community) =>
-        community.toString() === videoObject.community?._id?.toString()
-    ) || false
-  videoObject.is_following_community = is_following_community
-  videoObject = await checkAccess(videoObject, userId)
-
-  const reshare = await Reshare.findOne({
-    user: userId,
-    long_video: videoObject._id.toString(),
-  })
-  videoObject.is_reshared =
-    reshare && Object.keys(reshare).length > 0 ? true : false
-
-  if (videoObject.videoResolutions) {
-    if (videoObject.videoResolutions.variants instanceof Map) {
-      videoObject.videoResolutions.variants = Object.fromEntries(videoObject.videoResolutions.variants);
-    }
-    
-    if (!videoObject.videoResolutions.variants || Object.keys(videoObject.videoResolutions.variants).length === 0) {
-      if (videoObject.videoResolutions.master && videoObject.videoResolutions.master.url) {
-        if (videoObject.videoResolutions.master.type === 'hls') {
-          videoObject.videoResolutions.variants = {
-            "auto": videoObject.videoResolutions.master.url
-          };
-        } else {
-          videoObject.videoResolutions.variants = {
-            "default": videoObject.videoResolutions.master.url
-          };
-        }
+const generatePresignedUploadUrl=async(fileName,fileSize,contentType,userId)=>{
+  try {
+    if(fileSize> 4 * 1024 * 1024 * 1024){
+      return {
+        success: false,
+        message: 'File size exceeds the 4GB limit',
       }
+    }
+    if(contentType!='video/mp4'){
+      return {
+        success: false,
+        message: 'Only mp4 files are allowed',
+    }
+  }
+    const fileExtension=fileName.split('.').pop()
+    const s3Key=`long_video/${userId}/${uuidv4()}.${fileExtension}`
+
+    const uploadParams={
+      Bucket:process.env.AWS_S3_BUCKET,
+      Key:s3Key,
+      ContentType:contentType,
+      Expires:60*30, //5 minutes
+      Metadata:{
+        originalName:fileName,
+        uploadDate:new Date().toISOString(),
+        uploadedBy:userId
+      }
+    }
+    const uploadUrl=await s3.getSignedUrlPromise('putObject',uploadParams)
+    return {
+      success: true,
+      message: 'Presigned URL generated successfully',
+      uploadUrl,
+      s3Key,
+      expiresIn: uploadParams.Expires,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Failed to generate presigned URL',
+      error: error.message,
     }
   }
 }
@@ -564,5 +557,5 @@ module.exports = {
   communityProfilePhotoUpload,
   generateVideoThumbnail,
   getFileFromS3Url,
-  addDetailsToVideoObject,
+  generatePresignedUploadUrl
 }
