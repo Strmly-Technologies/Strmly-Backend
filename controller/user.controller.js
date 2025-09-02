@@ -387,6 +387,7 @@ const GetUserVideos = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+    console.log('working')
 
     let videos;
 
@@ -585,12 +586,10 @@ const GetUserVideos = async (req, res, next) => {
       }
     } else {
       videos = await LongVideo.find({ created_by: userId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .populate('comments', '_id content user createdAt')
         .lean()
         .populate('created_by', 'username profile_photo custom_name')
-        .populate('community', 'name profile_photo followers')
+        .populate('community', 'name profile_photo')
+        .populate('comments', '_id content user createdAt')
         .populate({
           path: 'series',
           populate: [
