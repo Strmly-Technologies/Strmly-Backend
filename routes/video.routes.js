@@ -16,6 +16,8 @@ const {
   finaliseChunkUpload,
   getVideoGiftingInfo,
   getVideoTotalGifting,
+  getUploadUrl,
+  processUploadedVideo,
 } = require('../controller/video.controller')
 const {
   checkVideoAccess,
@@ -99,5 +101,9 @@ router.put('/:id', authenticateToken, updateVideo)
 
 // Route to delete a video by ID
 router.delete('/:id', authenticateToken, deleteVideo)
+
+router.post('/get-url',authenticateToken,getUploadUrl)
+
+router.post('/process-upload',authenticateToken,processUploadedVideo)
 
 module.exports = router
