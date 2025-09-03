@@ -179,7 +179,7 @@ const userSchema = new mongoose.Schema(
       ref: 'LongVideo',
       default: [],
     },
-    comment_monetization_enabled: { type: Boolean, default: false },
+    comment_monetization_enabled: { type: Boolean, default: true },
 
     creator_profile: {
       bank_details: {

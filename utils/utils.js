@@ -277,7 +277,7 @@ const getFileFromS3Url = async (videoUrl) => {
   }
 }
 
-const handleError = (err, req, res) => {
+const handleError = (err, req, res, next) => {
   // Log error for debugging (remove sensitive information)
   const sanitizedError = {
     message: err.message,

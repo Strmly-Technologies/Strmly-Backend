@@ -713,6 +713,14 @@ const GiftComment = async (req, res, next) => {
   try {
     const { videoId, commentId, amount, giftNote } = req.body
     const gifterId = req.user.id.toString()
+    
+    console.log(`💰 GiftComment function called:`, {
+      videoId,
+      commentId,
+      amount,
+      gifterId,
+      giftNote
+    });
 
     // Validation
     if (!videoId || !commentId || !amount) {
@@ -780,6 +788,13 @@ const GiftComment = async (req, res, next) => {
         code: 'COMMENT_NOT_FOUND',
       })
     }
+    
+    console.log(`💰 Found comment:`, {
+      id: comment._id,
+      content: comment.content.substring(0, 30),
+      currentGifts: comment.gifts || 0,
+      user: comment.user
+    });
 
     const isTopLevelComment = comment.parent_comment === null
 
@@ -975,11 +990,32 @@ const GiftComment = async (req, res, next) => {
         })
 
         await receiverTransaction.save({ session })
+
+        // Update comment gift count and gifted_by array
+        try {
+          console.log(`💰 Updating comment ${commentId} with gift amount ${amount} from user ${gifterId}`);
+          const updatedComment = await Comment.findByIdAndUpdate(
+            commentId,
+            {
+              $inc: { gifts: amount },
+              $addToSet: { gifted_by: gifterId }
+            },
+            { session, new: true }
+          );
+          console.log(`💰 Comment updated successfully. New gift count: ${updatedComment?.gifts || 0}`);
+        } catch (commentUpdateError) {
+          console.error(`❌ Error updating comment ${commentId}:`, commentUpdateError);
+          // Don't throw here to avoid breaking the transaction
+        }
       })
 
       await session.endSession()
+      
+      // Verify the comment was updated (outside transaction for debugging)
+      const verifyComment = await Comment.findById(commentId);
+      console.log(`💰 Verification: Comment ${commentId} now has ${verifyComment?.gifts || 0} gifts`);
       //send comment gift notification
-      const gifter = User.findById(gifterId).select('username profile_photo')
+      const gifter = await User.findById(gifterId).select('username profile_photo')
       const user = await User.findById(comment.user.toString()).select(
         'FCM_token'
       )
