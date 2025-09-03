@@ -13,7 +13,9 @@ const {
   verifyResetToken,
   resetPassword,
   checkEmailExists,
-  checkUsernameExists
+  checkUsernameExists,
+  RegisterWithEmailVerification,
+  completeRegistration
 } = require('../controller/auth.controller')
 const { authenticateToken,parseGoogleOAuthToken} = require('../middleware/auth')
 
@@ -22,6 +24,10 @@ router.get('/check-username/:username', checkUsernameExists)
 
 // Check if email exists
 router.get('/check-email/:email', checkEmailExists)
+
+router.post('/register/email',RegisterWithEmailVerification)
+
+router.post('/register/complete',completeRegistration)
 
 // Register a new user
 router.post('/register', RegisterNewUser)

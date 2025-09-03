@@ -10,6 +10,184 @@ const {
 const { generateToken } = require('../utils/jwt')
 const { handleError } = require('../utils/utils')
 const { validateAndSanitize } = require('../middleware/validation')
+const crypto = require('crypto')
+
+const RegisterWithEmailVerification = async (req, res, next) => {
+  const { email } = req.body
+
+  if (!email) {
+    return res.status(400).json({ 
+      message: 'Email is required',
+      code: 'EMAIL_REQUIRED' 
+    })
+  }
+
+  try {
+    // Check if email already exists and is verified
+    const existingUser = await User.findOne({ email })
+    
+    if (existingUser) {
+      if (existingUser.email_verification.is_verified) {
+        return res.status(400).json({ 
+          message: 'Email already registered',
+          code: 'EMAIL_EXISTS' 
+        })
+      } else {
+        // Email exists but not verified - we can reuse this account
+        // Check if we can resend (rate limiting)
+        const lastSent = existingUser.email_verification.verification_sent_at
+        if (lastSent && new Date() - lastSent < 60000) { // 1 minute cooldown
+          return res.status(429).json({
+            message: 'Please wait before requesting another verification code',
+            code: 'RATE_LIMITED',
+          })
+        }
+
+        // Generate new OTP
+        const verificationOTP = generateVerificationOTP()
+        const verificationExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+
+        existingUser.email_verification.verification_otp = verificationOTP
+        existingUser.email_verification.verification_otp_expires = verificationExpires
+        existingUser.email_verification.verification_sent_at = new Date()
+        await existingUser.save()
+
+        // Send verification email
+        const emailResult = await sendVerificationEmail(
+          email,
+          email.split('@')[0], // Temporary username for email template
+          verificationOTP
+        )
+
+        if (!emailResult.success) {
+          return res.status(500).json({ 
+            message: 'Failed to send verification email',
+            code: 'EMAIL_SEND_FAILED'
+          })
+        }
+
+        return res.status(200).json({
+          message: 'Verification code sent to your email',
+          email: email,
+          step: 'verify_email',
+          exists: true,
+          otp_expires_in: '10 minutes'
+        })
+      }
+    }
+
+    // New email - create a temporary user account
+    const verificationOTP = generateVerificationOTP()
+    const verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+
+    // Create a temporary user with just email
+    const tempUser = new User({
+      email,
+      username: `temp_${Date.now()}`, // Temporary username
+      password: crypto.randomBytes(16).toString('hex'), // Random password
+      email_verification: {
+        is_verified: false,
+        verification_otp: verificationOTP,
+        verification_otp_expires: verificationOTPExpires,
+        verification_sent_at: new Date(),
+      },
+      is_temp_account: true, // Flag for temporary account
+    })
+
+    await tempUser.save()
+
+    // Send verification email
+    const emailResult = await sendVerificationEmail(
+      email,
+      email.split('@')[0], // Temporary username for email template
+      verificationOTP
+    )
+
+    if (!emailResult.success) {
+      return res.status(500).json({ 
+        message: 'Failed to send verification email',
+        code: 'EMAIL_SEND_FAILED' 
+      })
+    }
+
+    res.status(200).json({
+      message: 'Verification code sent to your email',
+      email: email,
+      step: 'verify_email',
+      otp_expires_in: '10 minutes'
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const completeRegistration = async (req, res, next) => {
+  console.log("completeRegistration called");
+  try {
+    const {email,username,password}=req.body
+    if (!email || !username || !password) {
+      return res.status(400).json({ message: 'All fields are required' })
+    }
+    const user=await User.findOne({email})
+    if(!user){
+      return res.status(400).json({ message: 'No user found' })
+    }
+    if(!user.email_verification.is_verified){
+      return res.status(400).json({ message: 'Email is not verified' })
+    }
+    // Check if username already exists
+     const existingUsername = await User.findOne({ 
+      username, 
+      _id: { $ne: user._id } 
+    })   
+     if (existingUsername) {
+      return res.status(400).json({ 
+        message: 'Username already taken',
+        code: 'USERNAME_EXISTS' 
+      })
+    }
+    const customName = username
+      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .substring(0, 50)
+      .trim()
+    user.username=username
+    user.password=password
+    user.is_temp_account=false
+    user.custom_name=customName
+    await user.save()
+    const existingWallet = await Wallet.findOne({ user_id: user._id })
+    if (!existingWallet) {
+      const newWallet = new Wallet({
+        user_id: user._id,
+        balance: 0,
+        currency: 'INR',
+        wallet_type: 'user',
+        status: 'active',
+        total_loaded: 0,
+      })
+      await newWallet.save()
+    }
+     const token = generateToken(user._id)
+     await sendWelcomeEmail(user.email, user.username)
+
+      res.status(201).json({
+      message: 'Registration completed successfully',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        email_verified: true,
+      }
+    })  
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+
 const LongVideo = require('../models/LongVideo')
 const RegisterNewUser = async (req, res, next) => {
   const { email, password, username } = req.body
@@ -124,9 +302,9 @@ const verifyEmail = async (req, res, next) => {
   }
 
   try {
-    const user = await User.findOne({
-      'email_verification.verification_otp': otpValidation.value,
-      'email_verification.verification_otp_expires': { $gt: new Date() },
+      const user = await User.findOne({
+      'email_verification.verification_otp': otp,
+      'email_verification.verification_otp_expires': { $gt: new Date() }
     })
 
     if (!user) {
@@ -147,8 +325,6 @@ const verifyEmail = async (req, res, next) => {
     user.email_verification.verification_otp = null
     user.email_verification.verification_otp_expires = null
     await user.save()
-
-    await sendWelcomeEmail(user.email, user.username)
 
     res.status(200).json({
       message: 'Email verified successfully! You can now sign in.',
@@ -687,4 +863,6 @@ module.exports = {
   resetPassword,
   checkUsernameExists,
   checkEmailExists,
+  RegisterWithEmailVerification,
+  completeRegistration,
 }

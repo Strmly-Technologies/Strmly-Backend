@@ -1,5 +1,6 @@
 const User = require('../models/User')
 const Community = require('../models/Community')
+const { s3 } = require('../config/AWS')
 const {
   uploadVideoToS3,
   handleError,
@@ -21,6 +22,7 @@ const { generateVideoABSSegments } = require('../utils/ABS')
 const fs = require('fs')
 const Series = require('../models/Series')
 const { randomUUID } = require('crypto')
+
 
 const getUploadUrl=async (req,res,next)=>{
   try {
@@ -136,7 +138,6 @@ const processUploadedVideo = async (req, res, next) => {
     })
 
     // Get duration + thumbnail
-    const { duration, durationFormatted } = await getVideoMetadata(tempVideoPath)
     const thumbnailBuffer = await generateVideoThumbnail(tempVideoPath)
 
     const thumbnailUploadResult = await uploadImageToS3(
@@ -170,8 +171,8 @@ const processUploadedVideo = async (req, res, next) => {
       thumbnailS3Key: thumbnailUploadResult.key,
       is_standalone: is_standalone === 'true',
       episode_number: episodeNumber || null,
-      duration: duration || 0,
-      duration_formatted: durationFormatted || '00:00:00',
+      duration: 0,
+      duration_formatted:'00:00:00',
     })
 
     let savedVideo = await longVideo.save()
@@ -227,8 +228,8 @@ const processUploadedVideo = async (req, res, next) => {
       videoS3Key: s3Key,
       thumbnailS3Key: thumbnailUploadResult.key,
       videoName: name || 'Untitled Video',
-      duration: duration || 0,
-      durationFormatted: durationFormatted || '00:00:00',
+      duration:  0,
+      durationFormatted:'00:00:00',
       videoData: {
         name: savedVideo.name,
         description: savedVideo.description,
@@ -239,8 +240,8 @@ const processUploadedVideo = async (req, res, next) => {
         age_restriction: savedVideo.age_restriction,
         start_time: savedVideo.start_time,
         display_till_time: savedVideo.display_till_time,
-        duration: savedVideo.duration || 0,
-        duration_formatted: savedVideo.duration_formatted || '00:00:00',
+        duration: 0,
+        duration_formatted:'00:00:00',
       },
       nextSteps: {
         message: 'Use videoId to add this video to a community',

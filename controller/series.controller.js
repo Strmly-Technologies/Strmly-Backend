@@ -2,7 +2,7 @@ const Series = require('../models/Series')
 const Wallet = require('../models/Wallet')
 const LongVideo = require('../models/LongVideo')
 const { handleError } = require('../utils/utils')
-const { addDetailsToVideoObject } = require('../utils/utils')
+const { addDetailsToVideoObject } = require('../utils/populateVideo')
 const mongoose = require('mongoose')
 const createSeries = async (req, res, next) => {
   try {

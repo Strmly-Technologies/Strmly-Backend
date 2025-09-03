@@ -275,6 +275,9 @@ const userSchema = new mongoose.Schema(
         default: null,
       },
     },
+    is_temp_account:{
+      type: Boolean,
+    },
     password_reset: {
       reset_otp: {
         type: String,
