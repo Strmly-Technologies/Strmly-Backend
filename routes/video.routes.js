@@ -19,6 +19,8 @@ const {
   getUploadUrl,
   processUploadedVideo,
 } = require('../controller/video.controller')
+const { createImageMulter } = require('../utils/utils')
+
 const {
   checkVideoAccess,
   streamVideo,
@@ -104,6 +106,10 @@ router.delete('/:id', authenticateToken, deleteVideo)
 
 router.post('/get-url',authenticateToken,getUploadUrl)
 
-router.post('/process-upload',authenticateToken,processUploadedVideo)
-
+router.post(
+  '/process-upload',
+  authenticateToken,
+  createImageMulter().single('thumbnail'), 
+  processUploadedVideo
+)
 module.exports = router
