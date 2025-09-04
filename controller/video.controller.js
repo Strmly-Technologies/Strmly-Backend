@@ -65,6 +65,7 @@ const processUploadedVideo = async (req, res, next) => {
       start_time,
       display_till_time
     } = req.body
+    const thumbnailFile = req.file 
 
     if (!s3Key) {
       return res.status(400).json({ error: 's3Key is required' })
@@ -121,34 +122,54 @@ const processUploadedVideo = async (req, res, next) => {
     }
 
     const videoUrl = `https://${process.env.AWS_S3_BUCKET}.s3.amazonaws.com/${s3Key}`
+    
+    let thumbnailUploadResult;
+    
+    if (thumbnailFile) {
+      // If thumbnail is provided, upload it directly to S3
+      thumbnailUploadResult = await uploadImageToS3(
+        `${name || 'video'}_thumbnail`,
+        thumbnailFile.mimetype,
+        thumbnailFile.buffer,
+        'video_thumbnails'
+      )
+      
+      if (!thumbnailUploadResult.success) {
+        return res.status(500).json({ message: 'Failed to upload thumbnail' })
+      }
+    } else {
+      // Download the video into temp folder
+      const tempDir = path.join(os.tmpdir(), 'video-processing')
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+      const tempVideoPath = path.join(tempDir, `${randomUUID()}.mp4`)
+      const downloadParams = { Bucket: process.env.AWS_S3_BUCKET, Key: s3Key }
+      const fileStream = s3.getObject(downloadParams).createReadStream()
+      const writeStream = fs.createWriteStream(tempVideoPath)
+      await new Promise((resolve, reject) => {
+        fileStream.pipe(writeStream)
+        writeStream.on('finish', resolve)
+        writeStream.on('error', reject)
+      })
 
-    // Download the video into temp folder
-    const tempDir = path.join(os.tmpdir(), 'video-processing')
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true })
-    }
-    const tempVideoPath = path.join(tempDir, `${randomUUID()}.mp4`)
-    const downloadParams = { Bucket: process.env.AWS_S3_BUCKET, Key: s3Key }
-    const fileStream = s3.getObject(downloadParams).createReadStream()
-    const writeStream = fs.createWriteStream(tempVideoPath)
-    await new Promise((resolve, reject) => {
-      fileStream.pipe(writeStream)
-      writeStream.on('finish', resolve)
-      writeStream.on('error', reject)
-    })
+      // Generate thumbnail from video
+      const thumbnailBuffer = await generateVideoThumbnail(tempVideoPath)
 
-    // Get duration + thumbnail
-    const thumbnailBuffer = await generateVideoThumbnail(tempVideoPath)
-
-    const thumbnailUploadResult = await uploadImageToS3(
-      `${name || 'video'}_thumbnail`,
-      'image/png',
-      thumbnailBuffer,
-      'video_thumbnails'
-    )
-    if (!thumbnailUploadResult.success) {
+      thumbnailUploadResult = await uploadImageToS3(
+        `${name || 'video'}_thumbnail`,
+        'image/png',
+        thumbnailBuffer,
+        'video_thumbnails'
+      )
+      
+      if (!thumbnailUploadResult.success) {
+        if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
+        return res.status(500).json({ message: 'Failed to upload thumbnail' })
+      }
+      
+      // Clean up
       if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
-      return res.status(500).json({ message: 'Failed to upload thumbnail' })
     }
 
     const longVideo = new LongVideo({
@@ -218,8 +239,6 @@ const processUploadedVideo = async (req, res, next) => {
       })
     }
 
-    if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
-
     res.status(200).json({
       message: 'Video processed and saved successfully',
       videoId: savedVideo._id,
@@ -228,7 +247,7 @@ const processUploadedVideo = async (req, res, next) => {
       videoS3Key: s3Key,
       thumbnailS3Key: thumbnailUploadResult.key,
       videoName: name || 'Untitled Video',
-      duration:  0,
+      duration: 0,
       durationFormatted:'00:00:00',
       videoData: {
         name: savedVideo.name,
