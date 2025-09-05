@@ -216,6 +216,16 @@ const longVideoSchema = new mongoose.Schema(
 
     gifts: { type: Number, default: 0 },
     gifted_by: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    keyframes:[{
+      position:{type:Number,required:true},
+      url:{type:String,required:true},
+      key:{type:String,required:true}
+    }],
+    processingStatus: {
+    type: String,
+    enum: ['queued', 'processing', 'completed', 'failed'],
+    default: 'queued'
+  },
   },
   { timestamps: true }
 )
