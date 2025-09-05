@@ -30,6 +30,7 @@ const path = require('path')
 const { RedisConnectionError } = require('./utils/errors')
 const { initializeWebSocket } = require('./utils/websocket')
 require('./utils/notification_worker') // Start the notification worker
+require('./utils/videoProcessingWorker')
 
 dotenv.config()
 validateEnv()
@@ -87,6 +88,7 @@ const server = app.listen(PORT, async () => {
   try {
     await connectDB()
     console.log(' MongoDB connected')
+
     
     await connectRedis()
     console.log(' Redis connected')

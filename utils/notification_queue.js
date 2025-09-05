@@ -15,7 +15,6 @@ try {
   notificationQueue = new Queue('notificationQueue', {
     connection: redisConnection,
     defaultJobOptions: {
-      // Fix: Use objects instead of numbers
       removeOnComplete: { count: 50 },
       removeOnFail: { count: 25 },
       attempts: 3,

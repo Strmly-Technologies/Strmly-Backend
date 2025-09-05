@@ -22,6 +22,7 @@ const { generateVideoABSSegments } = require('../utils/ABS')
 const fs = require('fs')
 const Series = require('../models/Series')
 const { randomUUID } = require('crypto')
+const { addVideoToProcessingQueue } = require('../utils/videoProcessingQueue')
 
 
 const getUploadUrl=async (req,res,next)=>{
@@ -137,46 +138,52 @@ const processUploadedVideo = async (req, res, next) => {
       if (!thumbnailUploadResult.success) {
         return res.status(500).json({ message: 'Failed to upload thumbnail' })
       }
-    } else {
-      // Download the video into temp folder
-      const tempDir = path.join(os.tmpdir(), 'video-processing')
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true })
-      }
-      const tempVideoPath = path.join(tempDir, `${randomUUID()}.mp4`)
-      const downloadParams = { Bucket: process.env.AWS_S3_BUCKET, Key: s3Key }
-      const fileStream = s3.getObject(downloadParams).createReadStream()
-      const writeStream = fs.createWriteStream(tempVideoPath)
-      await new Promise((resolve, reject) => {
-        fileStream.pipe(writeStream)
-        writeStream.on('finish', resolve)
-        writeStream.on('error', reject)
-      })
-
-      // Generate thumbnail from video
-      const thumbnailBuffer = await generateVideoThumbnail(tempVideoPath)
-
-      thumbnailUploadResult = await uploadImageToS3(
-        `${name || 'video'}_thumbnail`,
-        'image/png',
-        thumbnailBuffer,
-        'video_thumbnails'
-      )
-      
-      if (!thumbnailUploadResult.success) {
-        if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
-        return res.status(500).json({ message: 'Failed to upload thumbnail' })
-      }
-      
-      // Clean up
-      if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
+    }else{
+      thumbnailUploadResult = { 
+    url: null, 
+    key: null,
+    success: true 
+  };
     }
+      // // Download the video into temp folder
+      // const tempDir = path.join(os.tmpdir(), 'video-processing')
+      // if (!fs.existsSync(tempDir)) {
+      //   fs.mkdirSync(tempDir, { recursive: true })
+      // }
+      // const tempVideoPath = path.join(tempDir, `${randomUUID()}.mp4`)
+      // const downloadParams = { Bucket: process.env.AWS_S3_BUCKET, Key: s3Key }
+      // const fileStream = s3.getObject(downloadParams).createReadStream()
+      // const writeStream = fs.createWriteStream(tempVideoPath)
+      // await new Promise((resolve, reject) => {
+      //   fileStream.pipe(writeStream)
+      //   writeStream.on('finish', resolve)
+      //   writeStream.on('error', reject)
+      // })
+
+      // // Generate thumbnail from video
+      // const thumbnailBuffer = await generateVideoThumbnail(tempVideoPath)
+
+      // thumbnailUploadResult = await uploadImageToS3(
+      //   `${name || 'video'}_thumbnail`,
+      //   'image/png',
+      //   thumbnailBuffer,
+      //   'video_thumbnails'
+      // )
+      
+      // if (!thumbnailUploadResult.success) {
+      //   if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
+      //   return res.status(500).json({ message: 'Failed to upload thumbnail' })
+      // }
+      
+      // // Clean up
+      // if (fs.existsSync(tempVideoPath)) fs.unlinkSync(tempVideoPath)
+    
 
     const longVideo = new LongVideo({
       name: name || 'Untitled Video',
       description: description || 'No description provided',
       videoUrl,
-      thumbnailUrl: thumbnailUploadResult.url,
+      thumbnailUrl: thumbnailUploadResult?.url,
       created_by: userId,
       updated_by: userId,
       community: communityId || null,
@@ -188,8 +195,6 @@ const processUploadedVideo = async (req, res, next) => {
         age_restriction === 'true' || age_restriction === true || false,
       start_time: start_time ? Number(start_time) : 0,
       display_till_time: display_till_time ? Number(display_till_time) : 0,
-      videoS3Key: s3Key,
-      thumbnailS3Key: thumbnailUploadResult.key,
       is_standalone: is_standalone === 'true',
       episode_number: episodeNumber || null,
       duration: 0,
@@ -197,6 +202,12 @@ const processUploadedVideo = async (req, res, next) => {
     })
 
     let savedVideo = await longVideo.save()
+
+      addVideoToProcessingQueue(
+      savedVideo._id.toString(),
+      s3Key,
+      userId,
+    )
 
     // If series specified, update it
     if (seriesId) {
@@ -227,9 +238,9 @@ const processUploadedVideo = async (req, res, next) => {
     }
 
     // Stream processing tasks
-    await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'nsfw_detection')
-    await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'video_fingerprint')
-    await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'audio_fingerprint')
+    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'nsfw_detection')
+    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'video_fingerprint')
+    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'audio_fingerprint')
 
     // Update community
     if (communityId) {
@@ -244,8 +255,6 @@ const processUploadedVideo = async (req, res, next) => {
       videoId: savedVideo._id,
       videoUrl,
       thumbnailUrl: thumbnailUploadResult.url,
-      videoS3Key: s3Key,
-      thumbnailS3Key: thumbnailUploadResult.key,
       videoName: name || 'Untitled Video',
       duration: 0,
       durationFormatted:'00:00:00',

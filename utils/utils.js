@@ -497,6 +497,177 @@ const generateVideoThumbnail = (videoPath) => {
   })
 }
 
+const processVideoMetadata = (videoPath) => {
+  const thumbnailFilename = `thumb-${uuidv4()}.jpg`
+  const thumbnailPath = path.join(os.tmpdir(), thumbnailFilename)
+  const keyframesDir = path.join(os.tmpdir(), `keyframes-${uuidv4()}`)
+  
+  // Create keyframes directory
+  if (!fs.existsSync(keyframesDir)) {
+    fs.mkdirSync(keyframesDir, { recursive: true })
+  }
+  
+  return new Promise((resolve, reject) => {
+    // First, get the duration of the video using ffprobe
+    const ffprobeProcess = spawn('ffprobe', [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      videoPath
+    ]);
+    
+    let durationOutput = '';
+    
+    ffprobeProcess.stdout.on('data', (data) => {
+      durationOutput += data.toString();
+    });
+    
+    ffprobeProcess.on('error', (error) => {
+      console.error('FFprobe-Error:', error);
+      fs.unlinkSync(videoPath);
+      const errorMsg = `FFprobe-Error:${error.message}`;
+      const err = new Error(errorMsg);
+      err.name = 'FFprobeError';
+      reject(err);
+    });
+    
+    ffprobeProcess.on('exit', (code) => {
+      if (code !== 0) {
+        fs.unlinkSync(videoPath);
+        const msg = `FFprobe exited with code ${code}`;
+        console.error(msg);
+        const err = new Error(msg);
+        err.name = 'FFprobeError';
+        return reject(err);
+      }
+      
+      const duration = parseFloat(durationOutput.trim());
+      
+      // Next, generate the thumbnail
+      const thumbnailProcess = spawn('ffmpeg', [
+        '-i', videoPath,
+        '-ss', '00:00:03', // Take thumbnail from 3 seconds in
+        '-vframes', '1',
+        '-q:v', '2',
+        thumbnailPath,
+      ]);
+      
+      thumbnailProcess.stderr.on('data', (data) => {
+        console.error(data.toString());
+      });
+      
+      thumbnailProcess.on('error', (error) => {
+        console.error('FFmpeg-Error:', error);
+        fs.unlinkSync(videoPath);
+        const errorMsg = `FFmpeg-Error:${error.message}`;
+        const err = new Error(errorMsg);
+        err.name = 'FFmpegError';
+        reject(err);
+      });
+      
+      thumbnailProcess.on('exit', (thumbnailCode) => {
+        if (thumbnailCode !== 0) {
+          fs.unlinkSync(videoPath);
+          const msg = `FFmpeg exited with code ${thumbnailCode}`;
+          console.error(msg);
+          const errorMsg = `FFmpeg-Error:${msg}`;
+          const err = new Error(errorMsg);
+          err.name = 'FFmpegError';
+          return reject(err);
+        }
+        
+        // Generate keyframes (one frame every 10 seconds)
+        const keyframeRate = 10; // One keyframe every 10 seconds
+        const totalFrames = Math.ceil(duration / keyframeRate);
+        const keyframesPath = path.join(keyframesDir, 'keyframe_%04d.jpg');
+        
+        const keyframesProcess = spawn('ffmpeg', [
+          '-i', videoPath,
+          '-vf', `fps=1/${keyframeRate}`,  // Extract frames at specified interval
+          '-q:v', '3',                     // Quality level
+          keyframesPath
+        ]);
+        
+        keyframesProcess.stderr.on('data', (data) => {
+          console.error(data.toString());
+        });
+        
+        keyframesProcess.on('error', (error) => {
+          console.error('FFmpeg-Error:', error);
+          fs.unlinkSync(videoPath);
+          if (fs.existsSync(thumbnailPath)) fs.unlinkSync(thumbnailPath);
+          if (fs.existsSync(keyframesDir)) fs.rmdirSync(keyframesDir, { recursive: true });
+          const errorMsg = `FFmpeg-Error:${error.message}`;
+          const err = new Error(errorMsg);
+          err.name = 'FFmpegError';
+          reject(err);
+        });
+        
+        keyframesProcess.on('exit', (keyframeCode) => {
+          try {
+            // Read the generated thumbnail
+            const thumbnailBuffer = fs.readFileSync(thumbnailPath);
+            
+            // Read and process keyframes
+            const keyframes = [];
+            const keyframeFiles = fs.readdirSync(keyframesDir)
+              .filter(file => file.startsWith('keyframe_'))
+              .sort();
+            
+            for (const file of keyframeFiles) {
+              const frameNumber = parseInt(file.match(/keyframe_(\d+)/)[1], 10);
+              const timePosition = frameNumber * keyframeRate;
+              
+              const frameBuffer = fs.readFileSync(path.join(keyframesDir, file));
+              keyframes.push({
+                position: timePosition,
+                data: frameBuffer.toString('base64')
+              });
+            }
+            
+            // Format duration
+            const durationFormatted = formatDuration(duration);
+            
+            // Clean up
+            fs.unlinkSync(thumbnailPath);
+            fs.unlinkSync(videoPath);
+            fs.rmdirSync(keyframesDir, { recursive: true });
+            
+            // Return all the data
+            resolve({
+              thumbnail: thumbnailBuffer,
+              duration: duration,
+              durationFormatted: durationFormatted,
+              keyframes: keyframes
+            });
+          } catch (error) {
+            console.error('Error processing video assets:', error);
+            if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+            if (fs.existsSync(thumbnailPath)) fs.unlinkSync(thumbnailPath);
+            if (fs.existsSync(keyframesDir)) fs.rmdirSync(keyframesDir, { recursive: true });
+            const errorMsg = `FFmpeg-Error:${error.message}`;
+            const err = new Error(errorMsg);
+            err.name = 'FFmpegError';
+            reject(err);
+          }
+        });
+      });
+    });
+  });
+};
+
+const formatDuration = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '00:00:00';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  return [hours, minutes, secs]
+    .map((val) => val.toString().padStart(2, '0'))
+    .join(':');
+};
+
 
 
 
@@ -557,5 +728,7 @@ module.exports = {
   communityProfilePhotoUpload,
   generateVideoThumbnail,
   getFileFromS3Url,
-  generatePresignedUploadUrl
+  generatePresignedUploadUrl,
+  formatDuration,
+  processVideoMetadata,
 }
