@@ -76,12 +76,14 @@ const processUploadedVideo = async (req, res, next) => {
     if (!is_standalone) {
       return res.status(400).json({ error: 'is_standalone field required' });
     }
+    console.log('passed is_standalone check..');
 
     if (is_standalone === 'false' && (!episodeNumber || !seriesId)) {
       return res.status(400).json({
         error: 'episodeNumber and seriesId required for non-standalone videos',
       });
     }
+    console.log('passed is_standalone');
 
     if (type === 'Paid') {
       const numericAmount = parseFloat(amount);
@@ -187,6 +189,7 @@ const processUploadedVideo = async (req, res, next) => {
       created_by: userId,
       updated_by: userId,
       community: communityId || null,
+      series: seriesId || null,
       genre: genre || 'Action',
       type: type || 'Free',
       amount: amount ? parseFloat(amount) : 0,
@@ -238,9 +241,9 @@ const processUploadedVideo = async (req, res, next) => {
     }
 
     // Stream processing tasks
-    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'nsfw_detection')
-    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'video_fingerprint')
-    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'audio_fingerprint')
+    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'nsfw_detection');
+    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'video_fingerprint');
+    // await addVideoToStream(savedVideo._id.toString(), s3Key, userId, 'audio_fingerprint');
 
     // Update community
     if (communityId) {
@@ -1082,17 +1085,17 @@ const getVideoById = async (req, res, next) => {
           select: 'username profile_photo',
         },
         populate: [
-            {
-              path: 'episodes',
-              select:
-                'name episode_number season_number type thumbnailUrl views likes',
-              options: { sort: { season_number: 1, episode_number: 1 } },
-            },
-            {
-              path: 'created_by',
-              select: 'username profile_photo',
-            },
-          ],
+          {
+            path: 'episodes',
+            select:
+              'name episode_number season_number type thumbnailUrl views likes',
+            options: { sort: { season_number: 1, episode_number: 1 } },
+          },
+          {
+            path: 'created_by',
+            select: 'username profile_photo',
+          },
+        ],
       })
       .populate('liked_by', 'username profile_photo');
 
