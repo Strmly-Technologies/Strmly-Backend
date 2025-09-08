@@ -322,6 +322,7 @@ const UpdateUserProfile = async (req, res, next) => {
   }
 };
 const GetUserCommunities = async (req, res, next) => {
+  console.log("handler func", typeof (handleError));
   try {
     const userId = req.user.id.toString();
     const { type = 'all' } = req.query;
@@ -380,14 +381,14 @@ const GetUserCommunities = async (req, res, next) => {
 };
 
 const GetUserVideos = async (req, res, next) => {
-  console.log("handler func", typeof(handleError))
+  console.log("handler func", typeof (handleError));
   try {
     const userId = req.user.id.toString();
     const type = req.query.type || 'uploaded';
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    console.log('working')
+    console.log('working');
 
     let videos;
 
@@ -611,6 +612,21 @@ const GetUserVideos = async (req, res, next) => {
         .limit(parseInt(limit));
       for (let i = 0; i < videos.length; i++) {
         await addDetailsToVideoObject(videos[i], userId);
+
+        // Add creatorPassDetails
+        videos[i].hasCreatorPassOfVideoOwner = await checkCreatorPass(userId, videos[i].created_by._id.toString());
+
+        const creatorPassDetails = await User.findById(
+          videos[i].created_by._id?.toString()
+        )
+          .lean()
+          .select(
+            'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+          );
+
+        if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+          videos[i].creatorPassDetails = creatorPassDetails;
+        }
       }
     }
     res.status(200).json({
@@ -1182,6 +1198,7 @@ const GetUserProfileById = async (req, res, next) => {
 const GetUserVideosById = async (req, res, next) => {
   try {
     const userId = req.params.id;
+    const currentUser = req.user.id.toString();
     const type = req.query.type || 'uploaded';
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -1396,10 +1413,8 @@ const GetUserVideosById = async (req, res, next) => {
       }
     } else {
       videos = await LongVideo.find({ created_by: userId })
-        .populate('created_by', 'username profile_photo')
-        .populate('community', 'name profile_photo')
-        .populate('comments', '_id content user createdAt')
         .lean()
+        .populate('comments', '_id content user createdAt')
         .populate('created_by', 'username profile_photo name custom_name')
         .populate('community', 'name profile_photo followers')
         .populate({
@@ -1422,8 +1437,10 @@ const GetUserVideosById = async (req, res, next) => {
         .skip(skip)
         .limit(parseInt(limit));
       for (let i = 0; i < videos.length; i++) {
-        await addDetailsToVideoObject(videos[i], userId)
-        
+
+        await addDetailsToVideoObject(videos[i], currentUser);
+
+        videos[i].hasCreatorPassOfVideoOwner = await checkCreatorPass(currentUser, videos[i].created_by._id.toString());
         // Add creatorPassDetails
         const creatorPassDetails = await User.findById(
           videos[i].created_by._id?.toString()
@@ -2672,19 +2689,37 @@ const HasCommunityAccess = async (req, res, next) => {
 const HasUserAccess = async (req, res, next) => {
   try {
     const assetId = req.params.assetId;
+    const type = req.query.type;
     const userId = req.user.id.toString();
-    const video = await LongVideo.findById(assetId);
-    if (!video) {
-      return res.status(404).json({ message: 'Video not found' });
+    if (type == 'video') {
+      const video = await LongVideo.findById(assetId);
+      if (!video) {
+        return res.status(404).json({ message: 'Video not found' });
+      }
+      if (video.created_by.toString() === userId) {
+        return res.status(200).json({
+          message: 'User has access to their own video',
+          data: {
+            hasUserAccess: true,
+            accessData: null,
+          },
+        });
+      }
     }
-    if (video.created_by.toString() === userId) {
-      return res.status(200).json({
-        message: 'User is the creator of the video and has access',
-        data: {
-          hasUserAccess: true,
-          accessData: null,
-        },
-      });
+    else if (type == 'series') {
+      const series = await Series.findById(assetId);
+      if (!series) {
+        return res.status(404).json({ message: 'Series not found' });
+      }
+      if (series.created_by.toString() === userId) {
+        return res.status(200).json({
+          message: 'User has access to their own series',
+          data: {
+            hasUserAccess: true,
+            accessData: null,
+          },
+        });
+      }
     }
     const userAccess = await UserAccess.findOne({
       user_id: userId,
@@ -2695,7 +2730,6 @@ const HasUserAccess = async (req, res, next) => {
 
     const hasUserAccess =
       !userAccess || Object.keys(userAccess).length === 0 ? false : true;
-    console.log('hasUserAccess', hasUserAccess);
     return res.status(200).json({
       message: 'User asset access status retrieved successfully',
       data: {
@@ -2768,31 +2802,31 @@ const getUserFollowingCommunities = async (req, res, next) => {
   }
 }
 
-const checkCreatorPass=async(userId,profileId)=>{
-  if(userId===profileId){
-    return true
+const checkCreatorPass = async (userId, profileId) => {
+  if (userId === profileId) {
+    return true;
   }
   const creatorPass = await CreatorPass.findOne({
     user_id: userId,
     creator_id: profileId,
-  })
-  return creatorPass ? true : false
-}
+  });
+  return creatorPass ? true : false;
+};
 
-const checkUserHasCreatorPass=async(userId)=>{
+const checkUserHasCreatorPass = async (userId) => {
   const creatorPass = await CreatorPass.findOne({
     user_id: userId,
-  })
-  return creatorPass ? true : false
-}
+  });
+  return creatorPass ? true : false;
+};
 
-const checkCommunityPass=async(communityId,userId)=>{
+const checkCommunityPass = async (communityId, userId) => {
   const communityAccess = await CommunityAccess.findOne({
     user_id: userId,
     community_id: communityId,
-  })
-  return communityAccess ? true : false
-}
+  });
+  return communityAccess ? true : false;
+};
 
 module.exports = {
   getUserProfileDetails,
@@ -2832,4 +2866,4 @@ module.exports = {
   fetchSocialMediaLinks,
   getUserFollowingCommunities,
   checkCreatorPass
-}
+};
