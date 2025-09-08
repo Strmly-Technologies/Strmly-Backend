@@ -1076,11 +1076,23 @@ const getVideoById = async (req, res, next) => {
       .populate('community', 'name profile_photo followers')
       .populate({
         path: 'series',
-        select: 'title description price genre episodes seasons total_episodes',
+        select: 'title description price genre episodes type seasons total_episodes',
         populate: {
           path: 'created_by',
           select: 'username profile_photo',
         },
+        populate: [
+            {
+              path: 'episodes',
+              select:
+                'name episode_number season_number type thumbnailUrl views likes',
+              options: { sort: { season_number: 1, episode_number: 1 } },
+            },
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          ],
       })
       .populate('liked_by', 'username profile_photo');
 
