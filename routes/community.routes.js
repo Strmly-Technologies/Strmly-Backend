@@ -60,7 +60,7 @@ router.put('/update-settings', authenticateToken, UpdateCommunitySettings)
 router.get('/all', authenticateToken, getAllCommunities)
 
 // API to get user communities
-router.get('/user-communities', authenticateToken, getUserCommunities)
+router.get('/my-communities', authenticateToken, getUserCommunities)
 
 
 

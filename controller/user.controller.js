@@ -652,8 +652,8 @@ const GetUserInteractions = async (req, res, next) => {
       const commentedVideos = await LongVideo.find({
         'comments.user': userId,
       })
-        .select('name thumbnailUrl creator comments')
-        .populate('creator', 'username profile_photo');
+        .select('name thumbnailUrl created_by comments')
+        .populate('created_by', 'username profile_photo');
 
       const userComments = commentedVideos.map((video) => ({
         video: {
@@ -1043,7 +1043,7 @@ const GetUserFollowing = async (req, res, next) => {
 
 const getUserProfileDetails = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id.toString();
     const redis = getRedisClient();
     const cacheKey = `user_profile:${userId}`;
 
@@ -1456,8 +1456,8 @@ const GetUserVideosById = async (req, res, next) => {
 
 const SetCreatorPassPrice = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
-    const { price } = req.body
+    const userId = req.user.id.toString();
+    const { price } = req.body;
 
     await User.findByIdAndUpdate(userId, {
       'creator_profile.creator_pass_price': price,
@@ -1474,11 +1474,11 @@ const SetCreatorPassPrice = async (req, res, next) => {
 
 const HasCreatorPass = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
-    const { creatorId } = req.params
+    const userId = req.user.id.toString();
+    const { creatorId } = req.params;
 
-    if(creatorId === userId){
-      return res.status(200).json({ hasCreatorPass: true })
+    if (creatorId === userId) {
+      return res.status(200).json({ hasCreatorPass: true });
     }
 
     if (creatorId === userId.toString()) {
@@ -2001,8 +2001,8 @@ const updateSocialMediaLinks = async (req, res, next) => {
 
 const getUserDashboardAnalytics = async (req, res, next) => {
   const userId = req.user.id.toString();
-  const group = req.query.group
-  const response = {}
+  const group = req.query.group;
+  const response = {};
 
   try {
     //both created and joined communities
@@ -2226,7 +2226,7 @@ const getUserDashboardAnalytics = async (req, res, next) => {
           })
             .populate('created_by', 'username profile_photo')
             .populate('comments', '_id content user createdAt')
-            .select('_id name thumbnailUrl videoUrl description views likes createdAt comments duration genre type language age_restriction visibility gifts shares amount episode_number season_number start_time display_till_time')
+            .select('_id name thumbnailUrl videoUrl description views likes createdAt comments duration genre type language age_restriction visibility gifts shares amount episode_number season_number start_time display_till_time');
 
           const orderedVideos = paginatedVideoIds
             .map((videoId) =>
@@ -2673,7 +2673,6 @@ const HasCommunityAccess = async (req, res, next) => {
 const HasUserAccess = async (req, res, next) => {
   try {
     const assetId = req.params.assetId;
-    console.log(assetId);
     const userId = req.user.id.toString();
     const video = await LongVideo.findById(assetId);
     if (!video) {
@@ -2742,8 +2741,6 @@ const getUserFollowingCommunities = async (req, res, next) => {
     // Get communities user is following but is not a creator or founder
     const communities = await Community.find({
       _id: { $in: user.following_communities },
-      creators: { $nin: [userId] },
-      founder: { $ne: userId }
     })
       .populate('founder', 'username profile_photo')
       .populate('creators', 'username profile_photo')
