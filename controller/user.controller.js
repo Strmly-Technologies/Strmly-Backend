@@ -556,12 +556,18 @@ const GetUserVideos = async (req, res, next) => {
             },
             {
               path: 'series',
-              select:
-                'title description price genre episodes seasons total_episodes',
-              populate: {
-                path: 'created_by',
-                select: 'username profile_photo',
-              },
+              populate: [
+                {
+                  path: 'episodes',
+                  select:
+                    'name episode_number season_number thumbnailUrl views likes',
+                  options: { sort: { season_number: 1, episode_number: 1 } },
+                },
+                {
+                  path: 'created_by',
+                  select: 'username profile_photo',
+                },
+              ],
             },
             {
               path: 'community',
@@ -587,12 +593,18 @@ const GetUserVideos = async (req, res, next) => {
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
-          select:
-            'title description price genre episodes seasons total_episodes',
-          populate: {
-            path: 'created_by',
-            select: 'username profile_photo',
-          },
+          populate: [
+            {
+              path: 'episodes',
+              select:
+                'name episode_number season_number thumbnailUrl views likes',
+              options: { sort: { season_number: 1, episode_number: 1 } },
+            },
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          ],
         })
         .populate('liked_by', 'username profile_photo')
         .sort({ createdAt: -1 })
@@ -1199,7 +1211,7 @@ const GetUserVideosById = async (req, res, next) => {
                 'title description price genre episodes seasons total_episodes type',
               populate: {
                 path: 'created_by',
-                select: 'username profile_photo',
+                select: 'username name profile_photo',
               },
             },
             {
@@ -1389,16 +1401,22 @@ const GetUserVideosById = async (req, res, next) => {
         .populate('community', 'name profile_photo')
         .populate('comments', '_id content user createdAt')
         .lean()
-        .populate('created_by', 'username profile_photo custom_name')
+        .populate('created_by', 'username profile_photo name custom_name')
         .populate('community', 'name profile_photo followers')
         .populate({
           path: 'series',
-          select:
-            'title description price genre episodes seasons total_episodes type',
-          populate: {
-            path: 'created_by',
-            select: 'username profile_photo',
-          },
+          populate: [
+            {
+              path: 'episodes',
+              select:
+                'name episode_number season_number thumbnailUrl views likes',
+              options: { sort: { season_number: 1, episode_number: 1 } },
+            },
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          ],
         })
         .populate('liked_by', 'username profile_photo')
         .sort({ createdAt: -1 })
@@ -1463,6 +1481,10 @@ const HasCreatorPass = async (req, res, next) => {
       return res.status(200).json({ hasCreatorPass: true })
     }
 
+    if (creatorId === userId.toString()) {
+      return res.status(200).json({ hasCreatorPass: true });
+    }
+
     const access = await UserAccess.findOne({
       user_id: userId,
       content_id: creatorId,
@@ -1478,7 +1500,7 @@ const HasCreatorPass = async (req, res, next) => {
 
 const followUser = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString(); //convert to string to prevent type mismatch bugs
+    const userId = req.user.id.toString();
     const { followUserId } = req.body;
 
     if (!followUserId) {
@@ -1516,11 +1538,11 @@ const followUser = async (req, res, next) => {
     await followUser.save();
 
     // Clear cache for both users
-    const redis = getRedisClient()
+    const redis = getRedisClient();
     if (redis) {
-      await redis.del(`user_profile_public:${followUserId}`)
-      await redis.del(`user_profile_public:${userId}`)
-      console.log(`🗑️ Cleared profile cache for users: ${userId}, ${followUserId}`)
+      await redis.del(`user_profile_public:${followUserId}`);
+      await redis.del(`user_profile_public:${userId}`);
+      console.log(`🗑️ Cleared profile cache for users: ${userId}, ${followUserId}`);
     }
 
     res.status(200).json({
@@ -1541,20 +1563,23 @@ const followUser = async (req, res, next) => {
 
 const unfollowUser = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString(); //convert to string to prevent type mismatch bugs
+    const userId = req.user.id.toString();
     const { unfollowUserId } = req.body;
+
     if (!unfollowUserId) {
       return res.status(400).json({ message: 'Unfollow user ID is required' });
     }
     if (userId === unfollowUserId) {
       return res.status(400).json({ message: 'You cannot unfollow yourself' });
     }
+
     const user = await User.findById(userId);
     const unfollowUser = await User.findById(unfollowUserId);
+
     if (!user || !unfollowUser) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     const isFollowing = user.following.some(
       (id) => id.toString() === unfollowUserId
     );
@@ -1566,26 +1591,26 @@ const unfollowUser = async (req, res, next) => {
         .status(400)
         .json({ message: 'You are not following this user' });
     }
-    
+
     // Remove follow relationships
     user.following = user.following.filter(
       (id) => id.toString() !== unfollowUserId
     );
     unfollowUser.followers = unfollowUser.followers.filter(
       (id) => id.toString() !== userId
-    )
-    
-    await user.save()
-    await unfollowUser.save()
+    );
+
+    await user.save();
+    await unfollowUser.save();
 
     // Clear cache for both users
-    const redis = getRedisClient()
+    const redis = getRedisClient();
     if (redis) {
-      await redis.del(`user_profile_public:${unfollowUserId}`)
-      await redis.del(`user_profile_public:${userId}`)
-      console.log(`🗑️ Cleared profile cache for users: ${userId}, ${unfollowUserId}`)
+      await redis.del(`user_profile_public:${unfollowUserId}`);
+      await redis.del(`user_profile_public:${userId}`);
+      console.log(`🗑️ Cleared profile cache for users: ${userId}, ${unfollowUserId}`);
     }
-    
+
     res.status(200).json({
       message: 'User unfollowed successfully',
       isFollowing: false,
@@ -2647,20 +2672,21 @@ const HasCommunityAccess = async (req, res, next) => {
 
 const HasUserAccess = async (req, res, next) => {
   try {
-    const assetId = req.params.assetId
-    const userId = req.user.id.toString()
-    const video=await LongVideo.findById(assetId)
-    if(!video){
-      return res.status(404).json({ message: 'Video not found' })
+    const assetId = req.params.assetId;
+    console.log(assetId);
+    const userId = req.user.id.toString();
+    const video = await LongVideo.findById(assetId);
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
     }
-    if(video.created_by.toString()===userId){
+    if (video.created_by.toString() === userId) {
       return res.status(200).json({
         message: 'User is the creator of the video and has access',
         data: {
-          hasUserAccess:true,
+          hasUserAccess: true,
           accessData: null,
         },
-      })
+      });
     }
     const userAccess = await UserAccess.findOne({
       user_id: userId,
@@ -2671,6 +2697,7 @@ const HasUserAccess = async (req, res, next) => {
 
     const hasUserAccess =
       !userAccess || Object.keys(userAccess).length === 0 ? false : true;
+    console.log('hasUserAccess', hasUserAccess);
     return res.status(200).json({
       message: 'User asset access status retrieved successfully',
       data: {
