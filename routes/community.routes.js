@@ -34,7 +34,6 @@ router.post('/create', authenticateToken,communityProfilePhotoUpload,CreateCommu
 
 router.post('/update-settings',authenticateToken, UpdateCommunitySettingsAccess)
 
-
 // API to rename a community
 router.put('/rename', authenticateToken, RenameCommunity)
 
