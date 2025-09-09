@@ -1,23 +1,23 @@
 //const crypto = require('crypto')
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 //const razorpay = require('../config/razorpay')
-const verifyGooglePurchase = require('../utils/google_play_payments')
-const Wallet = require('../models/Wallet')
-const WalletTransaction = require('../models/WalletTransaction')
-const WalletTransfer = require('../models/WalletTransfer')
-const UserAccess = require('../models/UserAccess')
-const CommunityAccess = require('../models/CommunityAccess')
-const Series = require('../models/Series')
-const User = require('../models/User')
-const Community = require('../models/Community')
-const { handleError } = require('../utils/utils')
-const { checkCreatorPassAccess } = require('./creatorpass.controller')
+const verifyGooglePurchase = require('../utils/google_play_payments');
+const Wallet = require('../models/Wallet');
+const WalletTransaction = require('../models/WalletTransaction');
+const WalletTransfer = require('../models/WalletTransfer');
+const UserAccess = require('../models/UserAccess');
+const CommunityAccess = require('../models/CommunityAccess');
+const Series = require('../models/Series');
+const User = require('../models/User');
+const Community = require('../models/Community');
+const { handleError } = require('../utils/utils');
+const { checkCreatorPassAccess } = require('./creatorpass.controller');
 
-const MAX_WALLET_LOAD = 50000
-const MIN_WALLET_LOAD = 0
+const MAX_WALLET_LOAD = 50000;
+const MIN_WALLET_LOAD = 0;
 /* const PLATFORM_FEE_PERCENTAGE = 30
 const CREATOR_SHARE_PERCENTAGE = 70 */
-const MAX_DESCRIPTION_LENGTH = 200
+const MAX_DESCRIPTION_LENGTH = 200;
 /* 
 const generateShortReceipt = (prefix, userId) => {
   const shortUserId = userId.toString().slice(-8)
@@ -35,42 +35,42 @@ const validateAmount = (
     return {
       isValid: false,
       error: 'Amount is required and must be a number',
-    }
+    };
   }
   if (amount < min) {
-    return { isValid: false, error: `Minimum amount is ₹${min}` }
+    return { isValid: false, error: `Minimum amount is ₹${min}` };
   }
   if (amount > max) {
-    return { isValid: false, error: `Maximum amount is ₹${max}` }
+    return { isValid: false, error: `Maximum amount is ₹${max}` };
   }
   if (amount !== Math.floor(amount)) {
-    return { isValid: false, error: 'Amount must be a whole number' }
+    return { isValid: false, error: 'Amount must be a whole number' };
   }
-  return { isValid: true }
-}
+  return { isValid: true };
+};
 
 const validateObjectId = (id, fieldName = 'ID') => {
   if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-    return { isValid: false, error: `Invalid ${fieldName}` }
+    return { isValid: false, error: `Invalid ${fieldName}` };
   }
-  return { isValid: true }
-}
+  return { isValid: true };
+};
 
 const sanitizeString = (str, maxLength = 200) => {
-  if (!str) return ''
-  return str.toString().trim().substring(0, maxLength)
-}
+  if (!str) return '';
+  return str.toString().trim().substring(0, maxLength);
+};
 
 const getOrCreateWallet = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
-    const walletType = req.body?.walletType || 'user'
-    const validation = validateObjectId(userId, 'User ID')
+    const userId = req.user.id.toString();
+    const walletType = req.body?.walletType || 'user';
+    const validation = validateObjectId(userId, 'User ID');
     if (!validation.isValid) {
-      throw new Error(validation.error)
+      throw new Error(validation.error);
     }
 
-    let wallet = await Wallet.findOne({ user_id: userId })
+    let wallet = await Wallet.findOne({ user_id: userId });
 
     if (!wallet) {
       wallet = new Wallet({
@@ -80,8 +80,8 @@ const getOrCreateWallet = async (req, res, next) => {
         wallet_type: walletType,
         status: 'active',
         total_loaded: 0,
-      })
-      await wallet.save()
+      });
+      await wallet.save();
     }
     res.status(200).json({
       success: true,
@@ -90,46 +90,46 @@ const getOrCreateWallet = async (req, res, next) => {
         total_loaded: wallet.total_loaded,
         balance: wallet.balance,
       },
-    })
+    });
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 const createWalletLoadOrder = async (req, res, next) => {
   try {
-    const { amount } = req.body //send the original amount not after the 15%cut
-    const userId = req.user.id.toString()
+    const { amount } = req.body; //send the original amount not after the 15%cut
+    const userId = req.user.id.toString();
 
-    const amountValidation = validateAmount(amount)
+    const amountValidation = validateAmount(amount);
     if (!amountValidation.isValid) {
       return res.status(400).json({
         error: amountValidation.error,
         code: 'INVALID_AMOUNT',
-      })
+      });
     }
 
-    const userValidation = validateObjectId(userId, 'User ID')
+    const userValidation = validateObjectId(userId, 'User ID');
     if (!userValidation.isValid) {
       return res.status(400).json({
         error: userValidation.error,
         code: 'INVALID_USER_ID',
-      })
+      });
     }
 
-    const wallet = await Wallet.findOne({ user_id: userId })
+    const wallet = await Wallet.findOne({ user_id: userId });
     if (!wallet) {
       return res.status(404).json({
         error: 'Wallet not found',
         code: 'WALLET_NOT_FOUND',
-      })
+      });
     }
 
     if (wallet.status !== 'active') {
       return res.status(400).json({
         error: 'Wallet is not active. Please contact support.',
         code: 'WALLET_INACTIVE',
-      })
+      });
     }
     /* 
     const orderOptions = {
@@ -179,11 +179,11 @@ const createWalletLoadOrder = async (req, res, next) => {
         currentBalance: wallet.balance,
         balanceAfterLoad: wallet.balance + amount,
       },
-    })
+    });
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 const verifyWalletLoad = async (req, res, next) => {
   try {
@@ -192,23 +192,23 @@ const verifyWalletLoad = async (req, res, next) => {
       google_product_id,
       google_order_id,
       amount, //send the original amount not after the 15%cut
-    } = req.body
+    } = req.body;
 
-    const userId = req.user.id.toString()
+    const userId = req.user.id.toString();
 
     if (!google_purchase_token || !google_product_id || !google_order_id) {
       return res.status(400).json({
         success: false,
         error: 'Missing required payment verification fields',
         code: 'MISSING_PAYMENT_FIELDS',
-      })
+      });
     }
-    const amountValidation = validateAmount(amount)
+    const amountValidation = validateAmount(amount);
     if (!amountValidation.isValid) {
       return res.status(400).json({
         error: amountValidation.error,
         code: 'INVALID_AMOUNT',
-      })
+      });
     }
     /*     if (
       typeof razorpay_order_id !== 'string' ||
@@ -248,45 +248,45 @@ const verifyWalletLoad = async (req, res, next) => {
     const existingTransaction = await WalletTransaction.findOne({
       google_order_id: google_order_id,
       user_id: userId,
-    })
+    });
 
     if (existingTransaction) {
       return res.status(400).json({
         success: false,
         error: 'Payment already processed',
         code: 'PAYMENT_ALREADY_PROCESSED',
-      })
+      });
     }
 
-    let payment
+    let payment;
 
     payment = await verifyGooglePurchase(
       google_product_id,
       google_purchase_token
-    )
+    );
 
     if (!payment.valid) {
-      console.log(payment)
+      console.log(payment);
       return res.status(400).json({
         success: false,
         error: 'Payment not captured successfully',
         code: 'PAYMENT_NOT_CAPTURED',
-      })
+      });
     }
 
-    const wallet = await Wallet.findOne({ user_id: userId })
+    const wallet = await Wallet.findOne({ user_id: userId });
     if (!wallet) {
       return res.status(404).json({
         success: false,
         error: 'wallet not found',
         code: 'WALLET_NOT _FOUND',
-      })
+      });
     }
-    const balanceBefore = wallet.balance
-    const balanceAfter = balanceBefore + amount
+    const balanceBefore = wallet.balance;
+    const balanceAfter = balanceBefore + amount;
 
-    const session = await mongoose.startSession()
-    let walletTransaction
+    const session = await mongoose.startSession();
+    let walletTransaction;
 
     try {
       await session.withTransaction(async () => {
@@ -303,18 +303,18 @@ const verifyWalletLoad = async (req, res, next) => {
           google_product_id: google_product_id,
           google_order_id: google_order_id,
           status: 'completed',
-        })
+        });
 
-        await walletTransaction.save({ session })
+        await walletTransaction.save({ session });
 
-        wallet.balance = balanceAfter
-        wallet.total_loaded += amount
+        wallet.balance = balanceAfter;
+        wallet.total_loaded += amount;
 
-        wallet.last_transaction_at = new Date()
-        await wallet.save({ session })
-      })
+        wallet.last_transaction_at = new Date();
+        await wallet.save({ session });
+      });
 
-      await session.endSession()
+      await session.endSession();
 
       res.status(200).json({
         success: true,
@@ -340,104 +340,104 @@ const verifyWalletLoad = async (req, res, next) => {
             'Send tips to creators',
           ],
         },
-      })
+      });
     } catch (transactionError) {
-      await session.abortTransaction()
-      throw transactionError
+      await session.abortTransaction();
+      throw transactionError;
     } finally {
       if (session.inTransaction()) {
-        await session.endSession()
+        await session.endSession();
       }
     }
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 const transferToCreatorForSeries = async (req, res, next) => {
   try {
-    const { seriesId, amount, transferNote } = req.body
-    const buyerId = req.user.id.toString()
+    const { seriesId, amount, transferNote } = req.body;
+    const buyerId = req.user.id.toString();
 
     if (!seriesId) {
       return res.status(400).json({
         success: false,
         error: 'Series ID is required',
         code: 'MISSING_REQUIRED_FIELDS',
-      })
+      });
     }
 
-    const seriesValidation = validateObjectId(seriesId, 'Series ID')
+    const seriesValidation = validateObjectId(seriesId, 'Series ID');
     if (!seriesValidation.isValid) {
       return res.status(400).json({
         success: false,
         error: seriesValidation.error,
         code: 'INVALID_SERIES_ID',
-      })
+      });
     }
 
     const series = await Series.findById(seriesId).populate(
       'created_by',
       'username email'
-    )
+    );
     if (!series) {
       return res.status(404).json({
         success: false,
         error: 'Series not found',
         code: 'SERIES_NOT_FOUND',
-      })
+      });
     }
     const shouldUnlockFunds =
-      series.episodes.length >= series.promised_episode_count ? true : false
-    const creatorId = series.created_by._id.toString()
+      series.episodes.length >= series.promised_episode_count ? true : false;
+    const creatorId = series.created_by._id.toString();
 
     if (series.type !== 'Paid') {
       return res.status(400).json({
         success: false,
         error: 'This series is free to watch',
         code: 'SERIES_NOT_PAID',
-      })
+      });
     }
 
-    const amountValidation = validateAmount(amount, 1, 10000)
+    const amountValidation = validateAmount(amount, 1, 10000);
     if (!amountValidation.isValid) {
       return res.status(400).json({
         success: false,
         error: amountValidation.error,
         code: 'INVALID_AMOUNT',
-      })
+      });
     }
-    const seriesAmount = series.price
+    const seriesAmount = series.price;
     if (Number(seriesAmount) !== Number(amount)) {
       // if user amount and series amount are not same
       return res.status(400).json({
         success: false,
         error: 'Series price does not match the provided amount',
         code: 'SERIES_PRICE_MISMATCH',
-      })
+      });
     }
 
-    const sanitizedNote = sanitizeString(transferNote, MAX_DESCRIPTION_LENGTH)
+    const sanitizedNote = sanitizeString(transferNote, MAX_DESCRIPTION_LENGTH);
     if (transferNote && transferNote.length > MAX_DESCRIPTION_LENGTH) {
       return res.status(400).json({
         success: false,
         error: `Transfer note must be less than ${MAX_DESCRIPTION_LENGTH} characters`,
         code: 'INVALID_TRANSFER_NOTE',
-      })
+      });
     }
 
     const existingAccess = await UserAccess.findOne({
       user_id: buyerId,
       content_id: seriesId,
       content_type: 'Series',
-    })
+    });
 
     if (existingAccess) {
       return res.status(400).json({
         success: false,
         error: 'You already have access to this series',
         code: 'ALREADY_PURCHASED',
-      })
+      });
     }
 
     if (creatorId === buyerId) {
@@ -445,24 +445,24 @@ const transferToCreatorForSeries = async (req, res, next) => {
         success: false,
         error: 'You cannot buy your own series',
         code: 'CANNOT_BUY_OWN_SERIES',
-      })
+      });
     }
 
-    const buyerWallet = await Wallet.findOne({ user_id: buyerId })
+    const buyerWallet = await Wallet.findOne({ user_id: buyerId });
     if (!buyerWallet) {
       return res.status(404).json({
         success: false,
         error: 'buyer wallet not found',
         code: 'BUYER_WALLET_NOT _FOUND',
-      })
+      });
     }
-    const creatorWallet = await Wallet.findOne({ user_id: creatorId })
+    const creatorWallet = await Wallet.findOne({ user_id: creatorId });
     if (!creatorWallet) {
       return res.status(404).json({
         success: false,
         error: 'creator wallet not found',
         code: 'CREATOR_WALLET_NOT _FOUND',
-      })
+      });
     }
 
     if (buyerWallet.status !== 'active') {
@@ -470,7 +470,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
         success: false,
         error: 'Your wallet is not active',
         code: 'WALLET_INACTIVE',
-      })
+      });
     }
 
     if (buyerWallet.balance < amount) {
@@ -482,7 +482,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
         shortfall: amount - buyerWallet.balance,
         suggestion: 'Please load more money to your wallet',
         code: 'INSUFFICIENT_BALANCE',
-      })
+      });
     }
 
     if (creatorWallet.status !== 'active') {
@@ -490,11 +490,11 @@ const transferToCreatorForSeries = async (req, res, next) => {
         success: false,
         error: "Creator's wallet is not active",
         code: 'CREATOR_WALLET_INACTIVE',
-      })
+      });
     }
 
     // Check if user has active Creator Pass for this creator
-    const creatorPassCheck = await checkCreatorPassAccess(buyerId, creatorId)
+    const creatorPassCheck = await checkCreatorPassAccess(buyerId, creatorId);
     if (creatorPassCheck.hasAccess) {
       // Grant access directly without payment
       const userAccess = new UserAccess({
@@ -508,9 +508,9 @@ const transferToCreatorForSeries = async (req, res, next) => {
         metadata: {
           creator_pass_id: creatorPassCheck.pass._id,
         },
-      })
+      });
 
-      await userAccess.save()
+      await userAccess.save();
 
       return res.status(200).json({
         success: true,
@@ -529,26 +529,26 @@ const transferToCreatorForSeries = async (req, res, next) => {
           message: 'You can now watch all episodes of this series',
           seriesId: seriesId,
         },
-      })
+      });
     }
 
-    const buyerBalanceBefore = buyerWallet.balance
-    const creatorBalanceBefore = creatorWallet.balance
-    const lockedEarnings = series.locked_earnings
+    const buyerBalanceBefore = buyerWallet.balance;
+    const creatorBalanceBefore = creatorWallet.balance;
+    const lockedEarnings = series.locked_earnings;
 
     if (!shouldUnlockFunds) {
-      const session = await mongoose.startSession()
+      const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
-          const buyerBalanceAfter = buyerBalanceBefore - amount
-          buyerWallet.balance = buyerBalanceAfter
-          buyerWallet.total_spent += amount
-          buyerWallet.last_transaction_at = new Date()
-          await buyerWallet.save({ session })
-          series.locked_earnings += amount
-          series.earned_till_date += amount
-          series.total_purchases++
-          await series.save({ session })
+          const buyerBalanceAfter = buyerBalanceBefore - amount;
+          buyerWallet.balance = buyerBalanceAfter;
+          buyerWallet.total_spent += amount;
+          buyerWallet.last_transaction_at = new Date();
+          await buyerWallet.save({ session });
+          series.locked_earnings += amount;
+          series.earned_till_date += amount;
+          series.total_purchases++;
+          await series.save({ session });
           const buyerTransaction = new WalletTransaction({
             wallet_id: buyerWallet._id,
             user_id: buyerId,
@@ -568,9 +568,9 @@ const transferToCreatorForSeries = async (req, res, next) => {
               platform_fee: amount,
               creator_share: amount,
             },
-          })
+          });
 
-          await buyerTransaction.save({ session })
+          await buyerTransaction.save({ session });
 
           const userAccess = new UserAccess({
             user_id: buyerId,
@@ -580,11 +580,11 @@ const transferToCreatorForSeries = async (req, res, next) => {
             payment_method: 'wallet_transfer',
             payment_amount: amount,
             granted_at: new Date(),
-          })
+          });
 
-          await userAccess.save({ session })
-        })
-        await session.endSession()
+          await userAccess.save({ session });
+        });
+        await session.endSession();
         return res.status(200).json({
           success: true,
           message: `Series purchased successfully for ₹${amount}!`,
@@ -617,26 +617,26 @@ const transferToCreatorForSeries = async (req, res, next) => {
             message: 'You can now watch all episodes of this series',
             seriesId: seriesId,
           },
-        })
+        });
       } catch (transactionError) {
         if (session.inTransaction()) {
-          await session.abortTransaction()
+          await session.abortTransaction();
         }
-        throw transactionError
+        throw transactionError;
       } finally {
-        await session.endSession()
+        await session.endSession();
       }
     }
 
-    const session = await mongoose.startSession()
+    const session = await mongoose.startSession();
 
     try {
       const creatorAmount =
-        lockedEarnings > 0 ? amount + lockedEarnings : amount
+        lockedEarnings > 0 ? amount + lockedEarnings : amount;
       await session.withTransaction(async () => {
-        const buyerBalanceAfter = buyerBalanceBefore - amount
+        const buyerBalanceAfter = buyerBalanceBefore - amount;
 
-        const creatorBalanceAfter = creatorBalanceBefore + creatorAmount
+        const creatorBalanceAfter = creatorBalanceBefore + creatorAmount;
 
         const walletTransfer = new WalletTransfer({
           sender_id: buyerId,
@@ -663,26 +663,26 @@ const transferToCreatorForSeries = async (req, res, next) => {
               total_amount: creatorAmount,
             },
           },
-        })
+        });
 
-        await walletTransfer.save({ session })
+        await walletTransfer.save({ session });
 
-        buyerWallet.balance = buyerBalanceAfter
-        buyerWallet.total_spent += amount
-        buyerWallet.last_transaction_at = new Date()
-        await buyerWallet.save({ session })
+        buyerWallet.balance = buyerBalanceAfter;
+        buyerWallet.total_spent += amount;
+        buyerWallet.last_transaction_at = new Date();
+        await buyerWallet.save({ session });
 
-        creatorWallet.balance = creatorBalanceAfter
-        creatorWallet.total_received += creatorAmount
+        creatorWallet.balance = creatorBalanceAfter;
+        creatorWallet.total_received += creatorAmount;
 
-        creatorWallet.last_transaction_at = new Date()
-        await creatorWallet.save({ session })
-        series.earned_till_date += amount
+        creatorWallet.last_transaction_at = new Date();
+        await creatorWallet.save({ session });
+        series.earned_till_date += amount;
         if (lockedEarnings > 0) {
-          series.locked_earnings = 0
+          series.locked_earnings = 0;
         }
-        series.total_purchases++
-        await series.save({ session })
+        series.total_purchases++;
+        await series.save({ session });
         const buyerTransaction = new WalletTransaction({
           wallet_id: buyerWallet._id,
           user_id: buyerId,
@@ -701,9 +701,9 @@ const transferToCreatorForSeries = async (req, res, next) => {
             creator_name: series.created_by.username,
             transfer_id: walletTransfer._id,
           },
-        })
+        });
 
-        await buyerTransaction.save({ session })
+        await buyerTransaction.save({ session });
 
         const creatorTransaction = new WalletTransaction({
           wallet_id: creatorWallet._id,
@@ -724,9 +724,9 @@ const transferToCreatorForSeries = async (req, res, next) => {
             transfer_id: walletTransfer._id,
             total_amount: creatorAmount,
           },
-        })
+        });
 
-        await creatorTransaction.save({ session })
+        await creatorTransaction.save({ session });
 
         const userAccess = new UserAccess({
           user_id: buyerId,
@@ -737,9 +737,9 @@ const transferToCreatorForSeries = async (req, res, next) => {
           payment_method: 'wallet_transfer',
           payment_amount: amount,
           granted_at: new Date(),
-        })
+        });
 
-        await userAccess.save({ session })
+        await userAccess.save({ session });
 
         await User.findByIdAndUpdate(
           creatorId,
@@ -749,7 +749,7 @@ const transferToCreatorForSeries = async (req, res, next) => {
             },
           },
           { session }
-        )
+        );
 
         await Series.findByIdAndUpdate(
           seriesId,
@@ -765,10 +765,10 @@ const transferToCreatorForSeries = async (req, res, next) => {
             },
           },
           { session }
-        )
-      })
+        );
+      });
 
-      await session.endSession()
+      await session.endSession();
 
       res.status(200).json({
         success: true,
@@ -805,67 +805,67 @@ const transferToCreatorForSeries = async (req, res, next) => {
           message: 'You can now watch all episodes of this series',
           seriesId: seriesId,
         },
-      })
+      });
     } catch (transactionError) {
       if (session.inTransaction()) {
-        await session.abortTransaction()
+        await session.abortTransaction();
       }
-      throw transactionError
+      throw transactionError;
     } finally {
-      await session.endSession()
+      await session.endSession();
     }
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 const transferCommunityFee = async (req, res, next) => {
   try {
-    const { communityId, amount, feeNote } = req.body
-    const creatorId = req.user.id.toString()
+    const { communityId, amount, feeNote } = req.body;
+    const creatorId = req.user.id.toString();
 
     if (!communityId || !amount) {
       return res.status(400).json({
         success: false,
         error: 'Community ID and amount are required',
         code: 'MISSING_REQUIRED_FIELDS',
-      })
+      });
     }
 
-    const communityValidation = validateObjectId(communityId, 'Community ID')
+    const communityValidation = validateObjectId(communityId, 'Community ID');
     if (!communityValidation.isValid) {
       return res.status(400).json({
         success: false,
         error: communityValidation.error,
         code: 'INVALID_COMMUNITY_ID',
-      })
+      });
     }
 
-    const amountValidation = validateAmount(amount, 1, 5000)
+    const amountValidation = validateAmount(amount, 1, 5000);
     if (!amountValidation.isValid) {
       return res.status(400).json({
         success: false,
         error: amountValidation.error,
         code: 'INVALID_AMOUNT',
-      })
+      });
     }
 
-    const sanitizedNote = sanitizeString(feeNote, MAX_DESCRIPTION_LENGTH)
+    const sanitizedNote = sanitizeString(feeNote, MAX_DESCRIPTION_LENGTH);
 
     // Find the community
     const community = await Community.findById(communityId).populate(
       'founder',
       'username email'
-    )
+    );
     if (!community) {
       return res.status(404).json({
         success: false,
         error: 'Community not found',
         code: 'COMMUNITY_NOT_FOUND',
-      })
+      });
     }
 
-    const founderId = community.founder._id.toString()
+    const founderId = community.founder._id.toString();
 
     // Check if community has upload fee
     if (community.community_fee_type !== 'paid') {
@@ -873,20 +873,20 @@ const transferCommunityFee = async (req, res, next) => {
         success: false,
         error: "This community doesn't require upload fee",
         code: 'COMMUNITY_FREE_UPLOAD',
-      })
+      });
     }
 
     // Check if creator already has access
     const existingAccess = await CommunityAccess.findOne({
       user_id: creatorId,
       community_id: communityId,
-    })
+    });
 
     if (existingAccess) {
       // Check if access is expired
       if (existingAccess.isExpired()) {
         // Renew expired access
-        await existingAccess.renewSubscription()
+        await existingAccess.renewSubscription();
 
         return res.status(200).json({
           success: true,
@@ -902,7 +902,7 @@ const transferCommunityFee = async (req, res, next) => {
             message: 'You can continue uploading videos to this community',
             communityId: communityId,
           },
-        })
+        });
       } else if (existingAccess.status === 'active') {
         return res.status(400).json({
           success: false,
@@ -914,7 +914,7 @@ const transferCommunityFee = async (req, res, next) => {
               (existingAccess.expires_at - new Date()) / (1000 * 60 * 60 * 24)
             ),
           },
-        })
+        });
       }
     }
 
@@ -924,7 +924,7 @@ const transferCommunityFee = async (req, res, next) => {
         success: false,
         error: "Community founder doesn't need to pay upload fee",
         code: 'FOUNDER_EXEMPT_FROM_FEE',
-      })
+      });
     }
 
     if (amount !== community.community_fee_amount) {
@@ -932,25 +932,25 @@ const transferCommunityFee = async (req, res, next) => {
         success: false,
         error: 'Amount does not match the community fee',
         code: 'COMMUNITY_FEE_MISMATCH',
-      })
+      });
     }
 
     // Get wallets
-    const creatorWallet = await Wallet.findOne({ user_id: creatorId })
+    const creatorWallet = await Wallet.findOne({ user_id: creatorId });
     if (!creatorWallet) {
       return res.status(404).json({
         success: false,
         error: 'creator wallet not found',
         code: 'CREATOR_WALLET_NOT _FOUND',
-      })
+      });
     }
-    const founderWallet = await Wallet.findOne({ user_id: founderId })
+    const founderWallet = await Wallet.findOne({ user_id: founderId });
     if (!founderWallet) {
       return res.status(404).json({
         success: false,
         error: 'founder wallet not found',
         code: 'FOUNDER_WALLET_NOT _FOUND',
-      })
+      });
     }
 
     // Check creator's wallet balance
@@ -963,7 +963,7 @@ const transferCommunityFee = async (req, res, next) => {
         shortfall: amount - creatorWallet.balance,
         suggestion: 'Please load more money to your wallet',
         code: 'INSUFFICIENT_BALANCE',
-      })
+      });
     }
 
     // Check wallet statuses
@@ -972,7 +972,7 @@ const transferCommunityFee = async (req, res, next) => {
         success: false,
         error: 'Your wallet is not active',
         code: 'WALLET_INACTIVE',
-      })
+      });
     }
 
     if (founderWallet.status !== 'active') {
@@ -980,24 +980,24 @@ const transferCommunityFee = async (req, res, next) => {
         success: false,
         error: "Community founder's wallet is not active",
         code: 'FOUNDER_WALLET_INACTIVE',
-      })
+      });
     }
 
     // Calculate revenue sharing (currently 100% to founder, 0% to platform)
     const founderAmount = Math.round(
       amount * (community.revenue_sharing.founder_percentage / 100)
-    )
-    const platformAmount = amount - founderAmount
+    );
+    const platformAmount = amount - founderAmount;
 
-    const session = await mongoose.startSession()
+    const session = await mongoose.startSession();
 
-    const creatorBalanceBefore = creatorWallet.balance
-    const founderBalanceBefore = founderWallet.balance
+    const creatorBalanceBefore = creatorWallet.balance;
+    const founderBalanceBefore = founderWallet.balance;
 
     try {
       await session.withTransaction(async () => {
-        const creatorBalanceAfter = creatorBalanceBefore - amount
-        const founderBalanceAfter = founderBalanceBefore + founderAmount
+        const creatorBalanceAfter = creatorBalanceBefore - amount;
+        const founderBalanceAfter = founderBalanceBefore + founderAmount;
 
         // Create wallet transfer record
         const walletTransfer = new WalletTransfer({
@@ -1032,22 +1032,22 @@ const transferCommunityFee = async (req, res, next) => {
               platform_share: platformAmount,
             },
           },
-        })
+        });
 
-        await walletTransfer.save({ session })
+        await walletTransfer.save({ session });
 
         // Update creator wallet
-        creatorWallet.balance = creatorBalanceAfter
-        creatorWallet.total_spent += amount
-        creatorWallet.last_transaction_at = new Date()
-        await creatorWallet.save({ session })
+        creatorWallet.balance = creatorBalanceAfter;
+        creatorWallet.total_spent += amount;
+        creatorWallet.last_transaction_at = new Date();
+        await creatorWallet.save({ session });
 
         // Update founder wallet
-        founderWallet.balance = founderBalanceAfter
-        founderWallet.total_received += founderAmount
+        founderWallet.balance = founderBalanceAfter;
+        founderWallet.total_received += founderAmount;
 
-        founderWallet.last_transaction_at = new Date()
-        await founderWallet.save({ session })
+        founderWallet.last_transaction_at = new Date();
+        await founderWallet.save({ session });
 
         // Create creator transaction
         const creatorTransaction = new WalletTransaction({
@@ -1070,9 +1070,9 @@ const transferCommunityFee = async (req, res, next) => {
             founder_share: founderAmount,
             platform_share: platformAmount,
           },
-        })
+        });
 
-        await creatorTransaction.save({ session })
+        await creatorTransaction.save({ session });
 
         // Create founder transaction
         const founderTransaction = new WalletTransaction({
@@ -1096,12 +1096,12 @@ const transferCommunityFee = async (req, res, next) => {
             founder_share: founderAmount,
             platform_share: platformAmount,
           },
-        })
+        });
 
-        await founderTransaction.save({ session })
+        await founderTransaction.save({ session });
 
         // Create community access record with 30-day expiry
-        const accessExpiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        const accessExpiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
         const communityAccess = new CommunityAccess({
           user_id: creatorId,
@@ -1114,9 +1114,9 @@ const transferCommunityFee = async (req, res, next) => {
           subscription_status: 'active',
           status: 'active',
           granted_at: new Date(),
-        })
+        });
 
-        await communityAccess.save({ session })
+        await communityAccess.save({ session });
 
         // Update community statistics
         await Community.findByIdAndUpdate(
@@ -1127,14 +1127,14 @@ const transferCommunityFee = async (req, res, next) => {
               total_uploads: 1,
               'analytics.total_revenue': amount,
             },
-            $addToSet:{creators: creatorId},
+            $addToSet: { creators: creatorId },
             $set: {
               'analytics.last_analytics_update': new Date(),
             },
           },
           { session }
-        )
-        console.log("added as creator")
+        );
+        console.log("added as creator");
 
 
 
@@ -1147,10 +1147,10 @@ const transferCommunityFee = async (req, res, next) => {
             },
           },
           { session }
-        )
-      })
+        );
+      });
 
-      await session.endSession()
+      await session.endSession();
 
       res.status(200).json({
         success: true,
@@ -1197,36 +1197,36 @@ const transferCommunityFee = async (req, res, next) => {
           renewalInfo:
             'Your subscription will need to be renewed after 30 days',
         },
-      })
+      });
       // eslint-disable-next-line no-useless-catch
     } catch (transactionError) {
-      throw transactionError
+      throw transactionError;
     } finally {
-      await session.endSession()
+      await session.endSession();
     }
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 const getWalletDetails = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
+    const userId = req.user.id.toString();
 
-    const userValidation = validateObjectId(userId, 'User ID')
+    const userValidation = validateObjectId(userId, 'User ID');
     if (!userValidation.isValid) {
       return res.status(400).json({
         error: userValidation.error,
         code: 'INVALID_USER_ID',
-      })
+      });
     }
 
-    const wallet = await Wallet.findOne({ user_id: userId })
+    const wallet = await Wallet.findOne({ user_id: userId });
     if (!wallet) {
       return res.status(404).json({
         error: 'wallet not found',
         code: 'WALLET_NOT_FOUND',
-      })
+      });
     }
 
     // Get recent transfers without populate first
@@ -1237,37 +1237,37 @@ const getWalletDetails = async (req, res, next) => {
       .populate('receiver_id', 'username')
       .sort({ createdAt: -1 })
       .limit(10)
-      .lean()
+      .lean();
 
     // Manually populate content_id based on content_type
     for (let transfer of recentTransfers) {
       if (transfer.content_id && transfer.content_type) {
         try {
-          let contentModel
+          let contentModel;
           switch (transfer.content_type.toLowerCase()) {
             case 'series':
-              contentModel = Series
-              break
+              contentModel = Series;
+              break;
             case 'community':
-              contentModel = Community
-              break
+              contentModel = Community;
+              break;
             case 'video':
               // Assuming you have a Video model
               // contentModel = Video
-              break
+              break;
             default:
-              continue
+              continue;
           }
-          
+
           if (contentModel) {
             const content = await contentModel.findById(transfer.content_id)
               .select('title name')
-              .lean()
-            transfer.content_details = content
+              .lean();
+            transfer.content_details = content;
           }
         } catch (populateError) {
-          console.log(`Error populating content for ${transfer.content_type}:`, populateError.message)
-          transfer.content_details = null
+          console.log(`Error populating content for ${transfer.content_type}:`, populateError.message);
+          transfer.content_details = null;
         }
       }
     }
@@ -1280,7 +1280,7 @@ const getWalletDetails = async (req, res, next) => {
       .select(
         'transaction_type transaction_category amount description balance_after createdAt status'
       )
-      .lean()
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -1321,58 +1321,58 @@ const getWalletDetails = async (req, res, next) => {
         date: tx.createdAt,
         status: tx.status,
       })),
-    })
+    });
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 const getWalletTransactionHistory = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
+    const userId = req.user.id.toString();
     const {
       page = 1,
       limit = 20,
       type,
       category,
       timePeriod = '7d',
-    } = req.query
+    } = req.query;
 
-    const userValidation = validateObjectId(userId, 'User ID')
+    const userValidation = validateObjectId(userId, 'User ID');
     if (!userValidation.isValid) {
       return res.status(400).json({
         error: userValidation.error,
         code: 'INVALID_USER_ID',
-      })
+      });
     }
 
-    const pageNum = parseInt(page)
-    const limitNum = parseInt(limit)
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
 
     if (pageNum < 1 || pageNum > 1000) {
       return res.status(400).json({
         error: 'Page number must be between 1 and 1000',
         code: 'INVALID_PAGE_NUMBER',
-      })
+      });
     }
 
     if (limitNum < 1 || limitNum > 100) {
       return res.status(400).json({
         error: 'Limit must be between 1 and 100',
         code: 'INVALID_LIMIT',
-      })
+      });
     }
 
-    const filter = { user_id: userId }
+    const filter = { user_id: userId };
 
     if (type) {
       if (!['credit', 'debit'].includes(type)) {
         return res.status(400).json({
           error: "Transaction type must be 'credit' or 'debit'",
           code: 'INVALID_TRANSACTION_TYPE',
-        })
+        });
       }
-      filter.transaction_type = type
+      filter.transaction_type = type;
     }
 
     if (category) {
@@ -1391,46 +1391,46 @@ const getWalletTransactionHistory = async (req, res, next) => {
         'community_fee',
         'community_subscription',
         'community_fee_received',
-      ]
+      ];
       if (!validCategories.includes(category)) {
         return res.status(400).json({
           error: `Transaction category must be one of: ${validCategories.join(', ')}`,
           code: 'INVALID_TRANSACTION_CATEGORY',
-        })
+        });
       }
-      filter.transaction_category = category
+      filter.transaction_category = category;
     }
 
-    const now = new Date()
-    let startDate
+    const now = new Date();
+    let startDate;
 
     switch (timePeriod) {
       case '7d':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
       case '15d':
-        startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
-        break
+        startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+        break;
       case '30d':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-        break
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
       case '3m':
-        startDate = new Date(new Date(now).setMonth(now.getMonth() - 3))
-        break
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
+        break;
       case '6m':
-        startDate = new Date(new Date(now).setMonth(now.getMonth() - 6))
-        break
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
+        break;
       case '1y':
-        startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1))
-        break
+        startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
+        break;
       default:
         return res.status(400).json({
           success: false,
           error: 'Invalid time period',
           code: 'INVALID_TIME_PERIOD',
-        })
+        });
     }
-    filter.createdAt = { $gte: startDate }
+    filter.createdAt = { $gte: startDate };
 
     const transactions = await WalletTransaction.find(filter)
       .sort({ createdAt: -1 })
@@ -1438,9 +1438,9 @@ const getWalletTransactionHistory = async (req, res, next) => {
       .skip((pageNum - 1) * limitNum)
       .populate('content_id', 'title name')
       .select('-__v')
-      .lean()
+      .lean();
 
-    const total = await WalletTransaction.countDocuments(filter)
+    const total = await WalletTransaction.countDocuments(filter);
 
     res.status(200).json({
       success: true,
@@ -1466,35 +1466,35 @@ const getWalletTransactionHistory = async (req, res, next) => {
         hasPrevPage: pageNum > 1,
         itemsPerPage: limitNum,
       },
-    })
+    });
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 const getGiftHistory = async (req, res, next) => {
   try {
-    const userId = req.user.id.toString()
-    const { page = 1, limit = 20, type = 'all', timePeriod = '7d' } = req.query
+    const userId = req.user.id.toString();
+    const { page = 1, limit = 20, type = 'all', timePeriod = '7d' } = req.query;
 
-    const userValidation = validateObjectId(userId, 'User ID')
+    const userValidation = validateObjectId(userId, 'User ID');
     if (!userValidation.isValid) {
       return res.status(400).json({
         success: false,
         error: userValidation.error,
         code: 'INVALID_USER_ID',
-      })
+      });
     }
 
-    const pageNum = parseInt(page)
-    const limitNum = parseInt(limit)
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
 
     if (pageNum < 1 || pageNum > 1000) {
       return res.status(400).json({
         success: false,
         error: 'Page number must be between 1 and 1000',
         code: 'INVALID_PAGE_NUMBER',
-      })
+      });
     }
 
     if (limitNum < 1 || limitNum > 100) {
@@ -1502,60 +1502,60 @@ const getGiftHistory = async (req, res, next) => {
         success: false,
         error: 'Limit must be between 1 and 100',
         code: 'INVALID_LIMIT',
-      })
+      });
     }
 
-    let filter = {}
+    let filter = {};
 
     if (type === 'sent') {
-      filter = { sender_id: userId, transfer_type: 'comment_gift' }
+      filter = { sender_id: userId, transfer_type: 'comment_gift' };
     } else if (type === 'received') {
-      filter = { receiver_id: userId, transfer_type: 'comment_gift' }
+      filter = { receiver_id: userId, transfer_type: 'comment_gift' };
     } else if (type === 'all') {
       filter = {
         $or: [
           { sender_id: userId, transfer_type: 'comment_gift' },
           { receiver_id: userId, transfer_type: 'comment_gift' },
         ],
-      }
+      };
     } else {
       return res.status(400).json({
         success: false,
         error: "Type must be 'sent', 'received', or 'all'",
         code: 'INVALID_TYPE',
-      })
+      });
     }
 
-    const now = new Date()
-    let startDate
+    const now = new Date();
+    let startDate;
 
     switch (timePeriod) {
       case '7d':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
       case '15d':
-        startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
-        break
+        startDate = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+        break;
       case '30d':
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-        break
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
       case '3m':
-        startDate = new Date(new Date(now).setMonth(now.getMonth() - 3))
-        break
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 3));
+        break;
       case '6m':
-        startDate = new Date(new Date(now).setMonth(now.getMonth() - 6))
-        break
+        startDate = new Date(new Date(now).setMonth(now.getMonth() - 6));
+        break;
       case '1y':
-        startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1))
-        break
+        startDate = new Date(new Date(now).setFullYear(now.getFullYear() - 1));
+        break;
       default:
         return res.status(400).json({
           success: false,
           error: 'Invalid time period',
           code: 'INVALID_TIME_PERIOD',
-        })
+        });
     }
-    filter.createdAt = { $gte: startDate }
+    filter.createdAt = { $gte: startDate };
 
     const gifts = await WalletTransfer.find(filter)
       .populate('sender_id', 'username profilePicture')
@@ -1564,9 +1564,9 @@ const getGiftHistory = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .limit(limitNum)
       .skip((pageNum - 1) * limitNum)
-      .lean()
+      .lean();
 
-    const total = await WalletTransfer.countDocuments(filter)
+    const total = await WalletTransfer.countDocuments(filter);
 
     res.status(200).json({
       success: true,
@@ -1600,11 +1600,11 @@ const getGiftHistory = async (req, res, next) => {
           .filter((g) => g.receiver_id._id.toString() === userId)
           .reduce((sum, g) => sum + g.total_amount, 0),
       },
-    })
+    });
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 module.exports = {
   getWalletDetails,
@@ -1615,4 +1615,4 @@ module.exports = {
   getWalletTransactionHistory,
   getOrCreateWallet,
   getGiftHistory,
-}
+};

@@ -636,8 +636,6 @@ const getUserCommunities = async (req, res, next) => {
       })
     }
 
-
-
     let created = []
     let joined = []
 

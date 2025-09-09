@@ -34,7 +34,6 @@ router.post('/create', authenticateToken,communityProfilePhotoUpload,CreateCommu
 
 router.post('/update-settings',authenticateToken, UpdateCommunitySettingsAccess)
 
-
 // API to rename a community
 router.put('/rename', authenticateToken, RenameCommunity)
 
@@ -61,7 +60,7 @@ router.put('/update-settings', authenticateToken, UpdateCommunitySettings)
 router.get('/all', authenticateToken, getAllCommunities)
 
 // API to get user communities
-router.get('/user-communities', authenticateToken, getUserCommunities)
+router.get('/my-communities', authenticateToken, getUserCommunities)
 
 
 
