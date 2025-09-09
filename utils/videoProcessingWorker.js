@@ -61,15 +61,18 @@ const initializeWorker = async () => {
 
           // ✅ Optimize video in-place (overwrite same file)
           console.log('Optimizing video with FFmpeg...');
-          await new Promise((resolve, reject) => {
-            exec(
-              `ffmpeg -i "${tempVideoPath}" -c:v libx264 -c:a aac -movflags +faststart -preset veryfast -g 48 -keyint_min 48 -sc_threshold 0 -y "${tempVideoPath}"`,
-              (error, stdout, stderr) => {
-                if (error) return reject(error);
-                resolve();
-              }
-            );
-          });
+                  const optimizedPath = tempVideoPath.replace('.mp4', '-optimized.mp4');
+        await new Promise((resolve, reject) => {
+          exec(
+            `ffmpeg -i "${tempVideoPath}" -c:v libx264 -c:a aac -movflags +faststart -preset veryfast -g 48 -keyint_min 48 -sc_threshold 0 -y "${optimizedPath}"`,
+            (error, stdout, stderr) => {
+              if (error) return reject(error);
+              resolve();
+            }
+          );
+        });
+        // Replace original with optimized
+        fs.renameSync(optimizedPath, tempVideoPath);
 
           // Upload optimized video back to S3 (overwrite original)
           console.log('Uploading optimized video back to S3...');
