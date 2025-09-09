@@ -69,9 +69,21 @@ const connectRedis = async () => {
   }
 }
 
+const closeRedisConnection = async () => {
+  if (RedisClient) {
+    try {
+      await RedisClient.quit()
+      console.log('Redis connection closed')
+    } catch (err) {
+      console.error('Error closing Redis connection:', err.message)
+    }
+  }
+}
+
 module.exports = {
   connectRedis,
   RedisClient: () => RedisClient,
   createRedisClient,
   getRedisClient,
+  closeRedisConnection,
 }

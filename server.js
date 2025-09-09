@@ -25,7 +25,7 @@ const adminRoutes = require('./routes/admin.routes')
 const cors = require('cors')
 const validateEnv = require('./config/validateEnv')
 const { testS3Connection } = require('./utils/connection_testing')
-const { connectRedis } = require('./config/redis')
+const { connectRedis, closeRedisConnection } = require('./config/redis')
 const path = require('path')
 const { RedisConnectionError } = require('./utils/errors')
 const { initializeWebSocket } = require('./utils/websocket')
@@ -106,4 +106,16 @@ const server = app.listen(PORT, async () => {
   }
 
   await testS3Connection()
+})
+process.on('SIGINT', async () => {
+  console.log('Shutting down gracefully...')
+
+  await closeRedisConnection()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('Shutting down gracefully...')
+  await closeRedisConnection()
+  process.exit(0)
 })
