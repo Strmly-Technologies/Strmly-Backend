@@ -831,37 +831,37 @@ const getCommunityVideos = async (req, res, next) => {
     let videos
 
     if (videoType === 'long') {
-      const populated = await Community.findById(communityId)
-        .lean()
-        .select('_id long_videos')
-        .populate({
-          path: 'long_videos',
-          match: { visibility: { $ne: 'hidden' } },
-
-          populate: [
-            {
-              path: 'created_by',
-              select: 'username profile_photo custom_name',
-            },
-            {
-              path: 'series',
-              select:
-                'title description price genre episodes seasons total_episodes',
-              populate: {
-                path: 'created_by',
-                select: 'username profile_photo custom_name',
-              },
-            },
-            {
-              path: 'community',
-              select: 'name profile_photo followers',
-            },
-            {
-              path: 'liked_by',
-              select: 'username profile_photo',
-            },
-          ],
-        })
+     const populated = await Community.findById(communityId)
+  .lean()
+  .select('_id long_videos')
+  .populate({
+    path: 'long_videos',
+    match: { visibility: { $ne: 'hidden' } },
+    options: { sort: { createdAt: -1 } },  
+    populate: [
+      {
+        path: 'created_by',
+        select: 'username profile_photo custom_name',
+      },
+      {
+        path: 'series',
+        select:
+          'title description price genre episodes seasons total_episodes',
+        populate: {
+          path: 'created_by',
+          select: 'username profile_photo custom_name',
+        },
+      },
+      {
+        path: 'community',
+        select: 'name profile_photo followers',
+      },
+      {
+        path: 'liked_by',
+        select: 'username profile_photo',
+      },
+    ],
+  });
 
       videos = populated.long_videos
       for (let i = 0; i < videos.length; i++) {
@@ -895,7 +895,7 @@ const getCommunityVideos = async (req, res, next) => {
                 },
               ],
               options: {
-                sort: { season_number: 1, episode_number: 1 },
+                sort: { season_number: 1, episode_number: 1 , createdAt: -1},
               },
             },
           ],
@@ -1301,7 +1301,7 @@ module.exports = {
   getCommunityProfileDetails,
   getAllCommunities,
   getCommunityById,
-   getUserCommunities,
+  getUserCommunities,
   FollowCommunity,
   CreateCommunity,
   RenameCommunity,

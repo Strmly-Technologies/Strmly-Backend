@@ -7,28 +7,29 @@ const { getRedisClient } = require('../config/redis')
 
 const GlobalSearch = async (req, res, next) => {
   try {
-    const { query, limit = 10, page = 1 } = req.query
+    const { query, limit = 10, page = 1 } = req.query;
+    const currentUser = req.user.id.toString();
 
     if (!query || query.trim() === '') {
-      return res.status(400).json({ message: 'Search query is required' })
+      return res.status(400).json({ message: 'Search query is required' });
     }
-    const redis = getRedisClient()
-    const cacheKey = `global_search:${query}:${page}:${limit}`
+    const redis = getRedisClient();
+    const cacheKey = `global_search:${query}:${page}:${limit}`;
 
     if (redis) {
-      const cachedResult = await redis.get(cacheKey)
+      const cachedResult = await redis.get(cacheKey);
       if (cachedResult) {
-        console.log(`📦 Search cache HIT for query: ${query}`)
+        console.log(`📦 Search cache HIT for query: ${query}`);
         return res.status(200).json({
           ...JSON.parse(cachedResult),
           cached: true,
-        })
+        });
       }
     }
 
-    const searchRegex = new RegExp(query, 'i')
-    const skip = (page - 1) * limit
-    const limitNum = parseInt(limit)
+    const searchRegex = new RegExp(query, 'i');
+    const skip = (page - 1) * limit;
+    const limitNum = parseInt(limit);
 
     const [users, videos, series, communities] = await Promise.all([
       User.find({
@@ -41,8 +42,25 @@ const GlobalSearch = async (req, res, next) => {
       LongVideo.find({
         $or: [{ name: searchRegex }, { description: searchRegex }],
       })
-        .populate('created_by', 'username profile_photo')
-        .populate('series', 'title')
+        .populate('comments', '_id content user createdAt')
+        .populate('created_by', 'username profile_photo name custom_name')
+        .populate('community', 'name profile_photo followers')
+        .populate({
+          path: 'series',
+          populate: [
+            {
+              path: 'episodes',
+              select:
+                'name episode_number season_number thumbnailUrl views likes',
+              options: { sort: { season_number: 1, episode_number: 1 } },
+            },
+            {
+              path: 'created_by',
+              select: 'username profile_photo',
+            },
+          ],
+        })
+        .populate('liked_by', 'username profile_photo')
         .limit(limitNum)
         .skip(skip),
 
@@ -64,10 +82,35 @@ const GlobalSearch = async (req, res, next) => {
         .populate('founder', 'username profile_photo')
         .limit(limitNum)
         .skip(skip),
-    ])
+    ]);
 
     const totalResults =
-      users.length + videos.length + series.length + communities.length
+      users.length + videos.length + series.length + communities.length;
+
+    for (let i = 0; i < videos.length; i++) {
+      const videoObj = videos[i].toObject(); // Convert to plain JS object
+
+      await addDetailsToVideoObject(videoObj, currentUser);
+
+      videoObj.hasCreatorPassOfVideoOwner = await checkCreatorPass(
+        currentUser,
+        videoObj.created_by._id.toString()
+      );
+
+      const creatorPassDetails = await User.findById(
+        videoObj.created_by._id?.toString()
+      )
+        .lean()
+        .select(
+          'creator_profile.creator_pass_price'
+        );
+
+      if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+        videoObj.creatorPassDetails = creatorPassDetails;
+      }
+
+      videos[i] = videoObj; // Replace original doc with enriched plain object
+    }
 
     const result = {
       message: 'Search completed successfully',
@@ -78,7 +121,7 @@ const GlobalSearch = async (req, res, next) => {
         videos,
         series,
         communities,
-        
+
       },
       pagination: {
         currentPage: parseInt(page),
@@ -86,20 +129,19 @@ const GlobalSearch = async (req, res, next) => {
         hasMore: totalResults === limitNum * 3,
       },
       cached: false,
-    }
+    };
 
     // Cache the result for 5 minutes
     if (redis && totalResults > 0) {
-      await redis.setex(cacheKey, 300, JSON.stringify(result))
-      console.log(`💾 Search results cached for query: ${query}`)
+      await redis.setex(cacheKey, 300, JSON.stringify(result));
+      console.log(`💾 Search results cached for query: ${query}`);
     }
 
-    res.status(200).json(result)
+    res.status(200).json(result);
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
-
+};
 const searchFollowersOrFollowing = async (req, res, next) => {
   try {
     const { query, type, limit = 10, page = 1 } = req.query

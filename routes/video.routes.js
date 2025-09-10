@@ -18,6 +18,7 @@ const {
   getVideoTotalGifting,
   getUploadUrl,
   processUploadedVideo,
+  getAllVideos,
 } = require('../controller/video.controller')
 const { createImageMulter } = require('../utils/utils')
 
@@ -112,4 +113,7 @@ router.post(
   createImageMulter().single('thumbnail'), 
   processUploadedVideo
 )
+
+router.get('/all-videos',authenticateToken, getAllVideos)
+
 module.exports = router

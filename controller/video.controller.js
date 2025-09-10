@@ -1427,6 +1427,107 @@ const getVideoTotalGifting = async (req, res, next) => {
   }
 };
 
+
+const getAllVideos=async(req,res,next)=>{
+  try {
+    const userId=req.user.id.toString();
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+    const user= await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const viewedVideoIds = user.viewed_videos || [];
+    const videos=[]
+
+    const interestedVideos = await LongVideo.find({
+       visibility: { $ne: 'hidden' },
+      _id: { $nin: viewedVideoIds } // Exclude viewed videos
+    })
+      .lean()
+              .populate('created_by', 'username profile_photo custom_name')
+              .populate('community', 'name profile_photo followers')
+              .populate({
+                path: 'series',
+                populate: [
+                  {
+                    path: 'episodes',
+                    select:
+                      'name episode_number season_number thumbnailUrl views likes',
+                    options: { sort: { season_number: 1, episode_number: 1 } },
+                  },
+                  {
+                    path: 'created_by',
+                    select: 'username profile_photo',
+                  },
+                ],
+              })
+              .sort({ views: -1, likes: -1 })
+              .limit(Math.ceil(batchSize * 0.7));
+      
+            // Process each video with access check
+            for (let i = 0; i < interestedVideos.length; i++) {
+              let video = interestedVideos[i]; // Convert to plain object
+      
+              // Add following status
+              if (
+                video.created_by &&
+                followingIds.includes(video.created_by._id.toString())
+              ) {
+                video.is_following_creator = true;
+              } else {
+                video.is_following_creator = false;
+              }
+      
+              if (video.community) {
+                const isFollowing = video.community.followers.some(
+                  (followerId) => followerId.toString() === userId
+                );
+                video.is_following_community = isFollowing;
+              }
+              /*         if (video.start_time && video.display_till_time) {
+                video.start_time = video.start_time
+                video.display_till_time = video.display_till_time
+              } */
+      
+              const { checkCreatorPass } = require('./user.controller');
+              // Check access and add access field
+              video = await checkAccess(video, userId);
+              video.hasCreatorPassOfVideoOwner = await checkCreatorPass(userId, video.created_by._id.toString());
+              const creatorPassDetails = await User.findById(
+                video.created_by._id?.toString()
+              )
+                .lean()
+                .select(
+                  'creator_profile.creator_pass_price creator_profile.total_earned creator_profile.bank_verified creator_profile.verification_status creator_profile.creator_pass_deletion.deletion_requested creator_profile.bank_details.account_type'
+                );
+      
+              if (creatorPassDetails && Object.keys(creatorPassDetails).length > 0) {
+                video.creatorPassDetails = creatorPassDetails;
+              }
+              // check if user has liked the video
+              if (video.liked_by && video.liked_by.length > 0) {
+                video.is_liked_video = video.liked_by.some(
+                  (like) => like.user && like.user._id?.toString() === userId
+                );
+              }
+              interestedVideos[i] = video;
+            }
+            videos.push(...interestedVideos)
+            res.status(200).json({
+              message: 'Videos retrieved successfully',
+              data: videos,
+              pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(videos.length / limit),
+                totalResults: videos.length,
+              },
+            });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+}
+
 module.exports = {
   uploadVideo,
   searchVideos,
@@ -1446,4 +1547,5 @@ module.exports = {
   getVideoTotalGifting,
   getUploadUrl,
   processUploadedVideo,
+  getAllVideos
 };
