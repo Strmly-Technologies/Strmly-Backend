@@ -1441,7 +1441,6 @@ const getAllVideos = async (req, res, next) => {
     }
     
     const viewedVideoIds = (user.viewed_videos || []).map(id => {
-      // If already an ObjectId, use as is; otherwise convert
       return mongoose.Types.ObjectId.isValid(id) ? 
         (id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id)) : 
         null;
@@ -1463,7 +1462,7 @@ const getAllVideos = async (req, res, next) => {
         populate: [
           {
             path: 'episodes',
-            match: { _id: { $nin: viewedVideoIds } }, // ADD THIS LINE - Filter out viewed episodes
+            match: { _id: { $nin: viewedVideoIds } }, 
             select: 'name episode_number season_number thumbnailUrl views likes',
             options: { sort: { season_number: 1, episode_number: 1 } },
           },

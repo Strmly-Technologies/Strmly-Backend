@@ -34,6 +34,7 @@ const {
 } = require('../utils/utils')
 const { authenticateToken } = require('../middleware/auth')
 
+// route to get all videos 
 router.get('/all-videos',authenticateToken, getAllVideos)
 
 
@@ -116,6 +117,7 @@ router.post(
   createImageMulter().single('thumbnail'), 
   processUploadedVideo
 )
+
 
 
 module.exports = router
