@@ -1449,7 +1449,10 @@ const getAllVideos = async (req, res, next) => {
     console.log('Viewed Video IDs:', viewedVideoIds);
     const followingIds = (user.following || []).map((id) => id.toString());
 
-    const videos = [];
+    // Get total count for pagination (without skip/limit)
+    const totalCount = await LongVideo.countDocuments({
+      _id: { $nin: viewedVideoIds },
+    });
 
     const interestedVideos = await LongVideo.find({
       _id: { $nin: viewedVideoIds },
@@ -1472,11 +1475,13 @@ const getAllVideos = async (req, res, next) => {
           },
         ],
       })
-      .sort({ views: -1, likes: -1 });
+      .sort({ views: -1, likes: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
     // Process each video with access check
     for (let i = 0; i < interestedVideos.length; i++) {
-      let video = interestedVideos[i]; // Convert to plain object
+      let video = interestedVideos[i];
 
       // Add following status
       if (
@@ -1521,16 +1526,18 @@ const getAllVideos = async (req, res, next) => {
       
       interestedVideos[i] = video;
     }
-    
-    videos.push(...interestedVideos);
-    
+
     res.status(200).json({
       message: 'Videos retrieved successfully',
-      data: videos,
+      data: interestedVideos,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(videos.length / limit),
-        totalResults: videos.length,
+        totalPages: Math.ceil(totalCount / limit),
+        totalResults: totalCount,
+        hasNextPage: parseInt(page) < Math.ceil(totalCount / limit),
+        hasPreviousPage: parseInt(page) > 1,
+        resultsPerPage: parseInt(limit),
+        resultsOnThisPage: interestedVideos.length
       },
     });
   } catch (error) {
