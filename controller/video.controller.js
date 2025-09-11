@@ -23,6 +23,7 @@ const fs = require('fs');
 const Series = require('../models/Series');
 const { randomUUID } = require('crypto');
 const { addVideoToProcessingQueue } = require('../utils/videoProcessingQueue');
+const { checkAccess } = require('./recommendation.controller');
 
 
 const getUploadUrl = async (req, res, next) => {
@@ -1438,6 +1439,8 @@ const getAllVideos=async(req,res,next)=>{
       return res.status(404).json({ message: 'User not found' });
     }
     const viewedVideoIds = user.viewed_videos || [];
+    const followingIds = (user.following || []).map((id) => id.toString());
+
     const videos=[]
 
     const interestedVideos = await LongVideo.find({
@@ -1463,7 +1466,6 @@ const getAllVideos=async(req,res,next)=>{
                 ],
               })
               .sort({ views: -1, likes: -1 })
-              .limit(Math.ceil(batchSize * 0.7));
       
             // Process each video with access check
             for (let i = 0; i < interestedVideos.length; i++) {

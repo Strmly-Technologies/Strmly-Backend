@@ -34,6 +34,9 @@ const {
 } = require('../utils/utils')
 const { authenticateToken } = require('../middleware/auth')
 
+router.get('/all-videos',authenticateToken, getAllVideos)
+
+
 // Route to upload a new video
 //videoFile needed
 //accepts: FormData(name, description, genre, type, language, age_restriction, communityId, seriesId, videoFile)
@@ -114,6 +117,5 @@ router.post(
   processUploadedVideo
 )
 
-router.get('/all-videos',authenticateToken, getAllVideos)
 
 module.exports = router
