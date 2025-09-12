@@ -1446,7 +1446,6 @@ const getAllVideos = async (req, res, next) => {
         null;
     }).filter(Boolean);
     
-    console.log('Viewed Video IDs:', viewedVideoIds);
     const followingIds = (user.following || []).map((id) => id.toString());
 
     // Get total count for pagination (without skip/limit)
@@ -1475,9 +1474,17 @@ const getAllVideos = async (req, res, next) => {
           },
         ],
       })
-      .sort({ views: -1, likes: -1 })
       .skip(skip)
       .limit(parseInt(limit));
+
+       interestedVideos.sort((a,b)=>{
+      const scoreA=addPreferenceScore(a,user);
+      const scoreB=addPreferenceScore(b,user);
+      if(scoreA!==scoreB){
+        return scoreB-scoreA; // Descending order
+      }
+      return new Date(b.createdAt)-new Date(a.createdAt); // Newest first if scores are equal
+    })
 
     // Process each video with access check
     for (let i = 0; i < interestedVideos.length; i++) {
@@ -1527,6 +1534,7 @@ const getAllVideos = async (req, res, next) => {
       interestedVideos[i] = video;
     }
 
+
     res.status(200).json({
       message: 'Videos retrieved successfully',
       data: interestedVideos,
@@ -1544,6 +1552,30 @@ const getAllVideos = async (req, res, next) => {
     handleError(error, req, res, next);
   }
 };
+// Create a scoring system based on user preferences
+const addPreferenceScore = (video, user) => {
+  let score = 0;
+  
+  // Interest matching (higher weight)
+  if (user.interests && user.interests.includes(video.genre)) {
+    score += 100;
+  }
+  
+  // Following creator (high weight)
+  if (user.following && user.following.includes(video.created_by._id)) {
+    score += 80;
+  }
+  
+  // Community following (medium weight)
+  if (video.community && user.following_communities.includes(video.community._id)) {
+    score += 60;
+  }
+  
+  // Popular videos (low weight)
+  score += (video.views * 0.1) + (video.likes * 0.5);
+  
+  return score;
+}
 module.exports = {
   uploadVideo,
   searchVideos,
