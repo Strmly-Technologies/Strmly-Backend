@@ -4,6 +4,8 @@ const LongVideo = require('../models/LongVideo')
 const Series = require('../models/Series')
 const Community = require('../models/Community')
 const { getRedisClient } = require('../config/redis')
+const { addDetailsToVideoObject } = require('../utils/populateVideo')
+const { checkCreatorPass } = require('./user.controller')
 
 const GlobalSearch = async (req, res, next) => {
   try {
