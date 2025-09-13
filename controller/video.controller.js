@@ -1447,6 +1447,7 @@ const getAllVideos = async (req, res, next) => {
     }).filter(Boolean);
     
     const followingIds = (user.following || []).map((id) => id.toString());
+    console.log('Viewed Video IDs:', viewedVideoIds);
 
     // Get total count for pagination (without skip/limit)
     const totalCount = await LongVideo.countDocuments({

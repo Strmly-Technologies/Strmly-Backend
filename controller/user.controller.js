@@ -322,7 +322,6 @@ const UpdateUserProfile = async (req, res, next) => {
   }
 };
 const GetUserCommunities = async (req, res, next) => {
-  console.log("handler func", typeof (handleError));
   try {
     const userId = req.user.id.toString();
     const { type = 'all' } = req.query;
@@ -381,14 +380,12 @@ const GetUserCommunities = async (req, res, next) => {
 };
 
 const GetUserVideos = async (req, res, next) => {
-  console.log("handler func", typeof (handleError));
   try {
     const userId = req.user.id.toString();
     const type = req.query.type || 'uploaded';
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    console.log('working');
 
     let videos;
 
