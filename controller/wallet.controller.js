@@ -824,6 +824,8 @@ const transferCommunityFee = async (req, res, next) => {
     const { communityId, amount, feeNote } = req.body;
     const creatorId = req.user.id.toString();
 
+
+
     if (!communityId || !amount) {
       return res.status(400).json({
         success: false,
@@ -864,6 +866,15 @@ const transferCommunityFee = async (req, res, next) => {
         code: 'COMMUNITY_NOT_FOUND',
       });
     }
+    // check if community has reached its creator limit
+    if(community.creators.length==community.creator_limit){
+      return res.status(400).json({
+        success: false,
+        error: 'Community has reached its creator limit',
+        code: 'COMMUNITY_CREATOR_LIMIT_REACHED',
+      });
+    }
+    
 
     const founderId = community.founder._id.toString();
 

@@ -20,6 +20,7 @@ const {
   makeFirstJoinedCreatorFounder,
   getCommunityFollowingStatus,
   UpdateCommunitySettingsAccess,
+  checkFollowStatus,
 } = require('../controller/community.controller')
 
 const {
@@ -31,6 +32,8 @@ const { authenticateToken } = require('../middleware/auth')
 
 // API to create a community
 router.post('/create', authenticateToken,communityProfilePhotoUpload,CreateCommunity)
+
+router.post('follow/status',authenticateToken, checkFollowStatus)
 
 router.post('/update-settings',authenticateToken, UpdateCommunitySettingsAccess)
 

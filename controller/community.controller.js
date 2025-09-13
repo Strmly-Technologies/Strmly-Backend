@@ -571,6 +571,9 @@ const getCommunityById = async (req, res, next) => {
       return res.status(404).json({ message: 'Community not found' })
     }
 
+    // community pass available to purchase or not
+     community.available_for_purchase=community.creators.length<community.creator_limit
+
     const userId = req.user.id
     if (!userId) {
       return res.status(200).json(community)
@@ -623,7 +626,6 @@ const getCommunityById = async (req, res, next) => {
 }
 
 const getUserCommunities = async (req, res, next) => {
-  console.log("handler func", typeof(handleError))
   try {
     const userId = req.user.id.toString()
     const { type = 'all' } = req.query
@@ -1296,6 +1298,34 @@ const getCommunityFollowingStatus = async (req, res, next) => {
   }
 }
 
+const checkFollowStatus = async (req,res,next) => {
+  try{
+    const userId = req.user.id.toString()
+    const { communityId } = req.body
+    if(!communityId){
+      return res.status(400).json({ message: 'Community ID is required' })
+    }
+    const community = await Community.findById(communityId).select('followers')
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' })
+    }
+    const isFollowing = community.followers?.some(follower => follower.toString() === userId) || false
+    return res.status(200).json({
+      message: 'Follow status retrieved successfully',
+      isFollowing
+    })
+  }
+  catch(error){
+    handleError(error, req, res, next)
+  }
+}
+
+
+
+
+
+
+
 
 module.exports = {
   getCommunityProfileDetails,
@@ -1319,5 +1349,6 @@ module.exports = {
   makeFirstJoinedCreatorFounder,
   handleFounderLeaving,
   getCommunityFollowingStatus,
-  UpdateCommunitySettingsAccess
+  UpdateCommunitySettingsAccess,
+  checkFollowStatus,
 }
