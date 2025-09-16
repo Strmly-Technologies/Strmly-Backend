@@ -44,7 +44,15 @@ const CreateCommunity = async (req, res, next) => {
       profilePhotoUrl = uploadResult.Location
       console.log('✅ Community image uploaded:', profilePhotoUrl)
     }
-
+    // check if community with same name already exists
+    const existingCommunity = await Community.findOne({ name })
+    if (existingCommunity) {
+      return res.json({
+        success: false,
+        error: 'Community with this name already exists',
+        code: 'COMMUNITY_NAME_EXISTS'
+      })
+    }
     const newCommunity = new Community({
       name,
       bio: bio || '',
