@@ -49,7 +49,7 @@ const CreateCommunity = async (req, res, next) => {
     if (existingCommunity) {
       return res.json({
         success: false,
-        error: 'Community with this name already exists',
+        message: 'Community with this name already exists',
         code: 'COMMUNITY_NAME_EXISTS'
       })
     }
