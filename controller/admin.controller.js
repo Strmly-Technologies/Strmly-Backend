@@ -1663,6 +1663,59 @@ const ignoreVideo=async(req,res,next)=>{
 
 }
 
+const addMoneyToWallet=async(req,res,next)=>{
+  const {userId}=req.params
+  const {amount}=req.body
+  try {
+    if(!amount || amount<=0){
+      return res.status(400).json({message:'Invalid amount'})
+    }
+    const userWallet=await Wallet.findOne({user_id:userId});
+    if(!userWallet){
+      return res.status(404).json({message:'Wallet not found for user'})
+    }
+    const balanceBefore=userWallet.balance
+    userWallet.balance=Number(balanceBefore)+Number(amount)
+    await userWallet.save()
+    
+    const transaction=new WalletTransaction({
+      wallet_id:userWallet._id,
+      user_id:userId,
+      transaction_type:'credit',
+      transaction_category:'admin_adjustment',
+      amount:amount,
+      currency:'INR',
+      description:'Admin added money to wallet',
+      balance_before:balanceBefore,
+      balance_after:userWallet.balance,
+      status:'completed',
+      metadata:{
+        admin_adjustment:true
+      }
+    })
+    await transaction.save()
+    res.status(200).json({
+      success:true,
+      message:`₹${amount} added to user's wallet successfully`,
+      wallet:{
+        id:userWallet._id,
+        balance:userWallet.balance
+      },
+      transaction:{
+        id:transaction._id,
+        amount:transaction.amount,
+        type:transaction.transaction_type,
+        category:transaction.transaction_category,
+        status:transaction.status,
+        createdAt:transaction.createdAt
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+    
+  }
+}
+
 module.exports = {
   adminLogin,
   getAdminDashboard,
@@ -1687,4 +1740,5 @@ module.exports = {
   DeleteCopyVideo,
   ignoreVideo,
   getCommentGiftings,
+  addMoneyToWallet
 }

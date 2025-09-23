@@ -23,6 +23,7 @@ const {
   DeleteCopyVideo,
   ignoreVideo,
   getCommentGiftings,
+  addMoneyToWallet,
 } = require('../controller/admin.controller')
 const { authenticateAdmin } = require('../middleware/adminAuth')
 
@@ -59,5 +60,7 @@ router.get('/user/:userId/violations', authenticateAdmin, getViolationsByUser)
 router.delete('/video/:videoId/:type', authenticateAdmin, DeleteCopyVideo)
 // ignore video
 router.post('/video/:videoId/ignore/:type',authenticateAdmin,ignoreVideo)
+
+router.post('/wallet/add/:userId',authenticateAdmin,addMoneyToWallet)
 
 module.exports = router
