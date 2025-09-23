@@ -35,6 +35,7 @@ const walletTransactionSchema = new mongoose.Schema(
         'community_fee',
         'community_subscription',
         'community_fee_received',
+        'admin_adjustment',
       ],
     },
     amount: {

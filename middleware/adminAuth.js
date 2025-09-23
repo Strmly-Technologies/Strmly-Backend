@@ -33,7 +33,7 @@ const authenticateAdmin = (req, res, next) => {
 
   // Verify JWT token
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
     if (decoded.admin && decoded.username === ADMIN_CREDENTIALS.username) {
       req.admin = decoded
       next()
