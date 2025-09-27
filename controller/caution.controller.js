@@ -453,15 +453,17 @@ const reportContent = async (req, res, next) => {
   try {
     const userId = req.user.id
     const { contentId, contentype, reason, description } = req.body
+    
     if (!contentId || !contentype || !reason) {
-      return res
-        .status(400)
-        .json({ message: 'Content ID, type and reason are required' })
+      return res.status(400).json({ 
+        message: 'Content ID, type and reason are required' 
+      })
     }
+    
     const existingReport = await Report.findOne({
-      reporter_id,
-      content_type,
-      content_id,
+      reporter_id: userId,      
+      content_type: contentype,  
+      content_id: contentId,    
     })
 
     if (existingReport) {
@@ -470,6 +472,7 @@ const reportContent = async (req, res, next) => {
         message: 'You have already reported this content',
       })
     }
+    
     const report = new Report({
       reporter_id: userId,
       content_id: contentId,
@@ -477,7 +480,9 @@ const reportContent = async (req, res, next) => {
       reason,
       description,
     })
+    
     await report.save()
+    
     res.status(201).json({
       success: true,
       message: 'Report submitted successfully',
@@ -493,6 +498,7 @@ const reportContent = async (req, res, next) => {
     handleError(error, req, res, next)
   }
 }
+
 
 const getUserReports = async (req, res, next) => {
   try {
