@@ -186,175 +186,169 @@ const createWalletLoadOrder = async (req, res, next) => {
 };
 
 const verifyWalletLoad = async (req, res, next) => {
+  console.log("=== verifyWalletLoad START ===");
   try {
     const {
       google_purchase_token,
       google_product_id,
       google_order_id,
-      amount, //send the original amount not after the 15%cut
+      amount, // send the original amount not after the 15% cut
     } = req.body;
-    console.log(req.body);
-    const userId = req.user.id.toString();
-    console.log("user:",userId);
 
+    console.log("Request body:", req.body);
+
+    const userId = req.user.id.toString();
+    console.log("User ID:", userId);
+
+    // Input validation
     if (!google_purchase_token || !google_product_id || !google_order_id) {
+      console.warn("Missing required fields:", {
+        google_purchase_token,
+        google_product_id,
+        google_order_id,
+      });
       return res.status(400).json({
         success: false,
-        error: 'Missing required payment verification fields',
-        code: 'MISSING_PAYMENT_FIELDS',
+        error: "Missing required payment verification fields",
+        code: "MISSING_PAYMENT_FIELDS",
       });
     }
+
     const amountValidation = validateAmount(amount);
     if (!amountValidation.isValid) {
+      console.warn("Invalid amount:", amount);
       return res.status(400).json({
         error: amountValidation.error,
-        code: 'INVALID_AMOUNT',
+        code: "INVALID_AMOUNT",
       });
     }
-    /*     if (
-      typeof razorpay_order_id !== 'string' ||
-      !razorpay_order_id.startsWith('order_')
-    ) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid order ID format',
-        code: 'INVALID_ORDER_ID',
-      })
-    } */
 
-    /*     if (
-      typeof razorpay_payment_id !== 'string' ||
-      !razorpay_payment_id.startsWith('pay_')
-    ) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid payment ID format',
-        code: 'INVALID_PAYMENT_ID',
-      })
-    } */
-
-    /*     const generated_signature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(razorpay_order_id + '|' + razorpay_payment_id)
-      .digest('hex')
-
-    if (generated_signature !== razorpay_signature) {
-      return res.status(400).json({
-        success: false,
-        error: 'Payment verification failed. Invalid signature.',
-        code: 'SIGNATURE_VERIFICATION_FAILED',
-      })
-    }
- */
+    // Duplicate transaction check
+    console.log("Checking for existing transaction...");
     const existingTransaction = await WalletTransaction.findOne({
       google_order_id: google_order_id,
       user_id: userId,
     });
 
     if (existingTransaction) {
+      console.warn("Duplicate transaction detected:", existingTransaction._id);
       return res.status(400).json({
         success: false,
-        error: 'Payment already processed',
-        code: 'PAYMENT_ALREADY_PROCESSED',
+        error: "Payment already processed",
+        code: "PAYMENT_ALREADY_PROCESSED",
       });
     }
 
-    let payment;
-
-    payment = await verifyGooglePurchase(
+    // Verify purchase with Google
+    console.log("Verifying purchase with Google Play API...");
+    let payment = await verifyGooglePurchase(
       google_product_id,
       google_purchase_token
     );
-    console.log("payment verify details ",payment);
+    console.log("Google purchase verification result:", payment);
 
     if (!payment.valid) {
-      console.log(payment);
+      console.error("Payment verification failed:", payment.reason);
       return res.status(400).json({
         success: false,
-        error: 'Payment not captured successfully',
-        code: 'PAYMENT_NOT_CAPTURED',
+        error: "Payment not captured successfully",
+        code: "PAYMENT_NOT_CAPTURED",
       });
     }
 
+    // Wallet lookup
+    console.log("Fetching user wallet...");
     const wallet = await Wallet.findOne({ user_id: userId });
     if (!wallet) {
+      console.error("Wallet not found for user:", userId);
       return res.status(404).json({
         success: false,
-        error: 'wallet not found',
-        code: 'WALLET_NOT _FOUND',
+        error: "wallet not found",
+        code: "WALLET_NOT_FOUND",
       });
     }
+
     const balanceBefore = wallet.balance;
     const balanceAfter = balanceBefore + amount;
+    console.log("Balance before:", balanceBefore, "Balance after:", balanceAfter);
 
     const session = await mongoose.startSession();
     let walletTransaction;
 
     try {
+      console.log("Starting wallet transaction...");
       await session.withTransaction(async () => {
         walletTransaction = new WalletTransaction({
           wallet_id: wallet._id,
           user_id: userId,
-          transaction_type: 'credit',
-          transaction_category: 'wallet_load',
+          transaction_type: "credit",
+          transaction_category: "wallet_load",
           amount: amount,
-          currency: 'INR',
+          currency: "INR",
           description: `Loaded ₹${amount} from bank to wallet`,
           balance_before: balanceBefore,
           balance_after: balanceAfter,
           google_product_id: google_product_id,
           google_order_id: google_order_id,
-          status: 'completed',
+          status: "completed",
         });
 
+        console.log("Saving wallet transaction...");
         await walletTransaction.save({ session });
 
         wallet.balance = balanceAfter;
         wallet.total_loaded += amount;
-
         wallet.last_transaction_at = new Date();
+
+        console.log("Updating wallet balance and totals...");
         await wallet.save({ session });
       });
 
       await session.endSession();
+      console.log("Transaction committed successfully");
 
       res.status(200).json({
         success: true,
-        message: 'Wallet loaded successfully!',
+        message: "Wallet loaded successfully!",
         transaction: {
           id: walletTransaction._id,
           amount: amount,
           balanceBefore: balanceBefore,
           balanceAfter: balanceAfter,
           date: new Date(),
-          source: 'bank_transfer',
+          source: "bank_transfer",
         },
         wallet: {
           balance: wallet.balance,
           totalLoaded: wallet.total_loaded,
         },
         nextSteps: {
-          message:
-            'You can now transfer money to creators to buy their content',
+          message: "You can now transfer money to creators to buy their content",
           availableActions: [
-            'Buy series from creators',
-            'Purchase individual videos',
-            'Send tips to creators',
+            "Buy series from creators",
+            "Purchase individual videos",
+            "Send tips to creators",
           ],
         },
       });
     } catch (transactionError) {
+      console.error("Error during wallet transaction:", transactionError);
       await session.abortTransaction();
       throw transactionError;
     } finally {
       if (session.inTransaction()) {
+        console.warn("Session still in transaction. Ending session...");
         await session.endSession();
       }
     }
   } catch (error) {
+    console.error("Unexpected error in verifyWalletLoad:", error);
     handleError(error, req, res, next);
+  } finally {
+    console.log("=== verifyWalletLoad END ===");
   }
 };
+
 
 const transferToCreatorForSeries = async (req, res, next) => {
   try {
