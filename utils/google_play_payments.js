@@ -1,3 +1,4 @@
+
 const { google } = require('googleapis')
 const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT)
 const packageName = process.env.GOOGLE_PACKAGE_NAME
@@ -16,6 +17,7 @@ async function verifyGooglePurchase(productId, purchaseToken) {
     auth: authClient,
   })
 
+  console.log(`productId: ${productId}, purchaseToken: ${purchaseToken}`)
   try {
     const res = await androidPublisher.purchases.products.get({
       packageName,
@@ -24,13 +26,14 @@ async function verifyGooglePurchase(productId, purchaseToken) {
     })
 
     const purchase = res.data
+    console.log('purchase', purchase);
 
     if (purchase.purchaseState === 0) {
       // Check if already acknowledged
       if (purchase.acknowledgementState === 0) {
         await androidPublisher.purchases.products.acknowledge({
           packageName,
-          productId: purchase.productId,
+          productId: productId,
           token: purchaseToken,
           requestBody: {},
         })
