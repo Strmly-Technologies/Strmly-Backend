@@ -193,8 +193,9 @@ const verifyWalletLoad = async (req, res, next) => {
       google_order_id,
       amount, //send the original amount not after the 15%cut
     } = req.body;
-
+    console.log(req.body);
     const userId = req.user.id.toString();
+    console.log("user:",userId);
 
     if (!google_purchase_token || !google_product_id || !google_order_id) {
       return res.status(400).json({
@@ -264,6 +265,7 @@ const verifyWalletLoad = async (req, res, next) => {
       google_product_id,
       google_purchase_token
     );
+    console.log("payment verify details ",payment);
 
     if (!payment.valid) {
       console.log(payment);
