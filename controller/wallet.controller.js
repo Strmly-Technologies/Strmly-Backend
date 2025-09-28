@@ -201,11 +201,10 @@ const verifyWalletLoad = async (req, res, next) => {
     console.log("User ID:", userId);
 
     // Input validation
-    if (!google_purchase_token || !google_product_id || !google_order_id) {
+    if (!google_purchase_token || !google_product_id) {
       console.warn("Missing required fields:", {
         google_purchase_token,
         google_product_id,
-        google_order_id,
       });
       return res.status(400).json({
         success: false,
@@ -224,11 +223,11 @@ const verifyWalletLoad = async (req, res, next) => {
     }
 
     // Duplicate transaction check
-    console.log("Checking for existing transaction...");
-    const existingTransaction = await WalletTransaction.findOne({
-      google_order_id: google_order_id,
-      user_id: userId,
-    });
+    //console.log("Checking for existing transaction...");
+    // const existingTransaction = await WalletTransaction.findOne({
+    //   google_order_id: google_order_id,
+    //   user_id: userId,
+    // });
 
     if (existingTransaction) {
       console.warn("Duplicate transaction detected:", existingTransaction._id);
