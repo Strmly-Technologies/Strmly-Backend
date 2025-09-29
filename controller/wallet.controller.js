@@ -222,12 +222,12 @@ const verifyWalletLoad = async (req, res, next) => {
       });
     }
 
-    // Duplicate transaction check
-    //console.log("Checking for existing transaction...");
-    // const existingTransaction = await WalletTransaction.findOne({
-    //   google_order_id: google_order_id,
-    //   user_id: userId,
-    // });
+    //Duplicate transaction check
+    console.log("Checking for existing transaction...");
+    const existingTransaction = await WalletTransaction.findOne({
+      google_order_id: google_order_id,
+      user_id: userId,
+    });
 
     if (existingTransaction) {
       console.warn("Duplicate transaction detected:", existingTransaction._id);
@@ -238,7 +238,7 @@ const verifyWalletLoad = async (req, res, next) => {
       });
     }
 
-    // Verify purchase with Google
+    // Verify purchase with Google.
     console.log("Verifying purchase with Google Play API...");
     let payment = await verifyGooglePurchase(
       google_product_id,
@@ -288,7 +288,7 @@ const verifyWalletLoad = async (req, res, next) => {
           balance_before: balanceBefore,
           balance_after: balanceAfter,
           google_product_id: google_product_id,
-          google_order_id: google_order_id,
+          google_order_id: payment.purchase?.orderId,
           status: "completed",
         });
 
