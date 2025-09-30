@@ -14,6 +14,7 @@ const {
   cancelAccountDeletionRequest
 } = require('../controller/caution.controller')
 const { authenticateToken } = require('../middleware/auth')
+const { createMultipleImagesMulter } = require('../utils/utils')
 
 // API to delete a long video
 router.delete('/video/long/:videoId', authenticateToken, DeleteLongVideo)
@@ -47,7 +48,11 @@ router.patch(
 )
 
 // API to report content (video, community, user)
-router.post('/report', authenticateToken, reportContent)
+router.post('/report',
+   authenticateToken,
+   createMultipleImagesMulter().array('evidenceImages', 5), // Allow up to 5 images
+    reportContent
+  )
 
 // API to get user reports
 router.get('/reports', authenticateToken, getUserReports)

@@ -28,6 +28,10 @@ const reportSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'reviewed', 'resolved', 'dismissed'],
     default: 'pending'
+  },
+  evidence_images:{
+    type:[String],
+    default:[]
   }
 }, {
   timestamps: true
