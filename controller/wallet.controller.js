@@ -12,6 +12,8 @@ const User = require('../models/User');
 const Community = require('../models/Community');
 const { handleError } = require('../utils/utils');
 const { checkCreatorPassAccess } = require('./creatorpass.controller');
+const { verifyApplePurchase } = require('../utils/verify_apple_payment');
+ 
 
 const MAX_WALLET_LOAD = 50000;
 const MIN_WALLET_LOAD = 0;
@@ -189,10 +191,10 @@ const verifyWalletLoad = async (req, res, next) => {
   console.log("=== verifyWalletLoad START ===");
   try {
     const {
-      google_purchase_token,
+      purchase_token,
       google_product_id,
-      google_order_id,
-      amount, // send the original amount not after the 15% cut
+      amount,
+      platform
     } = req.body;
 
     console.log("Request body:", req.body);
@@ -201,9 +203,9 @@ const verifyWalletLoad = async (req, res, next) => {
     console.log("User ID:", userId);
 
     // Input validation
-    if (!google_purchase_token || !google_product_id) {
+    if (!purchase_token || !google_product_id) {
       console.warn("Missing required fields:", {
-        google_purchase_token,
+        purchase_token,
         google_product_id,
       });
       return res.status(400).json({
@@ -225,8 +227,9 @@ const verifyWalletLoad = async (req, res, next) => {
     //Duplicate transaction check
     console.log("Checking for existing transaction...");
     const existingTransaction = await WalletTransaction.findOne({
-      google_order_id: google_order_id,
+     purchase_token: purchase_token,
       user_id: userId,
+      platform:platform
     });
 
     if (existingTransaction) {
@@ -239,12 +242,16 @@ const verifyWalletLoad = async (req, res, next) => {
     }
 
     // Verify purchase with Google.
-    console.log("Verifying purchase with Google Play API...");
-    let payment = await verifyGooglePurchase(
-      google_product_id,
-      google_purchase_token
-    );
-    console.log("Google purchase verification result:", payment);
+    let payment;
+if (platform === "android") {
+  console.log("Verifying purchase with Google Play API...");
+  payment = await verifyGooglePurchase(google_product_id, purchase_token);
+  console.log("Google verification successful:");
+} else if (platform === "ios") {
+  console.log("Verifying purchase with Apple Store API...");
+  payment = await verifyApplePurchase(purchase_token);
+  console.log("Apple verification successful:");
+}
 
     if (!payment.valid) {
       console.error("Payment verification failed:", payment.reason);
@@ -287,9 +294,11 @@ const verifyWalletLoad = async (req, res, next) => {
           description: `Loaded ₹${amount} from bank to wallet`,
           balance_before: balanceBefore,
           balance_after: balanceAfter,
+          purchase_token: purchase_token,
           google_product_id: google_product_id,
-          google_order_id: payment.purchase?.orderId,
+          google_order_id: platform=='android'?payment.purchase?.orderId:null,
           status: "completed",
+          platform:platform,
         });
 
         console.log("Saving wallet transaction...");

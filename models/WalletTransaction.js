@@ -79,14 +79,21 @@ const walletTransactionSchema = new mongoose.Schema(
     razorpay_order_id: {
       type: String,
     },
-
     google_product_id: {
-      //frontend sets it
       type: String,
     },
     google_order_id: {
-      //google sets it
       type: String,
+    },
+    purchase_token: {
+      type: String,
+    },
+    apple_product_id: {
+      type: String,
+    },
+    platform:{
+      type:String,
+      enum:['ios','android']
     },
     status: {
       type: String,
@@ -110,7 +117,7 @@ const walletTransactionSchema = new mongoose.Schema(
       },
     },
   },
-  { timestamps: true }
+  {timestamps: true }
 )
 
 // Indexes for better performance

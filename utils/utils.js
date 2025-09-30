@@ -16,6 +16,28 @@ const {
   GooglePaymentsError,
 } = require('./errors')
 
+const createMultipleImagesMulter=()=>{
+  const fileFilter=(req,file,cb)=>{
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/jpg',
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed (JPG, PNG, GIF, WEBP)'));
+    }
+  };
+return multer({
+    storage: multer.memoryStorage(),
+    fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit per image
+  });
+};
+
 const dynamicVideoUpload = (req, res, next) => {
   const fileFilter = (req, file, cb) => {
     const allowedMimeTypes = ['video/mp4']
@@ -731,4 +753,5 @@ module.exports = {
   generatePresignedUploadUrl,
   formatDuration,
   processVideoMetadata,
+  createMultipleImagesMulter
 }

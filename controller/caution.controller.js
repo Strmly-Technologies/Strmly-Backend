@@ -451,37 +451,58 @@ const removeFounderFromCommunity = async (req, res, next) => {
 
 const reportContent = async (req, res, next) => {
   try {
-    const userId = req.user.id
-    const { contentId, contentype, reason, description } = req.body
+    const userId = req.user.id;
+    const { contentId, contentype, reason, description } = req.body;
     
     if (!contentId || !contentype || !reason) {
       return res.status(400).json({ 
         message: 'Content ID, type and reason are required' 
-      })
+      });
     }
     
+    // Check for existing report
     const existingReport = await Report.findOne({
       reporter_id: userId,      
       content_type: contentype,  
       content_id: contentId,    
-    })
+    });
 
     if (existingReport) {
       return res.status(400).json({
         success: false,
         message: 'You have already reported this content',
-      })
+      });
     }
     
+    // Handle uploaded images
+    const imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const imageKey = `report-evidence/${uuidv4()}-${file.originalname}`;
+        
+        await s3.upload({
+          Bucket: process.env.AWS_S3_BUCKET,
+          Key: imageKey,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        }).promise();
+        
+        const imageUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${imageKey}`;
+        imageUrls.push(imageUrl);
+      }
+    }
+    
+    // Create and save the report
     const report = new Report({
       reporter_id: userId,
       content_id: contentId,
       content_type: contentype,
       reason,
       description,
-    })
+      evidence_images: imageUrls
+    });
     
-    await report.save()
+    await report.save();
     
     res.status(201).json({
       success: true,
@@ -491,13 +512,14 @@ const reportContent = async (req, res, next) => {
         content_type: report.content_type,
         reason: report.reason,
         status: report.status,
+        evidence_images: report.evidence_images,
         createdAt: report.createdAt,
       },
-    })
+    });
   } catch (error) {
-    handleError(error, req, res, next)
+    handleError(error, req, res, next);
   }
-}
+};
 
 
 const getUserReports = async (req, res, next) => {
