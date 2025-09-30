@@ -475,20 +475,24 @@ const reportContent = async (req, res, next) => {
     }
     
     // Handle uploaded images
-    const imageUrls = [];
+    let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const imageKey = `report-evidence/${uuidv4()}-${file.originalname}`;
-        
-        await s3.upload({
-          Bucket: process.env.AWS_S3_BUCKET,
-          Key: imageKey,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-        }).promise();
-        
-        const imageUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${imageKey}`;
-        imageUrls.push(imageUrl);
+      try {
+        const uploadPromises = req.files.map(file => {
+          const imageKey = `report-evidence/${uuidv4()}-${file.originalname}`;
+          return s3.upload({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: imageKey,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+          }).promise().then(() => {
+            return `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${imageKey}`;
+          });
+        });
+        imageUrls = await Promise.all(uploadPromises);
+      } catch (uploadError) {
+        // If any upload fails, throw to be caught by outer catch
+        throw new Error('Failed to upload one or more evidence images to S3.');
       }
     }
     
