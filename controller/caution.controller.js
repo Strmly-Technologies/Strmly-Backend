@@ -9,6 +9,8 @@ const {
   sendAccountDeletionRequestEmail,
   sendDeletionRequestEmailToUser,
 } = require('../utils/email')
+const { s3 } = require('../config/AWS')
+const uuidv4 = require('uuid').v4
 
 const DeleteLongVideo = async (req, res, next) => {
   const { videoId } = req.params

@@ -14,10 +14,12 @@ const { sendEmail } = require('../utils/email')
 const WalletTransfer = require('../models/WalletTransfer')
 const AutoNSFW = require('../models/AutoNSFW')
 const AutoCopyright = require('../models/AutoCopyright')
+const Report = require('../models/Report')
 
 const adminLogin = async (req, res, next) => {
   try {
     const { username, password } = req.body
+    console.log("received")
 
     if (!username || !password) {
       return res.status(400).json({
@@ -406,6 +408,7 @@ const getReports=async(req,res,next)=>{
         }
       })
     )
+    console.log(reportsWithContent)
   res.status(200).json({
       success: true,
       reports: reportsWithContent,
