@@ -375,7 +375,7 @@ const getReports=async(req,res,next)=>{
           switch (report.content_type) {
             case 'video':
               contentDetails = await LongVideo.findById(report.content_id)
-                .select('name description thumbnailUrl created_by')
+                .select('name description thumbnailUrl created_by videoUrl')
                 .populate('created_by', 'username')
               break
             case 'comment':
