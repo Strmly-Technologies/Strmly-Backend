@@ -191,8 +191,8 @@ const verifyWalletLoad = async (req, res, next) => {
   console.log("=== verifyWalletLoad START ===");
   try {
     const {
-      purchase_token,
-      google_product_id,
+      receiptOrToken,
+      product_id,
       amount,
       platform
     } = req.body;
@@ -203,10 +203,10 @@ const verifyWalletLoad = async (req, res, next) => {
     console.log("User ID:", userId);
 
     // Input validation
-    if (!purchase_token || !google_product_id) {
+    if (!receiptOrToken || !product_id) {
       console.warn("Missing required fields:", {
-        purchase_token,
-        google_product_id,
+        receiptOrToken,
+        product_id,
       });
       return res.status(400).json({
         success: false,
@@ -227,9 +227,9 @@ const verifyWalletLoad = async (req, res, next) => {
     //Duplicate transaction check
     console.log("Checking for existing transaction...");
     const existingTransaction = await WalletTransaction.findOne({
-     purchase_token: purchase_token,
+      purchase_token: receiptOrToken,
       user_id: userId,
-      platform:platform
+      platform: platform
     });
 
     if (existingTransaction) {
@@ -243,15 +243,15 @@ const verifyWalletLoad = async (req, res, next) => {
 
     // Verify purchase with Google.
     let payment;
-if (platform === "android") {
-  console.log("Verifying purchase with Google Play API...");
-  payment = await verifyGooglePurchase(google_product_id, purchase_token);
-  console.log("Google verification successful:");
-} else if (platform === "ios") {
-  console.log("Verifying purchase with Apple Store API...");
-  payment = await verifyApplePurchase(purchase_token);
-  console.log("Apple verification successful:");
-}
+    if (platform === "android") {
+      console.log("Verifying purchase with Google Play API...");
+      payment = await verifyGooglePurchase(product_id, receiptOrToken);
+      console.log("Google verification successful:");
+    } else if (platform === "ios") {
+      console.log("Verifying purchase with Apple Store API...");
+      payment = await verifyApplePurchase(receiptOrToken);
+      console.log("Apple verification successful:");
+    }
 
     if (!payment.valid) {
       console.error("Payment verification failed:", payment.reason);
@@ -294,14 +294,14 @@ if (platform === "android") {
           description: `Loaded ₹${amount} from bank to wallet`,
           balance_before: balanceBefore,
           balance_after: balanceAfter,
-          purchase_token: purchase_token,
-          google_product_id: google_product_id,
-          google_order_id: platform=='android'?payment.purchase?.orderId:null,
+          purchase_token: receiptOrToken,
+          product_id: product_id,
+          google_order_id: platform == 'android' ? payment.purchase?.orderId : null,
           status: "completed",
-          platform:platform,
+          platform: platform,
         });
 
-        console.log("Saving wallet transaction...");
+        console.log("Saving wallet transaction...", walletTransaction);
         await walletTransaction.save({ session });
 
         wallet.balance = balanceAfter;
@@ -356,7 +356,6 @@ if (platform === "android") {
     console.log("=== verifyWalletLoad END ===");
   }
 };
-
 
 const transferToCreatorForSeries = async (req, res, next) => {
   try {
