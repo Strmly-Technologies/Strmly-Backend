@@ -1763,71 +1763,83 @@ const GiftVideo = async (req, res, next) => {
 
 const deleteComment = async (req, res, next) => {
   try {
-    const { commentId, videoId } = req.body
-    const userId = req.user.id.toString()
+    const { commentId, videoId } = req.body;
+    const userId = req.user.id.toString();
+
+    // Input validation
     if (!commentId || !videoId) {
-      return res
-        .status(400)
-        .json({ error: 'commentId and videoId are required' })
+      return res.status(400).json({ error: 'commentId and videoId are required' });
     }
-    const comment = await Comment.findById(commentId)
+
+    // Find the comment
+    const comment = await Comment.findById(commentId);
     if (!comment) {
-      return res.status(404).json({ error: 'Comment not found' })
+      return res.status(404).json({ error: 'Comment not found' });
     }
+
+    // Check if comment is monetized
     if (comment.gifts > 0) {
-      return res
-        .status(403)
-        .json({ error: 'Monetized comment cannot be deleted', commentId })
+      return res.status(403).json({ 
+        error: 'Monetized comment cannot be deleted', 
+        commentId 
+      });
     }
 
-    const user = await User.findById(userId)
+    // Check user exists
+    const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    const video = await LongVideo.findById(videoId)
-    if (
-      !video ||
-      (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')
-    ) {
-      return res.status(404).json({ error: 'Video not found' })
+    // Check video exists and is not deleted
+    const video = await LongVideo.findById(videoId);
+    if (!video || (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')) {
+      return res.status(404).json({ error: 'Video not found' });
     }
 
-    if (
-      comment.user.toString() !== userId &&
-      video.created_by.toString() !== userId
-    ) {
-      return res
-        .status(403)
-        .json({ error: 'User not authorized to delete this comment' })
+    console.log(userId, comment.user.toString(), video.created_by.toString());
+
+    //Authorization check
+    if (comment.user.toString() !== userId && video.created_by.toString() !== userId) {
+      return res.status(403).json({ 
+        error: 'User not authorized to delete this comment' 
+      });
     }
-    //delete comment/reply
-    await Comment.deleteOne({ _id: commentId })
-    //delete it from video's list of comments
+
+    // Start deletion process
+    // 1. Delete the comment itself
+    await Comment.deleteOne({ _id: commentId });
+
+    // 2. Remove from video's comments array
     await LongVideo.findOneAndUpdate(
       { _id: videoId },
       { $pull: { comments: commentId } },
       { new: true }
-    )
+    );
 
-    //if reply:delete it from comment's list of replies
-    const parentCommentId = comment.parent_comment.toString()
-    if (parentCommentId) {
-      const parentComment = await Comment.findById(parentCommentId)
+    // 3. Handle parent comment updates if this is a reply
+    if (comment.parent_comment) { // Check if parent_comment exists before toString()
+      const parentComment = await Comment.findById(comment.parent_comment);
       if (parentComment) {
         parentComment.replies = parentComment.replies.filter(
-          (reply) => reply.toString() !== commentId
-        )
-        await parentComment.save()
+          reply => reply.toString() !== commentId
+        );
+        await parentComment.save();
       }
     }
-    return res
-      .status(200)
-      .json({ message: 'Comment deleted successfully', commentId })
+
+    return res.status(200).json({
+      success: true,
+      message: 'Comment deleted successfully',
+      commentId,
+      type: comment.parent_comment ? 'reply' : 'comment'
+    });
+
   } catch (error) {
-    handleError(error, req, res, next)
+    console.error('Delete comment error:', error);
+    handleError(error, req, res, next);
   }
-}
+};
 
 const getCommentDetails=async(req,res,next)=>{
   try{
