@@ -6,6 +6,7 @@ const { addDetailsToVideoObject } = require('../utils/populateVideo');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const { checkCreatorPass } = require('./user.controller');
+const { asyncSend } = require('bullmq');
 const createSeries = async (req, res, next) => {
   try {
     const userId = req.user.id.toString();
@@ -242,6 +243,78 @@ const getUserSeries = async (req, res, next) => {
     handleError(error, req, res, next);
   }
 };
+
+const getUserSeriesByUserId=async(req,res,next)=>{
+  const { id } = req.params;
+  const userId = id;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
+  try {
+    // Ensure userId is a valid ObjectId
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    console.log('🔍 Fetching series for user:', userId);
+
+    // First get all series for debugging
+    const allSeries = await Series.find({ created_by: userId });
+    console.log('🔍 All series for user (before filtering):', allSeries.map(s => ({
+      id: s._id,
+      title: s.title,
+      visibility: s.visibility,
+      hidden_reason: s.hidden_reason
+    })));
+
+    const series = await Series.find({
+      created_by: userId,
+      $and: [
+        {
+          $or: [
+            { visibility: { $exists: false } },
+            { visibility: { $ne: 'hidden' } }
+          ]
+        }
+      ]
+    })
+      .populate('created_by', 'username email profile_photo')
+      .populate('community', 'name profile_photo')
+      .populate({
+        path: 'episodes',
+        select:
+          'name description thumbnailUrl season_number episode_number created_by videoUrl',
+        populate: {
+          path: 'created_by',
+          select: 'username email',
+        },
+        options: {
+          sort: { season_number: 1, episode_number: 1 },
+        },
+      });
+
+    console.log('📊 Found series count:', series.length);
+    console.log('📊 Series visibility status:', series.map(s => ({
+      id: s._id,
+      title: s.title,
+      visibility: s.visibility,
+      hidden_reason: s.hidden_reason
+    })));
+
+    if (!series || series.length === 0) {
+      return res.status(404).json({ error: 'No series found for this user' });
+    }
+    console.log(`Found ${series} series for user ${userId}`);
+    res.status(200).json({
+      message: series.length > 0 ? 'User series retrieved successfully' : 'No series found for this user',
+      data: series,
+    });
+  } catch (error) {
+    handleError(error, req, res, next);
+  }
+}
 
 const updateSeries = async (req, res, next) => {
   try {
@@ -754,4 +827,5 @@ module.exports = {
   getAllSeries,
   unlockFunds,
   recalculateSeriesAnalytics,
+  getUserSeriesByUserId
 }
