@@ -11,11 +11,14 @@ const {
   getUserSeries,
   unlockFunds,
   recalculateSeriesAnalytics,
+  getUserSeriesByUserId
 } = require('../controller/series.controller')
 const { authenticateToken } = require('../middleware/auth')
 
 // Route to get all series created by a user
 router.get('/user', authenticateToken, getUserSeries)
+
+router.get('/user/:id', authenticateToken, getUserSeriesByUserId)
 
 // Route to create a new series
 router.post('/create', authenticateToken, createSeries)
