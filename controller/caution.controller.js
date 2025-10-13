@@ -716,6 +716,115 @@ const cancelAccountDeletionRequest = async (req, res, next) => {
   }
 }
 
+const BlockUser=async (req,res,next)=>{
+  try {
+    const userId=req.user.id
+    const {targetId}=req.body
+    
+    if(!targetId){
+      return res.status(400).json({
+        success:false,
+        message:"Target user ID is required"
+      })
+    }
+    if(userId===targetId){
+      return res.status(400).json({
+        success:false,
+        message:"You cannot block yourself"
+      })
+    }
+    
+    const user=await User.findById(userId)
+    if(!user){
+      return res.status(404).json({
+        success:false,
+        message:"User not found"
+      })
+    }
+    const targetUser=await User.findById(targetId)
+    if(!targetUser){
+      return res.status(404).json({
+        success:false,
+        message:"Target user not found"
+      })
+    }
+    if(user.blocked_users.includes(targetId)){
+      return res.status(400).json({
+        success:false,
+        message:"User is already blocked"
+      })
+    }
+    
+    user.blocked_users.push(targetId)
+    await user.save()
+    
+    return res.status(200).json({
+      success:true,
+      message:"User blocked successfully"
+    })
+  } catch (error) {
+    console.error("Error blocking user:",error)
+    return res.status(500).json({
+      success:false,
+      message:"An error occurred while blocking the user"
+    })
+  }
+}
+
+const UnblockUser=async (req,res,next)=>{
+  try {
+    const userId=req.user.id
+    const {targetId}=req.body
+    
+    if(!targetId){
+      return res.status(400).json({
+        success:false,
+        message:"Target user ID is required"
+      })
+    }
+    if(userId===targetId){
+      return res.status(400).json({
+        success:false,
+        message:"You cannot unblock yourself"
+      })
+    }
+    
+    const user=await User.findById(userId)
+    if(!user){
+      return res.status(404).json({
+        success:false,
+        message:"User not found"
+      })
+    }
+    const targetUser=await User.findById(targetId)
+    if(!targetUser){
+      return res.status(404).json({
+        success:false,
+        message:"Target user not found"
+      })
+    }
+    if(!user.blocked_users.includes(targetId)){
+      return res.status(400).json({
+        success:false,
+        message:"User is not in your blocked list"
+      })
+    }
+    
+    user.blocked_users=user.blocked_users.filter(id=>id.toString()!==targetId)
+    await user.save()
+    
+    return res.status(200).json({
+      success:true,
+      message:"User unblocked successfully"
+    })
+  } catch (error) {
+    console.error("Error unblocking user:",error)
+    return res.status(500).json({
+      success:false,
+      message:"An error occurred while unblocking the user"
+    })
+  }
+}
 module.exports = {
   DeleteLongVideo,
   DeleteUserProfile,
@@ -729,4 +838,6 @@ module.exports = {
   getUserReports,
   requestAccountDeletion,
   cancelAccountDeletionRequest,
+  BlockUser,
+  UnblockUser
 }
