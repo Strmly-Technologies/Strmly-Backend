@@ -1447,15 +1447,19 @@ const getAllVideos = async (req, res, next) => {
     }).filter(Boolean);
     
     const followingIds = (user.following || []).map((id) => id.toString());
-    console.log('Viewed Video IDs:', viewedVideoIds);
 
     // Get total count for pagination (without skip/limit)
     const totalCount = await LongVideo.countDocuments({
       _id: { $nin: viewedVideoIds },
     });
 
+    // get user blocked accounts
+    const blockedUserIds=user.blocked_users.map((id) => id.toString());
+    
+    // Fetch videos excluding viewed ones and from blocked users
     const interestedVideos = await LongVideo.find({
       _id: { $nin: viewedVideoIds },
+      created_by: { $nin: blockedUserIds }
     })
       .lean()
       .populate('created_by', 'username profile_photo custom_name')

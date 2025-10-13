@@ -11,7 +11,9 @@ const {
   getUserReports,
   reportContent,
   requestAccountDeletion,
-  cancelAccountDeletionRequest
+  cancelAccountDeletionRequest,
+  BlockUser,
+  UnblockUser
 } = require('../controller/caution.controller')
 const { authenticateToken } = require('../middleware/auth')
 const { createMultipleImagesMulter } = require('../utils/utils')
@@ -61,5 +63,11 @@ router.post('/request-account-deletion', authenticateToken, requestAccountDeleti
 
 // API to cancel account deletion request
 router.post('/cancel-account-deletion', authenticateToken, cancelAccountDeletionRequest)
+
+//API to block user
+router.post('/block',authenticateToken,BlockUser)
+
+//API to unblock user
+router.post('/unblock',authenticateToken,UnblockUser)
 
 module.exports = router

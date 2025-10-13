@@ -279,10 +279,11 @@ const uploadMasterPlaylistToS3 = async (playlistContent, videoId) => {
     const fileName = `video-segments/${videoId}/master.m3u8`
 
     const uploadParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
+      Bucket: process.env.AWS_S3_BUCKET,
       Key: fileName,
       Body: playlistContent,
-      ContentType: 'application/vnd.apple.mpegurl',
+      ContentType: 'application/x-mpegURL'
+,
     }
 
     const result = await s3.upload(uploadParams).promise()
