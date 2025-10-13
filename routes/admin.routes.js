@@ -24,6 +24,8 @@ const {
   ignoreVideo,
   getCommentGiftings,
   addMoneyToWallet,
+  deleteReportedVideo,
+  DeleteUserProfile,
 } = require('../controller/admin.controller')
 const { authenticateAdmin } = require('../middleware/adminAuth')
 
@@ -49,6 +51,8 @@ router.get('/transaction/:id',authenticateAdmin,getTransactionById)
 router.get('/user/transactions/:userId', authenticateAdmin, getUserTransactions)
 router.get('/financial-overview', authenticateAdmin, getFinancialOverview)
 router.get('/comment-giftings', authenticateAdmin, getCommentGiftings)
+router.delete('/video/:videoId', authenticateAdmin, deleteReportedVideo)
+router.delete('/user/:userId', authenticateAdmin, DeleteUserProfile)
 
 // Content moderation routes
 router.get('/auto-nsfw-violations', authenticateAdmin, getAutoNSFWViolations)
