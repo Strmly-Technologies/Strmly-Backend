@@ -15,6 +15,10 @@ const WalletTransfer = require('../models/WalletTransfer')
 const AutoNSFW = require('../models/AutoNSFW')
 const AutoCopyright = require('../models/AutoCopyright')
 const Report = require('../models/Report')
+const { default: mongoose } = require('mongoose')
+const Reshare = require('../models/Reshare')
+const UserAccess = require('../models/UserAccess')
+const Comment = require('../models/Comment')
 
 const adminLogin = async (req, res, next) => {
   try {
@@ -1719,6 +1723,165 @@ const addMoneyToWallet=async(req,res,next)=>{
   }
 }
 
+const   deleteReportedVideo=async(req,res,next)=>{
+  const { videoId } = req.params
+  const {reporterId}=req.body
+  
+  if (!reporterId) {
+    return res.status(400).json({ message: 'Reporter ID is required' })
+  }
+
+  try {
+    const video = await LongVideo.findById(videoId)
+    if (!video || (video.visibility === 'hidden' && video.hidden_reason === 'video_deleted')) {
+      return res.status(404).json({ message: 'Video not found' })
+    }
+    
+    await Community.updateMany(
+      { long_videos: videoId },
+      { $pull: { long_videos: videoId } }
+    )
+    await User.updateMany(
+      {
+        $or: [
+          { saved_videos: videoId },
+          { playlist: videoId },
+          { history: videoId },
+          { liked_videos: videoId },
+          { video_frame: videoId },
+        ],
+      },
+      {
+        $pull: {
+          saved_videos: videoId,
+          playlist: videoId,
+          history: videoId,
+          liked_videos: videoId,
+          video_frame: videoId,
+        },
+      }
+    )
+    await LongVideo.findByIdAndDelete(videoId)
+    await Report.updateMany(
+      { content_id: videoId, status: { $ne: 'resolved' },reporter_id:reporterId },
+      { $set: { status: 'resolved' } }
+    )
+    res.status(200).json({ message: 'Reported video deleted successfully' })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
+const DeleteUserProfile = async (req, res, next) => {
+  const userId = req.params.userId;
+  const {reporterId} = req.body;
+  
+  if (!reporterId) {
+    return res.status(400).json({ message: 'Reporter ID is required' });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Start transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+  
+      await LongVideo.deleteMany({ created_by: userId }, { session });
+
+  
+      await Series.deleteMany({ created_by: userId }, { session });
+
+      
+      await Comment.deleteMany({ user: userId }, { session });
+
+      await Reshare.deleteMany({ user: userId }, { session });
+
+      const wallet = await Wallet.findOne({ user_id: userId });
+      if (wallet) {
+        await WalletTransaction.deleteMany({ wallet_id: wallet._id }, { session });
+        await WalletTransfer.deleteMany({ 
+          $or: [
+            { from_wallet: wallet._id },
+            { to_wallet: wallet._id }
+          ]
+        }, { session });
+        await wallet.deleteOne({ session });
+      }
+
+      await Community.updateMany(
+        { $or: [
+          { followers: userId },
+          { creators: userId },
+          { founder: userId }
+        ]},
+        { 
+          $pull: {
+            followers: userId,
+            creators: userId,
+            creator_join_order: { user: userId }
+          }
+        },
+        { session }
+      );
+
+      await UserAccess.deleteMany({ user_id: userId }, { session });
+      await CreatorPass.deleteMany({ 
+        $or: [
+          { user_id: userId },
+          { creator_id: userId }
+        ]
+      }, { session });
+
+      await User.updateMany(
+        { $or: [
+          { followers: userId },
+          { following: userId },
+          { blocked_users: userId }
+        ]},
+        { 
+          $pull: {
+            followers: userId,
+            following: userId,
+            blocked_users: userId
+          }
+        },
+        { session }
+      );
+
+
+      await user.deleteOne({ session });
+
+      await session.commitTransaction();
+      await Report.updateMany(
+      { content_id: userId, status: { $ne: 'resolved' },reporter_id:reporterId },
+      { $set: { status: 'resolved' } }
+    )
+
+      res.status(200).json({
+        success: true,
+        message: 'User account and all associated data deleted successfully'
+      });
+
+    } catch (error) {
+      // Rollback transaction on error
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    handleError(error, req, res, next);
+  }
+};
+
 module.exports = {
   adminLogin,
   getAdminDashboard,
@@ -1743,5 +1906,7 @@ module.exports = {
   DeleteCopyVideo,
   ignoreVideo,
   getCommentGiftings,
-  addMoneyToWallet
+  addMoneyToWallet,
+  deleteReportedVideo,
+  DeleteUserProfile
 }

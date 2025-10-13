@@ -451,6 +451,60 @@ const removeFounderFromCommunity = async (req, res, next) => {
   }
 }
 
+const reportUser=async(req,res,next)=>{
+  const userId=req.user.id
+  const {targetUserId,reason,description}=req.body
+  
+  if(!targetUserId || !reason){
+    return res.status(400).json({message:'Target user ID and reason are required'})
+  }
+  
+  try {
+    const targetUser=await User.findById(targetUserId)
+    if(!targetUser){
+      return res.status(404).json({message:'Target user not found'})
+    }
+    
+    // Check for existing report
+    const existingReport=await Report.findOne({
+      reporter_id:userId,
+      content_type:'user',
+      content_id:targetUserId
+    })
+    
+    if(existingReport){
+      return res.status(400).json({
+        success:false,
+        message:'You have already reported this user'
+      })
+    }
+    
+    const report=new Report({
+      reporter_id:userId,
+      content_id:targetUserId,
+      content_type:'user',
+      reason,
+      description
+    })
+    
+    await report.save()
+    
+    res.status(201).json({
+      success:true,
+      message:'User reported successfully',
+      report:{
+        id:report._id,
+        content_type:report.content_type,
+        reason:report.reason,
+        status:report.status,
+        createdAt:report.createdAt
+      }
+    })
+  } catch (error) {
+    handleError(error, req, res, next)
+  }
+}
+
 const reportContent = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -839,5 +893,6 @@ module.exports = {
   requestAccountDeletion,
   cancelAccountDeletionRequest,
   BlockUser,
-  UnblockUser
+  UnblockUser,
+  reportUser
 }
